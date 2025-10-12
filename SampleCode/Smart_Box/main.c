@@ -19,6 +19,7 @@ static volatile bool g_key_a_long_press_sent = false;
 static volatile uint32_t g_key_a_last_change_ms = 0;
 #define KEY_DEBOUNCE_MS 30u
 
+// ========================= BLE Mesh 與 LED/Mesh 指示區 =========================
 // BLE MESH AT 控制器
 static ble_mesh_at_controller_t g_ble_at;
 static volatile bool g_yellow_led_on = false;
@@ -29,7 +30,7 @@ static volatile bool g_yellow_led_on = false;
 static volatile uint32_t g_red_on_until_ms = 0;
 static volatile uint32_t g_blue_on_until_ms = 0;
 
-// 黃燈快闃（MDTSG/MDTPG 訊息指示）
+// 黃燈快閃（MDTSG/MDTPG 訊息指示）
 static volatile uint32_t g_yellow_flash_count = 0;
 static volatile uint32_t g_yellow_flash_next_ms = 0;
 static volatile bool g_yellow_flash_on = false;
@@ -46,15 +47,17 @@ static volatile bool g_provisioning_wait = false;
 static volatile bool g_is_bound = false;
 static char g_device_uid[32];
 
-// 最近一筆 Mesh 訊息解析結果
+// 最近一筆 Mesh 訊息解析狀態（MDTS/MDTSG/MDTPG 共用）
 static char g_last_sender_uid[32];
 static uint8_t g_last_payload[64];
 static volatile uint32_t g_last_payload_len = 0;
 static volatile uint32_t g_msg_count = 0;
 
-// PA.6 由 Mesh 指令控制的自動關閉計時（收到 0x31=ON 後啟動，5 秒內再收 ON 則延長 5 秒）
+// PA.6 由 Mesh 指令控制的自動關閉計時
+// 規格：收到 0x31(ON) 後啟動，5 秒內再收 0x31 則自動延長 5 秒；收到 0x30(OFF) 立即關閉並清除計時
 #define PA6_ON_HOLD_MS 5000u
 static volatile uint32_t g_pa6_auto_off_deadline_ms = 0;
+// ==============================================================================
 
 // 取得系統時間函數
 uint32_t get_system_time_ms(void)
@@ -99,15 +102,8 @@ static void leds_basic_init(void)
 }
 
 // 黃燈（PB.2）控制
-static inline void yellow_led_on(void)
-{
-    PB2 = 1;
-}
-static inline void yellow_led_off(void)
-{
-    PB2 = 0;
-}
-
+static inline void yellow_led_on(void) { PB2 = 1; }
+static inline void yellow_led_off(void) { PB2 = 0; }
 static inline void red_led_on(void) { PB1 = 1; }
 static inline void red_led_off(void) { PB1 = 0; }
 static inline void blue_led_on(void) { PB3 = 1; }
@@ -456,12 +452,6 @@ int main()
     while (1)
     {
         uint32_t current_time = g_systick_ms;
-
-        // 執行數位 I/O 測試（若未受 Mesh 指令鎖定）
-        if (g_pa6_auto_off_deadline_ms == 0)
-        {
-            digital_io_test();
-        }
 
         // 更新 KeyA 按鍵狀態
         key_a_update();
