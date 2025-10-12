@@ -1,47 +1,20 @@
 #include "NuMicro.h"
-#include "led_controller.h"
-#include "key_controller.h"
 #include "ble_mesh_at.h"
+#include <string.h>
 
 #define PLL_CLOCK 192000000
 #define PROJECT_NAME "Smart_Box"
 
-// LED 索引定義
-#define LED_RED_INDEX 0
-#define LED_YELLOW_INDEX 1
-#define LED_BLUE_INDEX 2
-#define LED_COUNT 3
-
-// 按鍵索引定義
-#define KEY_A_INDEX 0
-#define KEY_COUNT 1
-
-// LED 顯示模式
-typedef enum
-{
-    LED_MODE_NORMAL = 0, // 正常閃爍模式
-    LED_MODE_SLOW,       // 慢速閃爍模式
-    LED_MODE_FAST,       // 快速閃爍模式
-    LED_MODE_WAVE,       // 流水燈模式
-    LED_MODE_COUNT       // 模式總數
-} led_display_mode_t;
+// KeyA 按鍵設定 (PB.15)
+#define KEY_A_LONG_PRESS_MS 5000u // 5 秒長按
 
 // 全域變數
 volatile uint32_t g_systick_ms = 0;
 
-// LED 控制器陣列
-led_controller_t led_controllers[LED_COUNT];
-led_manager_t led_manager;
-
-// 按鍵控制器陣列
-key_controller_t key_controllers[KEY_COUNT];
-key_manager_t key_manager;
-
-// LED 顯示模式
-volatile led_display_mode_t current_led_mode = LED_MODE_NORMAL;
-
-// 控制是否啟用原本的 LED 管理（預設關閉，改由 UART 測試控制黃燈）
-static bool g_led_control_enabled = false;
+// KeyA 按鍵狀態 (PB.15 - active low)
+static volatile bool g_key_a_pressed = false;
+static volatile uint32_t g_key_a_press_start_ms = 0;
+static volatile bool g_key_a_long_press_sent = false;
 
 // BLE MESH AT 控制器
 static ble_mesh_at_controller_t g_ble_at;
@@ -52,6 +25,29 @@ static volatile bool g_yellow_led_on = false;
 // - 紅燈：逾時/錯誤 閃爍較長脈衝
 static volatile uint32_t g_red_on_until_ms = 0;
 static volatile uint32_t g_blue_on_until_ms = 0;
+
+// 黃燈快闃（MDTSG/MDTPG 訊息指示）
+static volatile uint32_t g_yellow_flash_count = 0;
+static volatile uint32_t g_yellow_flash_next_ms = 0;
+static volatile bool g_yellow_flash_on = false;
+#define YELLOW_FLASH_ON_MS 100u
+#define YELLOW_FLASH_OFF_MS 150u
+
+// 藍燈心跳（未綁定時每 2 秒閃 0.2 秒）
+#define BLUE_HEARTBEAT_PERIOD_MS 2000u
+#define BLUE_HEARTBEAT_ON_MS 200u
+static volatile uint32_t g_blue_heartbeat_last_ms = 0;
+static volatile bool g_provisioning_wait = false;
+
+// 綁定與 UID 紀錄
+static volatile bool g_is_bound = false;
+static char g_device_uid[32];
+
+// 最近一筆 Mesh 訊息解析結果
+static char g_last_sender_uid[32];
+static uint8_t g_last_payload[64];
+static volatile uint32_t g_last_payload_len = 0;
+static volatile uint32_t g_msg_count = 0;
 
 // 取得系統時間函數
 uint32_t get_system_time_ms(void)
@@ -122,6 +118,121 @@ static inline void pulse_blue(uint32_t duration_ms)
     g_blue_on_until_ms = g_systick_ms + duration_ms;
 }
 
+// 黃燈快闃 N 次（例如 MDTSG=1, MDTPG=2）
+static inline void flash_yellow(uint32_t count)
+{
+    if (g_yellow_flash_count > 0)
+        return; // 還在闃耀中，忽略新要求
+    g_yellow_flash_count = count;
+    g_yellow_flash_next_ms = g_systick_ms + 10; // 立即開始
+    g_yellow_flash_on = false;
+}
+
+// 小工具：十六進位字串轉 bytes（僅接受 [0-9A-Fa-f]，長度需為偶數）
+static int hex_nibble(char c)
+{
+    if (c >= '0' && c <= '9')
+        return (int)(c - '0');
+    if (c >= 'a' && c <= 'f')
+        return 10 + (int)(c - 'a');
+    if (c >= 'A' && c <= 'F')
+        return 10 + (int)(c - 'A');
+    return -1;
+}
+
+static uint32_t hex_to_bytes(const char *hex, uint8_t *out, uint32_t max_out)
+{
+    // 跳過前導空白
+    while (*hex == ' ' || *hex == '\t')
+        hex++;
+    const char *p = hex;
+    uint32_t n = 0;
+    while (*p && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n')
+    {
+        if (hex_nibble(*p) < 0)
+            return 0; // 非 hex 字元
+        n++;
+        p++;
+    }
+    if ((n & 1u) != 0u)
+        return 0; // 必須是偶數長度
+    uint32_t out_len = n / 2u;
+    if (out_len > max_out)
+        out_len = max_out;
+    for (uint32_t i = 0; i < out_len; i++)
+    {
+        int hi = hex_nibble(hex[i * 2]);
+        int lo = hex_nibble(hex[i * 2 + 1]);
+        if (hi < 0 || lo < 0)
+            return 0;
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return out_len;
+}
+
+static void handle_mesh_line(const char *line)
+{
+    // 複製到本地緩衝以便分詞
+    char buf[128];
+    uint32_t i = 0;
+    while (line[i] && i < sizeof(buf) - 1)
+    {
+        buf[i] = line[i];
+        i++;
+    }
+    buf[i] = '\0';
+
+    // 檢查是否 MDTSG-MSG、MDTPG-MSG 或 MDTS-MSG
+    const char *key1 = "MDTSG-MSG";
+    const char *key2 = "MDTPG-MSG";
+    const char *key3 = "MDTS-MSG";
+    if (strstr(buf, key1) == NULL && strstr(buf, key2) == NULL && strstr(buf, key3) == NULL)
+        return;
+
+    // 以空白切分，取 tokens[1] 為 sender，最後一個 token 當作 hex payload
+    char *tokens[8];
+    int tcount = 0;
+    char *tok = strtok(buf, " \t\r\n");
+    while (tok && tcount < 8)
+    {
+        tokens[tcount++] = tok;
+        tok = strtok(NULL, " \t\r\n");
+    }
+    if (tcount < 3)
+        return;
+    const char *sender = tokens[1];
+    const char *hex;
+    if (strstr(tokens[0], key3) != NULL && tcount >= 3)
+    {
+        hex = tokens[3];
+    }
+    else
+    {
+        hex = tokens[tcount - 1];
+    }
+
+    // 儲存 sender
+    uint32_t sl = 0;
+    while (sender[sl] && sl < sizeof(g_last_sender_uid) - 1)
+    {
+        g_last_sender_uid[sl] = sender[sl];
+        sl++;
+    }
+    g_last_sender_uid[sl] = '\0';
+
+    // 轉換 hex 到 bytes
+    g_last_payload_len = hex_to_bytes(hex, g_last_payload, (uint32_t)sizeof(g_last_payload));
+    g_msg_count++;
+
+    // 根據訊息類型觸發黃燈闃耀
+    if (strstr(tokens[0], key1) != NULL)
+        flash_yellow(1); // MDTSG 黃燈闃 1 次
+    else if (strstr(tokens[0], key2) != NULL)
+        flash_yellow(2); // MDTPG 黃燈闃 2 次
+    else if (strstr(tokens[0], key3) != NULL)
+        flash_yellow(3); // MDTS 黃燈闃 3 次
+}
+
 // BLE MESH AT 事件回調函數
 void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
 {
@@ -141,20 +252,38 @@ void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
         break;
 
     case BLE_MESH_AT_EVENT_PROV_BOUND:
-        // 綁定成功，亮黃燈
-        yellow_led_on();
-        g_yellow_led_on = true;
+        // 綁定成功，藍燈持續亮
+        blue_led_on();
+        g_is_bound = true;
+        // 記錄 UID
+        {
+            const char *uid = ble_mesh_at_get_uid(&g_ble_at);
+            size_t k = 0;
+            while (uid[k] && k < sizeof(g_device_uid) - 1)
+            {
+                g_device_uid[k] = uid[k];
+                k++;
+            }
+            g_device_uid[k] = '\0';
+        }
+        // 停止藍燈心跳
+        g_provisioning_wait = false;
         break;
 
     case BLE_MESH_AT_EVENT_PROV_UNBOUND:
-        // 未綁定/解除綁定，關黃燈
-        yellow_led_off();
-        g_yellow_led_on = false;
+        // 未綁定/解除綁定，關藍燈
+        blue_led_off();
+        g_is_bound = false;
+        g_device_uid[0] = '\0';
+        // 啟動藍燈心跳
+        g_provisioning_wait = true;
         break;
 
     case BLE_MESH_AT_EVENT_LINE_RECEIVED:
         // 藍燈短脈衝表示有收到行（非 VER 成功）
         pulse_blue(120);
+        // 嘗試解析 MDTSG/MDTPG
+        handle_mesh_line(data);
         break;
 
     case BLE_MESH_AT_EVENT_TIMEOUT:
@@ -187,153 +316,60 @@ void digital_io_init(void)
     // PB.7 設定為輸入 (DI)
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     // GPIO_SetPullCtl(PB, BIT7, GPIO_PUSEL_PULL_DOWN); // 設定下拉電阻
+
+    // KeyA (PB.15) 設定為輸入 (active low)
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetPullCtl(PB, BIT15, GPIO_PUSEL_PULL_UP); // 設定上拉電阻
 }
 
 // 數位 I/O 測試函數
 void digital_io_test(void)
 {
     // 讀取 PB.7 輸入狀態
-    bool di_state = (PB7 != 0);
+    bool di_state = (PB7 != 1);
 
     // 根據 PB.7 輸入控制 PA.6 輸出
-    // PB.7 = 1 時，PA.6 = 1
-    // PB.7 = 0 時，PA.6 = 0
+    // PB.7 = 1 時，PA.6 = 0
+    // PB.7 = 0 時，PA.6 = 1
     PA6 = di_state ? 1 : 0;
 }
 
-// 設定 LED 顯示模式
-void set_led_display_mode(led_display_mode_t mode)
+// KeyA 按鍵處理函數 (簡化版本)
+void key_a_update(void)
 {
-    if (!g_led_control_enabled)
+    uint32_t current_time = g_systick_ms;
+    bool key_pressed = (PB15 == 0); // active low
+
+    if (key_pressed && !g_key_a_pressed)
     {
-        // LED 控制已停用
-        return;
+        // 按鍵剛被按下
+        g_key_a_pressed = true;
+        g_key_a_press_start_ms = current_time;
+        g_key_a_long_press_sent = false;
     }
-
-    current_led_mode = mode;
-
-    // 根據模式配置 LED 時序
-    led_config_t led_configs[LED_COUNT];
-
-    switch (mode)
+    else if (!key_pressed && g_key_a_pressed)
     {
-    case LED_MODE_NORMAL:
-        // 正常模式：不同週期閃爍
-        led_configs[0] = (led_config_t){PB, BIT1, 500, 100, false}; // 紅色
-        led_configs[1] = (led_config_t){PB, BIT2, 300, 80, false};  // 黃色
-        led_configs[2] = (led_config_t){PB, BIT3, 200, 60, false};  // 藍色
-        break;
-
-    case LED_MODE_SLOW:
-        // 慢速模式：週期加倍
-        led_configs[0] = (led_config_t){PB, BIT1, 1000, 200, false}; // 紅色
-        led_configs[1] = (led_config_t){PB, BIT2, 600, 160, false};  // 黃色
-        led_configs[2] = (led_config_t){PB, BIT3, 400, 120, false};  // 藍色
-        break;
-
-    case LED_MODE_FAST:
-        // 快速模式：週期減半
-        led_configs[0] = (led_config_t){PB, BIT1, 250, 50, false}; // 紅色
-        led_configs[1] = (led_config_t){PB, BIT2, 150, 40, false}; // 黃色
-        led_configs[2] = (led_config_t){PB, BIT3, 100, 30, false}; // 藍色
-        break;
-
-    case LED_MODE_WAVE:
-        // 流水燈模式：依序點亮
-        led_configs[0] = (led_config_t){PB, BIT1, 900, 300, false}; // 紅色
-        led_configs[1] = (led_config_t){PB, BIT2, 900, 300, false}; // 黃色（延遲300ms）
-        led_configs[2] = (led_config_t){PB, BIT3, 900, 300, false}; // 藍色（延遲600ms）
-        break;
-
-    default:
-        return;
+        // 按鍵剛被釋放
+        g_key_a_pressed = false;
+        g_key_a_long_press_sent = false;
     }
-
-    // 重新初始化 LED 控制器
-    for (int i = 0; i < LED_COUNT; i++)
+    else if (key_pressed && g_key_a_pressed && !g_key_a_long_press_sent)
     {
-        led_controller_init(&led_controllers[i], &led_configs[i]);
-    }
-
-    // 設定為閃爍模式
-    led_manager_set_all_blinking(&led_manager);
-
-    // 流水燈模式需要特殊處理延遲
-    if (mode == LED_MODE_WAVE)
-    {
-        uint32_t current_time = get_system_time_ms();
-        led_controller_set_state(&led_controllers[1], LED_STATE_BLINKING, current_time + 300);
-        led_controller_set_state(&led_controllers[2], LED_STATE_BLINKING, current_time + 600);
-    }
-}
-
-// 按鍵事件處理回調函數
-void on_key_event(uint8_t key_index, key_event_t event, uint32_t press_duration)
-{
-    switch (key_index)
-    {
-    case KEY_A_INDEX:
-        switch (event)
+        // 按鍵持續按下，檢查是否達到長按時間
+        uint32_t press_duration = current_time - g_key_a_press_start_ms;
+        if (press_duration >= KEY_A_LONG_PRESS_MS)
         {
-        case KEY_EVENT_SHORT_PRESS:
-            break;
-
-        case KEY_EVENT_LONG_PRESS:
-            // 長按5秒發送 AT+NR（自我解除綁定）
-            if (press_duration >= 3000)
-            {
-                (void)ble_mesh_at_send_nr(&g_ble_at);
-            }
-            break;
-
-        case KEY_EVENT_DOUBLE_CLICK:
-            // 雙擊送 REBOOT（改由實際送指令）
-            (void)ble_mesh_at_send_reboot(&g_ble_at);
-            break;
-
-        case KEY_EVENT_PRESS:
-            break;
-
-        case KEY_EVENT_RELEASE:
-            break;
-
-        default:
-            break;
+            // 長按 5 秒，發送 AT+NR 解綁命令
+            (void)ble_mesh_at_send_nr(&g_ble_at);
+            g_key_a_long_press_sent = true; // 防止重複發送
         }
-        break;
-
-    default:
-        break;
     }
-}
-
-void led_system_init(void)
-{
-    // 若需要重新啟用 LED 管理，可將此函式內容恢復並設定 g_led_control_enabled=true
-}
-
-void key_system_init(void)
-{
-    // 按鍵 A 配置 (PB.15) - 按鍵連接到 PB.15
-    key_config_t key_configs[KEY_COUNT] = {
-        {PB, BIT15, true, 50, 3000, 1000} // PB.15, active_low, 50ms消抖, 3s長按, 1s雙擊間隔
-    };
-
-    // 初始化按鍵控制器
-    for (int i = 0; i < KEY_COUNT; i++)
-    {
-        key_controller_init(&key_controllers[i], &key_configs[i]);
-    }
-
-    // 初始化按鍵管理器
-    key_manager_init(&key_manager, key_controllers, KEY_COUNT, get_system_time_ms);
 }
 
 int main()
 {
     SYS_Init();
     leds_basic_init();
-    key_system_init();
     digital_io_init();
 
     // 設定 SysTick 為 1 毫秒精度
@@ -351,17 +387,24 @@ int main()
     ble_mesh_at_init(&g_ble_at, &ble_config, on_ble_mesh_at_event, get_system_time_ms);
     yellow_led_off();
 
+    // 上電後先送 REBOOT，並進入等待綁定狀態（藍燈心跳）
+    (void)ble_mesh_at_send_reboot(&g_ble_at);
+    g_is_bound = false;
+    g_device_uid[0] = '\0';
+    g_provisioning_wait = true;
+    g_blue_heartbeat_last_ms = g_systick_ms;
+
     // LED 測試序列關閉；改由 UART1 AT 驗證結果控制黃燈
 
     while (1)
     {
         uint32_t current_time = g_systick_ms;
 
-        // 更新所有按鍵 (非阻塞)
-        key_manager_update_all(&key_manager, on_key_event);
-
         // 執行數位 I/O 測試
         digital_io_test();
+
+        // 更新 KeyA 按鍵狀態
+        key_a_update();
 
         // 更新 BLE MESH AT 模組
         ble_mesh_at_update(&g_ble_at);
@@ -374,8 +417,45 @@ int main()
         }
         if (g_blue_on_until_ms && current_time >= g_blue_on_until_ms)
         {
-            blue_led_off();
+            // 如果已綁定，保持藍燈常亮；否則依脈衝到期時間關閉
+            if (!g_is_bound)
+            {
+                blue_led_off();
+            }
             g_blue_on_until_ms = 0;
+        }
+
+        // 黃燈快閃狀態機（MDTSG/MDTPG 指示）
+        if (g_yellow_flash_count > 0 && current_time >= g_yellow_flash_next_ms)
+        {
+            if (!g_yellow_flash_on)
+            {
+                // 開始一次閃爍
+                yellow_led_on();
+                g_yellow_flash_on = true;
+                g_yellow_flash_next_ms = current_time + YELLOW_FLASH_ON_MS;
+            }
+            else
+            {
+                // 結束一次閃爍
+                yellow_led_off();
+                g_yellow_flash_on = false;
+                g_yellow_flash_count--;
+                if (g_yellow_flash_count > 0)
+                {
+                    g_yellow_flash_next_ms = current_time + YELLOW_FLASH_OFF_MS;
+                }
+            }
+        }
+
+        // 未綁定時的藍燈心跳（每 2 秒閃 0.2 秒）
+        if (g_provisioning_wait && !g_is_bound)
+        {
+            if ((current_time - g_blue_heartbeat_last_ms) >= BLUE_HEARTBEAT_PERIOD_MS)
+            {
+                pulse_blue(BLUE_HEARTBEAT_ON_MS);
+                g_blue_heartbeat_last_ms = current_time;
+            }
         }
 
         // 持續事件處理與 LED 脈衝維持，不輸出文字
