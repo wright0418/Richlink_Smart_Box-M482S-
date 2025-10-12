@@ -15,6 +15,9 @@ volatile uint32_t g_systick_ms = 0;
 static volatile bool g_key_a_pressed = false;
 static volatile uint32_t g_key_a_press_start_ms = 0;
 static volatile bool g_key_a_long_press_sent = false;
+// 按鍵去抖
+static volatile uint32_t g_key_a_last_change_ms = 0;
+#define KEY_DEBOUNCE_MS 30u
 
 // BLE MESH AT 控制器
 static ble_mesh_at_controller_t g_ble_at;
@@ -48,6 +51,10 @@ static char g_last_sender_uid[32];
 static uint8_t g_last_payload[64];
 static volatile uint32_t g_last_payload_len = 0;
 static volatile uint32_t g_msg_count = 0;
+
+// PA.6 由 Mesh 指令控制的自動關閉計時（收到 0x31=ON 後啟動，5 秒內再收 ON 則延長 5 秒）
+#define PA6_ON_HOLD_MS 5000u
+static volatile uint32_t g_pa6_auto_off_deadline_ms = 0;
 
 // 取得系統時間函數
 uint32_t get_system_time_ms(void)
@@ -118,14 +125,26 @@ static inline void pulse_blue(uint32_t duration_ms)
     g_blue_on_until_ms = g_systick_ms + duration_ms;
 }
 
-// 黃燈快闃 N 次（例如 MDTSG=1, MDTPG=2）
+// 黃燈快閃 N 次（例如 MDTSG=1, MDTPG=2）
+// 支援累加模式，避免事件遺漏
 static inline void flash_yellow(uint32_t count)
 {
-    if (g_yellow_flash_count > 0)
-        return; // 還在闃耀中，忽略新要求
-    g_yellow_flash_count = count;
-    g_yellow_flash_next_ms = g_systick_ms + 10; // 立即開始
-    g_yellow_flash_on = false;
+    if (g_yellow_flash_count == 0)
+    {
+        // 新開始閃爍
+        g_yellow_flash_count = count;
+        g_yellow_flash_next_ms = g_systick_ms + 10; // 立即開始
+        g_yellow_flash_on = false;
+    }
+    else
+    {
+        // 累加閃爍次數，但限制最大值避免無限排隊
+        g_yellow_flash_count += count;
+        if (g_yellow_flash_count > 10)
+        {
+            g_yellow_flash_count = 10; // 最多排隊10次
+        }
+    }
 }
 
 // 小工具：十六進位字串轉 bytes（僅接受 [0-9A-Fa-f]，長度需為偶數）
@@ -145,6 +164,8 @@ static uint32_t hex_to_bytes(const char *hex, uint8_t *out, uint32_t max_out)
     // 跳過前導空白
     while (*hex == ' ' || *hex == '\t')
         hex++;
+
+    // 找到有效hex字串的結尾
     const char *p = hex;
     uint32_t n = 0;
     while (*p && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n')
@@ -154,11 +175,16 @@ static uint32_t hex_to_bytes(const char *hex, uint8_t *out, uint32_t max_out)
         n++;
         p++;
     }
-    if ((n & 1u) != 0u)
-        return 0; // 必須是偶數長度
+
+    // 檢查長度：必須>0且為偶數
+    if (n == 0 || (n & 1u) != 0u)
+        return 0;
+
     uint32_t out_len = n / 2u;
     if (out_len > max_out)
         out_len = max_out;
+
+    // 轉換hex到bytes
     for (uint32_t i = 0; i < out_len; i++)
     {
         int hi = hex_nibble(hex[i * 2]);
@@ -202,7 +228,7 @@ static void handle_mesh_line(const char *line)
         return;
     const char *sender = tokens[1];
     const char *hex;
-    if (strstr(tokens[0], key3) != NULL && tcount >= 3)
+    if (strstr(tokens[0], key3) != NULL && tcount >= 4)
     {
         hex = tokens[3];
     }
@@ -231,6 +257,24 @@ static void handle_mesh_line(const char *line)
         flash_yellow(2); // MDTPG 黃燈闃 2 次
     else if (strstr(tokens[0], key3) != NULL)
         flash_yellow(3); // MDTS 黃燈闃 3 次
+
+    // 解析有效負載：若為單一位元組，0x30=OFF、0x31=ON
+    if (g_last_payload_len == 1)
+    {
+        uint8_t b = g_last_payload[0];
+        if (b == 0x30u)
+        {
+            // OFF 命令：立即關閉 PA6 並清除計時
+            PA6 = 0;
+            g_pa6_auto_off_deadline_ms = 0;
+        }
+        else if (b == 0x31u)
+        {
+            // ON 命令：開啟 PA6 並起算/延長 5 秒自動關閉
+            PA6 = 1;
+            g_pa6_auto_off_deadline_ms = g_systick_ms + PA6_ON_HOLD_MS;
+        }
+    }
 }
 
 // BLE MESH AT 事件回調函數
@@ -334,30 +378,43 @@ void digital_io_test(void)
     PA6 = di_state ? 1 : 0;
 }
 
-// KeyA 按鍵處理函數 (簡化版本)
+// KeyA 按鍵處理函數 (加入去抖功能)
 void key_a_update(void)
 {
     uint32_t current_time = g_systick_ms;
     bool key_pressed = (PB15 == 0); // active low
 
-    if (key_pressed && !g_key_a_pressed)
+    // 檢查按鍵狀態是否改變
+    bool state_changed = (key_pressed != g_key_a_pressed);
+
+    if (state_changed)
     {
-        // 按鍵剛被按下
-        g_key_a_pressed = true;
-        g_key_a_press_start_ms = current_time;
-        g_key_a_long_press_sent = false;
-    }
-    else if (!key_pressed && g_key_a_pressed)
-    {
-        // 按鍵剛被釋放
-        g_key_a_pressed = false;
-        g_key_a_long_press_sent = false;
+        // 狀態改變，檢查去抖時間
+        if ((int32_t)(current_time - g_key_a_last_change_ms - KEY_DEBOUNCE_MS) >= 0)
+        {
+            // 去抖時間已過，接受狀態改變
+            g_key_a_last_change_ms = current_time;
+
+            if (key_pressed && !g_key_a_pressed)
+            {
+                // 按鍵剛被按下
+                g_key_a_pressed = true;
+                g_key_a_press_start_ms = current_time;
+                g_key_a_long_press_sent = false;
+            }
+            else if (!key_pressed && g_key_a_pressed)
+            {
+                // 按鍵剛被釋放
+                g_key_a_pressed = false;
+                g_key_a_long_press_sent = false;
+            }
+        }
+        // 否則忽略此次狀態改變（在去抖期間內）
     }
     else if (key_pressed && g_key_a_pressed && !g_key_a_long_press_sent)
     {
         // 按鍵持續按下，檢查是否達到長按時間
-        uint32_t press_duration = current_time - g_key_a_press_start_ms;
-        if (press_duration >= KEY_A_LONG_PRESS_MS)
+        if ((int32_t)(current_time - g_key_a_press_start_ms - KEY_A_LONG_PRESS_MS) >= 0)
         {
             // 長按 5 秒，發送 AT+NR 解綁命令
             (void)ble_mesh_at_send_nr(&g_ble_at);
@@ -400,8 +457,11 @@ int main()
     {
         uint32_t current_time = g_systick_ms;
 
-        // 執行數位 I/O 測試
-        digital_io_test();
+        // 執行數位 I/O 測試（若未受 Mesh 指令鎖定）
+        if (g_pa6_auto_off_deadline_ms == 0)
+        {
+            digital_io_test();
+        }
 
         // 更新 KeyA 按鍵狀態
         key_a_update();
@@ -409,13 +469,13 @@ int main()
         // 更新 BLE MESH AT 模組
         ble_mesh_at_update(&g_ble_at);
 
-        // 無阻塞 LED 脈衝維持：逾時到期自動熄滅
-        if (g_red_on_until_ms && current_time >= g_red_on_until_ms)
+        // 無阻塞 LED 脈衝維持：逾時到期自動熄滅（使用差值比較避免溢位）
+        if (g_red_on_until_ms && (int32_t)(current_time - g_red_on_until_ms) >= 0)
         {
             red_led_off();
             g_red_on_until_ms = 0;
         }
-        if (g_blue_on_until_ms && current_time >= g_blue_on_until_ms)
+        if (g_blue_on_until_ms && (int32_t)(current_time - g_blue_on_until_ms) >= 0)
         {
             // 如果已綁定，保持藍燈常亮；否則依脈衝到期時間關閉
             if (!g_is_bound)
@@ -426,7 +486,7 @@ int main()
         }
 
         // 黃燈快閃狀態機（MDTSG/MDTPG 指示）
-        if (g_yellow_flash_count > 0 && current_time >= g_yellow_flash_next_ms)
+        if (g_yellow_flash_count > 0 && (int32_t)(current_time - g_yellow_flash_next_ms) >= 0)
         {
             if (!g_yellow_flash_on)
             {
@@ -448,10 +508,17 @@ int main()
             }
         }
 
+        // PA6 Mesh ON 保持計時：逾時則自動關閉
+        if (g_pa6_auto_off_deadline_ms && (int32_t)(current_time - g_pa6_auto_off_deadline_ms) >= 0)
+        {
+            PA6 = 0; // 自動 OFF
+            g_pa6_auto_off_deadline_ms = 0;
+        }
+
         // 未綁定時的藍燈心跳（每 2 秒閃 0.2 秒）
         if (g_provisioning_wait && !g_is_bound)
         {
-            if ((current_time - g_blue_heartbeat_last_ms) >= BLUE_HEARTBEAT_PERIOD_MS)
+            if ((int32_t)(current_time - g_blue_heartbeat_last_ms - BLUE_HEARTBEAT_PERIOD_MS) >= 0)
             {
                 pulse_blue(BLUE_HEARTBEAT_ON_MS);
                 g_blue_heartbeat_last_ms = current_time;
