@@ -1,8 +1,7 @@
-#include <stdio.h>
-#include <string.h>
 #include "NuMicro.h"
 #include "led_controller.h"
 #include "key_controller.h"
+#include "ble_mesh_at.h"
 
 #define PLL_CLOCK 192000000
 #define PROJECT_NAME "Smart_Box"
@@ -44,14 +43,15 @@ volatile led_display_mode_t current_led_mode = LED_MODE_NORMAL;
 // 控制是否啟用原本的 LED 管理（預設關閉，改由 UART 測試控制黃燈）
 static bool g_led_control_enabled = false;
 
-// UART1（BLE AT）接收行緩衝
-static volatile bool g_uart1_line_ready = false;
-static char g_uart1_line[128];
-static volatile uint32_t g_uart1_line_len = 0;
-static volatile bool g_uart1_seen_cr = false;
+// BLE MESH AT 控制器
+static ble_mesh_at_controller_t g_ble_at;
+static volatile bool g_yellow_led_on = false;
 
-// BLE AT 命令狀態
-static volatile bool g_at_ver_sent = false;
+// 簡易 LED 脈衝（無 printf 下的事件指示）：
+// - 藍燈：收到一般行（LINE_RECEIVED）閃爍短脈衝
+// - 紅燈：逾時/錯誤 閃爍較長脈衝
+static volatile uint32_t g_red_on_until_ms = 0;
+static volatile uint32_t g_blue_on_until_ms = 0;
 
 // 取得系統時間函數
 uint32_t get_system_time_ms(void)
@@ -76,18 +76,11 @@ void SYS_Init(void)
 
     CLK_EnableModuleClock(UART0_MODULE);
     CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL1_UART0SEL_HXT, CLK_CLKDIV0_UART0(1));
-    // UART1 時鐘
-    CLK_EnableModuleClock(UART1_MODULE);
-    CLK_SetModuleClock(UART1_MODULE, CLK_CLKSEL1_UART1SEL_HXT, CLK_CLKDIV0_UART1(1));
     SystemCoreClockUpdate();
 
     // UART0 腳位設定
     SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
     SYS->GPB_MFPH |= (SYS_GPB_MFPH_PB12MFP_UART0_RXD | SYS_GPB_MFPH_PB13MFP_UART0_TXD);
-
-    // UART1 腳位設定（PA.8 = RXD, PA.9 = TXD）
-    SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA8MFP_Msk | SYS_GPA_MFPH_PA9MFP_Msk);
-    SYS->GPA_MFPH |= (SYS_GPA_MFPH_PA8MFP_UART1_RXD | SYS_GPA_MFPH_PA9MFP_UART1_TXD);
 
     SYS_LockReg();
 }
@@ -112,87 +105,76 @@ static inline void yellow_led_off(void)
     PB2 = 0;
 }
 
-// UART1（BLE AT）初始化與中斷啟用
-static void UART1_BLE_Init(void)
+static inline void red_led_on(void) { PB1 = 1; }
+static inline void red_led_off(void) { PB1 = 0; }
+static inline void blue_led_on(void) { PB3 = 1; }
+static inline void blue_led_off(void) { PB3 = 0; }
+
+static inline void pulse_red(uint32_t duration_ms)
 {
-    UART_Open(UART1, 115200);
-    // 啟用接收資料可用與接收逾時中斷
-    UART_ENABLE_INT(UART1, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
-    NVIC_EnableIRQ(UART1_IRQn);
+    red_led_on();
+    g_red_on_until_ms = g_systick_ms + duration_ms;
 }
 
-// UART1 傳送字串（阻塞式，簡易實作）
-static void UART1_Send(const char *s)
+static inline void pulse_blue(uint32_t duration_ms)
 {
-    while (*s)
-    {
-        while (UART_GET_TX_FULL(UART1))
-            ;
-        UART_WRITE(UART1, (uint8_t)*s++);
-    }
+    blue_led_on();
+    g_blue_on_until_ms = g_systick_ms + duration_ms;
 }
 
-// UART1 處理單一接收位元組，偵測 CRLF 為一行結束
-static inline void uart1_handle_rx_byte(uint8_t ch)
+// BLE MESH AT 事件回調函數
+void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
 {
-    if (g_uart1_line_ready)
+    switch (event)
     {
-        // 尚未處理上一行，丟棄新資料以避免覆蓋
-        return;
-    }
-
-    if (ch == '\r')
-    {
-        g_uart1_seen_cr = true;
-        return;
-    }
-
-    if (ch == '\n')
-    {
-        if (g_uart1_seen_cr)
+    case BLE_MESH_AT_EVENT_VER_SUCCESS:
+        if (!g_yellow_led_on)
         {
-            // 行結束
-            g_uart1_line[g_uart1_line_len] = '\0';
-            g_uart1_line_ready = true;
+            yellow_led_on();
+            g_yellow_led_on = true;
         }
-        // 重置行狀態
-        g_uart1_seen_cr = false;
-        g_uart1_line_len = 0;
-        return;
-    }
+        break;
 
-    g_uart1_seen_cr = false;
-    if (g_uart1_line_len < sizeof(g_uart1_line) - 1)
-    {
-        g_uart1_line[g_uart1_line_len++] = (char)ch;
-    }
-    else
-    {
-        // 超長，丟棄這行直到下一個 CRLF
-        g_uart1_line_len = 0;
+    case BLE_MESH_AT_EVENT_REBOOT_SUCCESS:
+        // 收到 REBOOT-MSG SUCCESS，藍燈短閃
+        pulse_blue(120);
+        break;
+
+    case BLE_MESH_AT_EVENT_PROV_BOUND:
+        // 綁定成功，亮黃燈
+        yellow_led_on();
+        g_yellow_led_on = true;
+        break;
+
+    case BLE_MESH_AT_EVENT_PROV_UNBOUND:
+        // 未綁定/解除綁定，關黃燈
+        yellow_led_off();
+        g_yellow_led_on = false;
+        break;
+
+    case BLE_MESH_AT_EVENT_LINE_RECEIVED:
+        // 藍燈短脈衝表示有收到行（非 VER 成功）
+        pulse_blue(120);
+        break;
+
+    case BLE_MESH_AT_EVENT_TIMEOUT:
+        // 紅燈長脈衝表示逾時
+        pulse_red(500);
+        break;
+
+    case BLE_MESH_AT_EVENT_ERROR:
+        // 紅燈長脈衝表示錯誤
+        pulse_red(500);
+        break;
+
+    default:
+        break;
     }
 }
 
 void UART1_IRQHandler(void)
 {
-    uint32_t intsts = UART1->INTSTS;
-
-    // 接收資料可用或接收逾時
-    if (intsts & (UART_INTSTS_RDAIF_Msk | UART_INTSTS_RXTOIF_Msk))
-    {
-        while (!UART_GET_RX_EMPTY(UART1))
-        {
-            uint8_t ch = (uint8_t)UART_READ(UART1);
-            uart1_handle_rx_byte(ch);
-        }
-    }
-
-    // 清錯誤旗標（如有）
-    uint32_t fifosts = UART1->FIFOSTS;
-    if (fifosts & (UART_FIFOSTS_BIF_Msk | UART_FIFOSTS_FEF_Msk | UART_FIFOSTS_PEF_Msk | UART_FIFOSTS_RXOVIF_Msk))
-    {
-        UART1->FIFOSTS = (UART_FIFOSTS_BIF_Msk | UART_FIFOSTS_FEF_Msk | UART_FIFOSTS_PEF_Msk | UART_FIFOSTS_RXOVIF_Msk);
-    }
+    ble_mesh_at_uart_irq_handler(&g_ble_at);
 }
 
 // 數位 I/O 系統初始化
@@ -205,8 +187,6 @@ void digital_io_init(void)
     // PB.7 設定為輸入 (DI)
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     // GPIO_SetPullCtl(PB, BIT7, GPIO_PUSEL_PULL_DOWN); // 設定下拉電阻
-
-    printf("Digital I/O Initialized: PA.6 (DO), PB.7 (DI)\n");
 }
 
 // 數位 I/O 測試函數
@@ -219,19 +199,6 @@ void digital_io_test(void)
     // PB.7 = 1 時，PA.6 = 1
     // PB.7 = 0 時，PA.6 = 0
     PA6 = di_state ? 1 : 0;
-
-    // 顯示 I/O 狀態（每 500ms 顯示一次）
-    static uint32_t last_status_time = 0;
-    uint32_t current_time = get_system_time_ms();
-
-    if (current_time - last_status_time >= 500)
-    {
-        printf("Digital I/O Status - DI (PB.7): %s -> DO (PA.6): %s\n",
-               di_state ? "HIGH" : "LOW",
-               (PA6 != 0) ? "HIGH" : "LOW");
-
-        last_status_time = current_time;
-    }
 }
 
 // 設定 LED 顯示模式
@@ -298,8 +265,6 @@ void set_led_display_mode(led_display_mode_t mode)
         led_controller_set_state(&led_controllers[1], LED_STATE_BLINKING, current_time + 300);
         led_controller_set_state(&led_controllers[2], LED_STATE_BLINKING, current_time + 600);
     }
-
-    printf("LED Mode changed to: %d\n", mode);
 }
 
 // 按鍵事件處理回調函數
@@ -311,50 +276,25 @@ void on_key_event(uint8_t key_index, key_event_t event, uint32_t press_duration)
         switch (event)
         {
         case KEY_EVENT_SHORT_PRESS:
-            printf("Key A Short Press\n");
             break;
 
         case KEY_EVENT_LONG_PRESS:
-            printf("Key A Long Press (%d ms)\n", press_duration);
-            // 長按3秒發送 AT+VER 命令
+            // 長按5秒發送 AT+NR（自我解除綁定）
             if (press_duration >= 3000)
             {
-                if (!g_at_ver_sent)
-                {
-                    printf("Sending AT+VER command...\n");
-                    UART1_Send("AT+VER\r\n");
-                    g_at_ver_sent = true;
-                    printf("AT+VER sent, waiting for response...\n");
-                }
-                else
-                {
-                    printf("AT+VER already sent\n");
-                }
+                (void)ble_mesh_at_send_nr(&g_ble_at);
             }
             break;
 
         case KEY_EVENT_DOUBLE_CLICK:
-            printf("Key A Double Click - Quick mode toggle\n");
-            // 雙擊在快速和正常模式間切換（若 LED 控制已停用則忽略）
-            if (g_led_control_enabled)
-            {
-                if (current_led_mode == LED_MODE_FAST)
-                {
-                    set_led_display_mode(LED_MODE_NORMAL);
-                }
-                else
-                {
-                    set_led_display_mode(LED_MODE_FAST);
-                }
-            }
+            // 雙擊送 REBOOT（改由實際送指令）
+            (void)ble_mesh_at_send_reboot(&g_ble_at);
             break;
 
         case KEY_EVENT_PRESS:
-            printf("Key A Pressed\n");
             break;
 
         case KEY_EVENT_RELEASE:
-            printf("Key A Released (held for %d ms)\n", press_duration);
             break;
 
         default:
@@ -400,27 +340,16 @@ int main()
     // SystemCoreClock = 192MHz, 每毫秒需要 192000 個時鐘週期
     SysTick_Config(SystemCoreClock / 1000); // 1 毫秒中斷一次
 
-    UART_Open(UART0, 115200);
-    printf("%s: Smart Box with UART1 BLE AT, Key & Digital I/O\n", PROJECT_NAME);
-    printf("Core Clock: %d Hz\n", SystemCoreClock);
-    printf("LED control via manager: DISABLED (manual GPIO).\n");
-
-    // UART1 (BLE AT) 初始化
-    UART1_BLE_Init();
-    printf("UART1 for BLE AT: 115200 8N1, TX=PA.9, RX=PA.8\n");
-    // 先關閉黃燈，等待按鍵觸發 AT 命令後驗證通過再點亮
+    // 初始化 BLE MESH AT 模組
+    ble_mesh_at_config_t ble_config = {
+        .baudrate = 115200,
+        .tx_pin_port = 0, // PA
+        .tx_pin_num = 9,  // PA.9
+        .rx_pin_port = 0, // PA
+        .rx_pin_num = 8   // PA.8
+    };
+    ble_mesh_at_init(&g_ble_at, &ble_config, on_ble_mesh_at_event, get_system_time_ms);
     yellow_led_off();
-    printf("Press Key A for 3 seconds to send AT+VER\n");
-
-    printf("\nKey Controls:\n");
-    printf("- Short Press: Info message\n");
-    printf("- Long Press (3s): Send AT+VER command\n");
-    printf("- Double Click: (LED control disabled)\n");
-
-    printf("\nDigital I/O Test:\n");
-    printf("- PB.7 (DI): Input control signal\n");
-    printf("- PA.6 (DO): Output follows input\n");
-    printf("- Logic: PB.7=HIGH -> PA.6=HIGH, PB.7=LOW -> PA.6=LOW\n");
 
     // LED 測試序列關閉；改由 UART1 AT 驗證結果控制黃燈
 
@@ -434,59 +363,21 @@ int main()
         // 執行數位 I/O 測試
         digital_io_test();
 
-        // 若 UART1 接收到一行，進行解析
-        if (g_uart1_line_ready)
+        // 更新 BLE MESH AT 模組
+        ble_mesh_at_update(&g_ble_at);
+
+        // 無阻塞 LED 脈衝維持：逾時到期自動熄滅
+        if (g_red_on_until_ms && current_time >= g_red_on_until_ms)
         {
-            // 只讀取一次指標，避免最佳化重排
-            __DSB();
-            printf("BLE AT Response: %s\r\n", g_uart1_line);
-
-            if (strncmp(g_uart1_line, "VER-MSG SUCCESS", 15) == 0)
-            {
-                yellow_led_on();
-                printf(" -> VER-MSG SUCCESS detected, Yellow LED ON\n");
-            }
-            else if (g_at_ver_sent)
-            {
-                printf(" -> Response received but not VER-MSG SUCCESS\n");
-            }
-
-            g_uart1_line_ready = false;
+            red_led_off();
+            g_red_on_until_ms = 0;
+        }
+        if (g_blue_on_until_ms && current_time >= g_blue_on_until_ms)
+        {
+            blue_led_off();
+            g_blue_on_until_ms = 0;
         }
 
-        // 顯示當前按鍵狀態（僅在按下時）
-        static bool last_key_state = false;
-        bool current_key_state = key_manager_is_key_pressed(&key_manager, KEY_A_INDEX);
-        if (current_key_state != last_key_state)
-        {
-            if (current_key_state)
-            {
-                printf("Key A is being pressed...\n");
-            }
-            last_key_state = current_key_state;
-        }
-
-        // 顯示長按進度（每500ms顯示一次）
-        if (current_key_state)
-        {
-            static uint32_t last_progress_time = 0;
-            if (current_time - last_progress_time >= 500)
-            {
-                uint32_t press_duration = key_manager_get_key_press_duration(&key_manager, KEY_A_INDEX);
-                if (press_duration >= 1000)
-                {
-                    printf("Long press progress: %d ms\n", press_duration);
-                }
-                last_progress_time = current_time;
-            }
-        }
-
-        // 每秒輸出一次時間資訊
-        static uint32_t last_print_time = 0;
-        if (current_time - last_print_time >= 1000)
-        {
-            printf("Runtime: %d.%03d s\n", current_time / 1000, current_time % 1000);
-            last_print_time = current_time;
-        }
+        // 持續事件處理與 LED 脈衝維持，不輸出文字
     }
 }

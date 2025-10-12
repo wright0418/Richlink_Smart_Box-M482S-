@@ -84,3 +84,4 @@ project:
         - file: ../main.c
         - file: ../led_controller.c
         - file: ../key_controller.c
+        - file: ../ble_mesh_at.c
