@@ -2,8 +2,8 @@ build:
   generated-by: csolution version 2.11.0
   solution: ../../../../Smart_Box.csolution.yml
   project: ../../../../Smart_Box.cproject.yml
-  context: Smart_Box.debug+GNUC
-  compiler: GCC
+  context: Smart_Box.release+ARMCLANG
+  compiler: AC6
   device: Nuvoton::M487JIDAE
   device-pack: Nuvoton::NuMicroM4_DFP@1.0.1
   processor:
@@ -12,26 +12,32 @@ build:
   packs:
     - pack: Nuvoton::NuMicroM4_DFP@1.0.1
       path: ${CMSIS_PACK_ROOT}/Nuvoton/NuMicroM4_DFP/1.0.1
-  optimize: debug
+  optimize: balanced
   misc:
+    ASM:
+      - -D__MICROLIB
     C:
-      - -std=gnu11
-      - --specs=nano.specs
-      - -Wno-return-type
-      - -Wno-unused-but-set-variable
-      - -fdata-sections
-      - -ffunction-sections
-      - -fno-builtin
-      - -fshort-enums
+      - -std=c99
+      - -fno-rtti
       - -funsigned-char
-      - -mthumb
-      - -Wno-main
+      - -fshort-enums
+      - -fshort-wchar
+      - -ffunction-sections
+      - -fdata-sections
+      - -D__MICROLIB
+      - -o0
       - -gdwarf-4
     Link:
-      - -Xlinker
-      - --gc-sections
-      - --specs=nano.specs
-      - -Wl,-Map,"././Smart_Box.map"
+      - --library_type=microlib
+      - --map
+      - --load_addr_map_info
+      - --symbols
+      - --info sizes
+      - --info totals
+      - --entry Reset_Handler
+      - --summary_stderr
+      - --info summarysizes
+      - --diag_suppress=6314
   add-path:
     - ../../../../../../../Library/Device/Nuvoton/M480/Include
     - ../../../../../../../Library/StdDriver/inc
@@ -47,13 +53,13 @@ build:
     - type: bin
       file: Smart_Box.bin
     - type: elf
-      file: Smart_Box.elf
+      file: Smart_Box.axf
   linker:
-    script: ../../../../../../../Library/Device/Nuvoton/M480/Source/GCC/gcc_arm.ld
+    script: ../../../../Smart_Box_AC6.sct
   groups:
     - group: CMSIS
       files:
-        - file: ../../../../../../../Library/Device/Nuvoton/M480/Source/GCC/startup_M480.S
+        - file: ../../../../../../../Library/Device/Nuvoton/M480/Source/ARM/startup_M480_vsac6.S
           category: sourceAsm
         - file: ../../../../../../../Library/Device/Nuvoton/M480/Source/system_M480.c
           category: sourceC

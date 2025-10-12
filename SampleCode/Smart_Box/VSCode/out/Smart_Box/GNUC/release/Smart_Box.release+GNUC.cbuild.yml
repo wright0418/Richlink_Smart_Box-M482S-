@@ -2,7 +2,7 @@ build:
   generated-by: csolution version 2.11.0
   solution: ../../../../Smart_Box.csolution.yml
   project: ../../../../Smart_Box.cproject.yml
-  context: Smart_Box.debug+GNUC
+  context: Smart_Box.release+GNUC
   compiler: GCC
   device: Nuvoton::M487JIDAE
   device-pack: Nuvoton::NuMicroM4_DFP@1.0.1
@@ -12,7 +12,7 @@ build:
   packs:
     - pack: Nuvoton::NuMicroM4_DFP@1.0.1
       path: ${CMSIS_PACK_ROOT}/Nuvoton/NuMicroM4_DFP/1.0.1
-  optimize: debug
+  optimize: balanced
   misc:
     C:
       - -std=gnu11

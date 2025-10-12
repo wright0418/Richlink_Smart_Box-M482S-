@@ -79,9 +79,7 @@ build:
       files:
         - file: ../../../../../main.c
           category: sourceC
-        - file: ../../../../../led_controller.c
-          category: sourceC
-        - file: ../../../../../key_controller.c
+        - file: ../../../../../ble_mesh_at.c
           category: sourceC
   licenses:
     - license: <unknown>
