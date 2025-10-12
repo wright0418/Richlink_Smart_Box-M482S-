@@ -1,0 +1,8 @@
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/database.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-build.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-configure.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-executes.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-database.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/edit_cache.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/rebuild_cache.dir

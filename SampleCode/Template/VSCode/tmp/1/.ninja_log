@@ -1,0 +1,27 @@
+# ninja log v6
+11	281	7819553894734524	CMakeFiles/Group_CMSIS.dir/D_/Nuvoton/M480_SmartBox/Library/Device/Nuvoton/M480/Source/system_M480.o	a3acc7533b19b05f
+4	284	7819553894664507	CMakeFiles/Group_CMSIS.dir/D_/Nuvoton/M480_SmartBox/Library/Device/Nuvoton/M480/Source/ARM/startup_M480_vsac6.o	c5d6f06ef24a115c
+51	305	7819553895137612	CMakeFiles/Group_Library.dir/D_/Nuvoton/M480_SmartBox/Library/StdDriver/src/sys.o	bea5c0cf1752a32a
+21	327	7819553894834587	CMakeFiles/Group_Library.dir/D_/Nuvoton/M480_SmartBox/Library/StdDriver/src/retarget.o	5ba3141cbf28b7f2
+86	328	7819553895484704	CMakeFiles/Group_User.dir/D_/Nuvoton/M480_SmartBox/SampleCode/Template/main.o	22205e70f6f4a621
+35	345	7819553894974597	CMakeFiles/Group_Library.dir/D_/Nuvoton/M480_SmartBox/Library/StdDriver/src/uart.o	e30587ce6cfbf1b8
+69	394	7819553895314688	CMakeFiles/Group_Library.dir/D_/Nuvoton/M480_SmartBox/Library/StdDriver/src/clk.o	9ee6f5d1b8f1f888
+394	630	7819553900266467	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/out/Template/ARMCLANG/debug/Template.axf	ea09a46a6eb91f59
+394	630	7819553900266467	ac6_linker_script.sct	ea09a46a6eb91f59
+394	630	7819553900266467	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/ac6_linker_script.sct	ea09a46a6eb91f59
+45	138	7819553902085597	CMakeFiles/database	2ec5e42355b45344
+45	138	7819553902085597	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344
+7	331	7819563562594180	CMakeFiles/Group_User.dir/D_/Nuvoton/M480_SmartBox/SampleCode/Template/main.o	22205e70f6f4a621
+332	554	7819563567358786	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/out/Template/ARMCLANG/debug/Template.axf	ea09a46a6eb91f59
+332	554	7819563567358786	ac6_linker_script.sct	ea09a46a6eb91f59
+332	554	7819563567358786	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/ac6_linker_script.sct	ea09a46a6eb91f59
+44	142	7819563569614027	CMakeFiles/database	2ec5e42355b45344
+44	142	7819563569614027	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344
+4	92	7819577180055780	CMakeFiles/database	2ec5e42355b45344
+4	92	7819577180055780	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344
+27	130	7819582103810915	CMakeFiles/database	2ec5e42355b45344
+27	130	7819582103810915	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344
+5	89	7819582437255947	CMakeFiles/database	2ec5e42355b45344
+5	89	7819582437255947	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344
+3	78	7819591555817581	CMakeFiles/database	2ec5e42355b45344
+3	78	7819591555817581	D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/1/CMakeFiles/database	2ec5e42355b45344

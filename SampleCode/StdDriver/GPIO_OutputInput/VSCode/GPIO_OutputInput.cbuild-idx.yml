@@ -1,0 +1,17 @@
+build-idx:
+  generated-by: csolution version 2.11.0
+  csolution: GPIO_OutputInput.csolution.yml
+  cbuild-run: out/GPIO_OutputInput+GNUC.cbuild-run.yml
+  tmpdir: tmp
+  cprojects:
+    - cproject: GPIO_OutputInput.cproject.yml
+  cbuilds:
+    - cbuild: out/GPIO_OutputInput/GNUC/debug/GPIO_OutputInput.debug+GNUC.cbuild.yml
+      project: GPIO_OutputInput
+      configuration: .debug+GNUC
+      messages:
+        info:
+          - GPIO_OutputInput.cbuild-pack.yml - file is already up-to-date
+          - GPIO_OutputInput+GNUC.cbuild-run.yml - file is already up-to-date
+          - GPIO_OutputInput.debug+GNUC.cbuild.yml - file generated successfully
+  rebuild: true

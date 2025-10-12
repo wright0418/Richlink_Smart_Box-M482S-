@@ -1,0 +1,27 @@
+; M487JIDAE Scatter file for AC6
+
+LR_ROM0 0x00000000 0x00080000 {
+  
+  ER_ROM0 0x00000000 0x00080000 {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    *(+RO +XO)
+  }
+  
+  RW_NOINIT 0x20000000 UNINIT (0x00028000 - 0x00000C00 - 0x00000200) {
+    *.o(.bss.noinit)
+    *.o(.bss.noinit.*)
+  }
+  
+  RW_RAM0 AlignExpr(+0, 8) (0x00028000 - 0x00000C00 - 0x00000200 - AlignExpr(ImageLength(RW_NOINIT), 8)) {
+    *(+RW +ZI)
+  }
+  
+  ARM_LIB_HEAP (AlignExpr(+0, 8)) EMPTY 0x00000C00 {
+    ; Reserve empty region for heap
+  }
+  
+  ARM_LIB_STACK (0x20000000 + 0x00028000) EMPTY -0x00000200 {
+    ; Reserve empty region for stack
+  }
+}

@@ -1,0 +1,52 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/CMakeFiles/BitBand.release+ARMCLANG"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/CMakeFiles/BitBand.release+ARMCLANG.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/CMakeFiles/BitBand.release+ARMCLANG-complete.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-build.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-configure.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-database.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-download.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-executes.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-install.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-mkdir.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-patch.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-test.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"BitBand.release+ARMCLANG"
+		],
+		"name" : "BitBand.release+ARMCLANG"
+	}
+}

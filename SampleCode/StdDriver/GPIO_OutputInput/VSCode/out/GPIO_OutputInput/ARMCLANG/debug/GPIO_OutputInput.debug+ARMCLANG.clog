@@ -1,0 +1,8 @@
+# CMSIS Build Audit File generated on 2025-10-12T14:39:13
+
+# Project Description File: X:/SampleCode/StdDriver/GPIO_OutputInput/VSCode/GPIO_OutputInput.debug+ARMCLANG.cprj
+
+# Toolchain Configuration File: C:/Users/Wright/.vcpkg/artifacts/2139c4c6/tools.open.cmsis.pack.cmsis.toolbox/2.9.0/etc/AC6.6.16.2.cmake
+
+# Package: Nuvoton::NuMicroM4_DFP@1.0.1
+  Location: C:\Users\Wright\AppData\Local\Arm\Packs/Nuvoton/NuMicroM4_DFP/1.0.1/

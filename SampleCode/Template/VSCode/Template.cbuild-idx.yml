@@ -1,0 +1,16 @@
+build-idx:
+  generated-by: csolution version 2.11.0
+  csolution: Template.csolution.yml
+  cbuild-run: out/Template+ARMCLANG.cbuild-run.yml
+  tmpdir: tmp
+  cprojects:
+    - cproject: Template.cproject.yml
+  cbuilds:
+    - cbuild: out/Template/ARMCLANG/debug/Template.debug+ARMCLANG.cbuild.yml
+      project: Template
+      configuration: .debug+ARMCLANG
+      messages:
+        info:
+          - Template.cbuild-pack.yml - file is already up-to-date
+          - Template+ARMCLANG.cbuild-run.yml - file is already up-to-date
+          - Template.debug+ARMCLANG.cbuild.yml - file is already up-to-date

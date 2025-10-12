@@ -1,0 +1,37 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-build"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-build.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-build.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-configure.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-patch.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-update.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-download.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-mkdir.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"Smart_Box.debug+ARMCLANG"
+		],
+		"name" : "Smart_Box.debug+ARMCLANG-build"
+	}
+}

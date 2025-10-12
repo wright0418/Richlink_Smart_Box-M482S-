@@ -1,0 +1,52 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/CMakeFiles/Template.debug+ARMCLANG"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/CMakeFiles/Template.debug+ARMCLANG.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/CMakeFiles/Template.debug+ARMCLANG-complete.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-build.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-configure.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-database.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-download.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-executes.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-install.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-mkdir.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-patch.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-test.rule"
+		},
+		{
+			"file" : "D:/Nuvoton/M480_SmartBox/SampleCode/Template/VSCode/tmp/Template.debug+ARMCLANG/src/Template.debug+ARMCLANG-stamp/Template.debug+ARMCLANG-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"Template.debug+ARMCLANG"
+		],
+		"name" : "Template.debug+ARMCLANG"
+	}
+}

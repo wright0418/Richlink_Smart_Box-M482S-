@@ -1,0 +1,6 @@
+{
+    "debug.hideSlowPreLaunchWarning": true,
+    "clangd.arguments": [
+        "--compile-commands-dir=d:\\Nuvoton\\M480_SmartBox\\SampleCode\\Smart_Box\\VSCode\\out\\Smart_Box\\ARMCLANG\\debug"
+    ]
+}

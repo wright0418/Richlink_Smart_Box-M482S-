@@ -1,0 +1,7 @@
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/database.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/Smart_Box.debug+ARMCLANG.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/Group_CMSIS.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/Group_Library.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/Group_User.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/edit_cache.dir
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/1/CMakeFiles/rebuild_cache.dir

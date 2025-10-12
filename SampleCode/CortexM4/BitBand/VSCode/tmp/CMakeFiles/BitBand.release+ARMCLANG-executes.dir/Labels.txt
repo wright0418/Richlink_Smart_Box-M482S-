@@ -1,0 +1,12 @@
+# Target labels
+ BitBand.release+ARMCLANG
+# Source files and their labels
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/CMakeFiles/BitBand.release+ARMCLANG-executes
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/CMakeFiles/BitBand.release+ARMCLANG-executes.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-executes.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-build.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-configure.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-patch.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-update.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-download.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/CortexM4/BitBand/VSCode/tmp/BitBand.release+ARMCLANG/src/BitBand.release+ARMCLANG-stamp/BitBand.release+ARMCLANG-mkdir.rule

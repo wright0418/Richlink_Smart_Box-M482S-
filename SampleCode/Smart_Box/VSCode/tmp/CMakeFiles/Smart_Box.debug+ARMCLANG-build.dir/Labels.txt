@@ -1,0 +1,11 @@
+# Target labels
+ Smart_Box.debug+ARMCLANG
+# Source files and their labels
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-build
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/CMakeFiles/Smart_Box.debug+ARMCLANG-build.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-build.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-configure.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-patch.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-update.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-download.rule
+D:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG/src/Smart_Box.debug+ARMCLANG-stamp/Smart_Box.debug+ARMCLANG-mkdir.rule
