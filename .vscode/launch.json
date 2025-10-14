@@ -24,18 +24,21 @@
             "type": "gdbtarget",
             "request": "attach",
             "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode",
-            "program": "Smart_Box/ARMCLANG/debug/Smart_Box.axf",
+            "program": "out\\Smart_Box\\ARMCLANG\\debug\\Smart_Box.axf",
             "gdb": "arm-none-eabi-gdb",
             "initCommands": [
                 ""
             ],
             "customResetCommands": [
-                "monitor reset halt"
+                "monitor reset halt",
+                "tbreak main",
+                "continue"
             ],
             "target": {
                 "port": "3333"
             },
             "cmsis": {
+                "cbuildRunFile": "${command:cmsis-csolution.getCbuildRunFile}",
                 "updateConfiguration": "auto"
             }
         }

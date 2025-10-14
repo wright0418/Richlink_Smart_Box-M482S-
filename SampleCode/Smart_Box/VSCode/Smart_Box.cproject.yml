@@ -15,6 +15,7 @@ project:
           -D__MICROLIB,
           -o0,
           -gdwarf-4,
+          -DMODBUS_RTU,
         ]
       ASM: [-D__MICROLIB]
       Link:
@@ -45,6 +46,7 @@ project:
           -mthumb,
           -Wno-main,
           -gdwarf-4,
+          -DMODBUS_RTU,
         ]
       Link:
         - -Xlinker
@@ -64,6 +66,7 @@ project:
     - ../../../Library/Device/Nuvoton/M480/Include
     - ../../../Library/StdDriver/inc
     - ../../../Library/CMSIS/Include
+    - ../modbus_rtu
   groups:
     - group: CMSIS
       files:
@@ -83,3 +86,13 @@ project:
       files:
         - file: ../main.c
         - file: ../ble_mesh_at.c
+    - group: ModbusRTU
+      files:
+        - file: ../modbus_rtu/modbus_crc.c
+        - file: ../modbus_rtu/modbus_timing.c
+        - file: ../modbus_rtu/modbus_rtu_protocol.c
+        - file: ../modbus_rtu/modbus_rtu_client.c
+        - file: ../modbus_rtu/modbus_rtu_server.c
+        - file: ../modbus_rtu/uart_rs485_driver.c
+        - file: ../modbus_rtu/modbus_rtu_test.c
+        - file: ../../../Library/StdDriver/src/crc.c

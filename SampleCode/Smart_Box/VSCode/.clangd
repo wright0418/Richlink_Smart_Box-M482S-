@@ -420,5 +420,6 @@ CompileFlags:
       -ID:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/../../../Library/StdDriver/inc
     - >-
       -ID:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/../../../Library/CMSIS/Include
+    - '-ID:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/../modbus_rtu'
     - >-
       -ID:/Nuvoton/M480_SmartBox/SampleCode/Smart_Box/VSCode/tmp/Smart_Box.debug+ARMCLANG
