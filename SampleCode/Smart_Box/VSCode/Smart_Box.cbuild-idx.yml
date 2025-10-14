@@ -1,6 +1,7 @@
 build-idx:
   generated-by: csolution version 2.11.0
   csolution: Smart_Box.csolution.yml
+  cbuild-run: out/Smart_Box+ARMCLANG.cbuild-run.yml
   tmpdir: tmp
   cprojects:
     - cproject: Smart_Box.cproject.yml
@@ -11,5 +12,5 @@ build-idx:
       messages:
         info:
           - Smart_Box.cbuild-pack.yml - file is already up-to-date
+          - Smart_Box+ARMCLANG.cbuild-run.yml - file is already up-to-date
           - Smart_Box.debug+ARMCLANG.cbuild.yml - file is already up-to-date
-  rebuild: true

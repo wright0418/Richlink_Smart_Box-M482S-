@@ -95,4 +95,5 @@ project:
         - file: ../modbus_rtu/modbus_rtu_server.c
         - file: ../modbus_rtu/uart_rs485_driver.c
         - file: ../modbus_rtu/modbus_rtu_test.c
+        - file: ../modbus_sensor_manager.c
         - file: ../../../Library/StdDriver/src/crc.c

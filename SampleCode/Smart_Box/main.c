@@ -1,12 +1,9 @@
 #include "NuMicro.h"
 #include "ble_mesh_at.h"
 #include <string.h>
-#include <stdio.h>
 
 #ifdef MODBUS_RTU
-#include "modbus_rtu_test.h"
-#include "modbus_rtu_client.h"
-#include "uart_rs485_driver.h"
+#include "modbus_sensor_manager.h"
 #endif
 
 #define PLL_CLOCK 192000000
@@ -28,16 +25,7 @@
 volatile uint32_t g_systick_ms = 0;
 
 #ifdef MODBUS_RTU
-static bool g_modbus_rtu_self_test_pass = false;
-static modbus_rtu_client_t g_modbus_client;
-static bool g_modbus_client_active = false;
-static uint16_t g_modbus_sensor_registers[MODBUS_RTU_CLIENT_MAX_REGISTERS] = {0};
-static uint16_t g_modbus_sensor_quantity = 0;
-static bool g_modbus_last_request_ok = false;
-static modbus_exception_t g_modbus_last_exception = MODBUS_EXCEPTION_NONE;
-static uint32_t g_modbus_next_poll_ms = 0;
-static uint32_t g_modbus_last_response_ms = 0;
-static uint32_t g_modbus_consecutive_failures = 0;
+static modbus_sensor_manager_t g_modbus_sensor_manager;
 #endif
 
 // KeyA 按鍵狀態 (PB.15 - active low)
@@ -406,139 +394,19 @@ void digital_io_init(void)
 }
 
 #ifdef MODBUS_RTU
-static uint32_t modbus_get_timestamp_us(void *context)
+// MODBUS Sensor Manager 回調函數
+static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity)
 {
-    (void)context;
-    return g_systick_ms * 1000U;
+    (void)registers; // 可在此處理感測器資料
+    (void)quantity;
+    pulse_blue(120); // 成功時藍燈閃爍
 }
 
-static bool modbus_uart_tx_write(const uint8_t *data, uint16_t length, void *context)
+static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures)
 {
-    (void)context;
-    if ((data == NULL) || (length == 0U))
-    {
-        return false;
-    }
-    return uart_rs485_driver_write(data, length);
-}
-
-static void modbus_uart_rx_callback(uint8_t byte, uint32_t timestamp_us, void *context)
-{
-    modbus_rtu_client_t *client = (modbus_rtu_client_t *)context;
-    if (client != NULL)
-    {
-        modbus_rtu_client_handle_rx_byte(client, byte, timestamp_us);
-    }
-}
-
-static void modbus_handle_client_state(void)
-{
-    if (!g_modbus_client_active)
-    {
-        return;
-    }
-
-    uint32_t now_us = g_systick_ms * 1000U;
-    modbus_rtu_client_poll(&g_modbus_client, now_us);
-
-    if (modbus_rtu_client_is_busy(&g_modbus_client))
-    {
-        return;
-    }
-
-    modbus_rtu_client_state_t state = modbus_rtu_client_get_state(&g_modbus_client);
-    if (state == MODBUS_RTU_CLIENT_STATE_COMPLETE)
-    {
-        if ((g_modbus_client.function_code == MODBUS_RTU_FUNCTION_READ_HOLDING) ||
-            (g_modbus_client.function_code == MODBUS_RTU_FUNCTION_READ_INPUT))
-        {
-            modbus_rtu_client_copy_response(&g_modbus_client, g_modbus_sensor_registers, MODBUS_RTU_CLIENT_MAX_REGISTERS);
-            g_modbus_sensor_quantity = modbus_rtu_client_get_quantity(&g_modbus_client);
-
-            if ((g_modbus_client.function_code == MODBUS_RTU_FUNCTION_READ_INPUT) && (g_modbus_sensor_quantity > 0U))
-            {
-                printf("[MODBUS] Read %u input registers starting at 0x%04X\r\n",
-                       (unsigned)g_modbus_sensor_quantity,
-                       (unsigned)MODBUS_SENSOR_START_ADDRESS);
-
-                for (uint16_t i = 0; i < g_modbus_sensor_quantity; i++)
-                {
-                    printf("  Reg 0x%04X = 0x%04X\r\n",
-                           (unsigned)(MODBUS_SENSOR_START_ADDRESS + i),
-                           g_modbus_sensor_registers[i]);
-                }
-            }
-        }
-        else
-        {
-            g_modbus_sensor_quantity = 0U;
-        }
-        g_modbus_last_request_ok = true;
-        g_modbus_last_exception = MODBUS_EXCEPTION_NONE;
-        g_modbus_last_response_ms = g_systick_ms;
-        g_modbus_consecutive_failures = 0;
-        pulse_blue(120);
-        modbus_rtu_client_clear(&g_modbus_client);
-        g_modbus_next_poll_ms = g_systick_ms + MODBUS_SENSOR_POLL_INTERVAL_MS;
-    }
-    else if (state != MODBUS_RTU_CLIENT_STATE_IDLE)
-    {
-        g_modbus_last_request_ok = false;
-        if (state == MODBUS_RTU_CLIENT_STATE_EXCEPTION)
-        {
-            g_modbus_last_exception = modbus_rtu_client_get_exception(&g_modbus_client);
-        }
-        else
-        {
-            g_modbus_last_exception = MODBUS_EXCEPTION_NONE;
-        }
-
-        if (g_modbus_consecutive_failures < 0xFFFFFFFFU)
-        {
-            g_modbus_consecutive_failures++;
-        }
-
-        pulse_red(200);
-        modbus_rtu_client_clear(&g_modbus_client);
-        g_modbus_next_poll_ms = g_systick_ms + MODBUS_SENSOR_POLL_INTERVAL_MS;
-    }
-}
-
-static void modbus_try_start_request(void)
-{
-    if (!g_modbus_client_active)
-    {
-        return;
-    }
-
-    if (modbus_rtu_client_is_busy(&g_modbus_client))
-    {
-        return;
-    }
-
-    if ((int32_t)(g_systick_ms - g_modbus_next_poll_ms) < 0)
-    {
-        return;
-    }
-
-    bool started = modbus_rtu_client_start_read_input(&g_modbus_client,
-                                                      MODBUS_SENSOR_SLAVE_ADDRESS,
-                                                      MODBUS_SENSOR_START_ADDRESS,
-                                                      MODBUS_SENSOR_REGISTER_QUANTITY,
-                                                      MODBUS_SENSOR_RESPONSE_TIMEOUT_MS);
-    if (started)
-    {
-        g_modbus_last_request_ok = false;
-        g_modbus_last_exception = MODBUS_EXCEPTION_NONE;
-    }
-    else
-    {
-        if (g_modbus_consecutive_failures < 0xFFFFFFFFU)
-        {
-            g_modbus_consecutive_failures++;
-        }
-        g_modbus_next_poll_ms = g_systick_ms + 100U;
-    }
+    (void)exception;
+    (void)consecutive_failures;
+    pulse_red(200); // 失敗時紅燈閃爍
 }
 #endif
 
@@ -610,56 +478,21 @@ int main()
     SysTick_Config(SystemCoreClock / 1000); // 1 毫秒中斷一次
 
 #ifdef MODBUS_RTU
-    // 執行自我測試
-    g_modbus_rtu_self_test_pass = modbus_rtu_run_module_self_test();
-    if (!g_modbus_rtu_self_test_pass)
+    // 直接初始化 MODBUS Sensor Manager
+    modbus_sensor_config_t sensor_config = {
+        .slave_address = MODBUS_SENSOR_SLAVE_ADDRESS,
+        .start_address = MODBUS_SENSOR_START_ADDRESS,
+        .register_quantity = MODBUS_SENSOR_REGISTER_QUANTITY,
+        .poll_interval_ms = MODBUS_SENSOR_POLL_INTERVAL_MS,
+        .response_timeout_ms = MODBUS_SENSOR_RESPONSE_TIMEOUT_MS,
+        .failure_threshold = MODBUS_SENSOR_FAILURE_THRESHOLD};
+
+    if (!modbus_sensor_manager_init(&g_modbus_sensor_manager, &sensor_config,
+                                    modbus_sensor_success_callback,
+                                    modbus_sensor_error_callback))
     {
         red_led_on();
         g_red_on_until_ms = 0;
-    }
-    else
-    {
-        // 自我測試通過，初始化 MODBUS RTU Client
-
-        // 配置 UART/RS485 驅動
-        uart_rs485_driver_config_t uart_config = {
-            .uart = UART0,
-            .irq_number = UART0_IRQn,
-            .module_clock = UART0_MODULE,
-            .baudrate = 9600,
-            .dir_gpio_port = PB,
-            .dir_gpio_pin = 14,
-            .timestamp_callback = modbus_get_timestamp_us,
-            .timestamp_context = NULL};
-
-        // 初始化 UART/RS485 驅動
-        uart_rs485_driver_init(&uart_config);
-        uart_rs485_driver_set_rx_callback(modbus_uart_rx_callback, &g_modbus_client);
-
-        // 配置 MODBUS RTU Client
-        modbus_rtu_client_config_t client_config = {
-            .tx_handler = modbus_uart_tx_write,
-            .tx_context = NULL,
-            .timestamp_callback = modbus_get_timestamp_us,
-            .timestamp_context = NULL,
-            .baudrate = 9600,
-            .crc_method = MODBUS_CRC_METHOD_AUTO};
-
-        g_modbus_client_active = modbus_rtu_client_init(&g_modbus_client, &client_config);
-        if (g_modbus_client_active)
-        {
-            g_modbus_sensor_quantity = 0;
-            g_modbus_last_request_ok = false;
-            g_modbus_last_exception = MODBUS_EXCEPTION_NONE;
-            g_modbus_next_poll_ms = g_systick_ms;
-            g_modbus_last_response_ms = 0;
-            g_modbus_consecutive_failures = 0;
-        }
-        else
-        {
-            red_led_on();
-            g_red_on_until_ms = 0;
-        }
     }
 #endif
 
@@ -691,15 +524,7 @@ int main()
         key_a_update();
 
 #ifdef MODBUS_RTU
-        if (!g_modbus_rtu_self_test_pass)
-        {
-            red_led_on();
-        }
-        else if (g_modbus_client_active)
-        {
-            modbus_handle_client_state();
-            modbus_try_start_request();
-        }
+        modbus_sensor_manager_poll(&g_modbus_sensor_manager, current_time);
 #endif
 
         // 更新 BLE MESH AT 模組

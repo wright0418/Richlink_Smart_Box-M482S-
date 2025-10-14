@@ -27,6 +27,7 @@ build:
       - -D__MICROLIB
       - -o0
       - -gdwarf-4
+      - -DMODBUS_RTU
     Link:
       - --library_type=microlib
       - --map
@@ -42,6 +43,7 @@ build:
     - ../../../../../../../Library/Device/Nuvoton/M480/Include
     - ../../../../../../../Library/StdDriver/inc
     - ../../../../../../../Library/CMSIS/Include
+    - ../../../../../modbus_rtu
     - ${CMSIS_PACK_ROOT}/Nuvoton/NuMicroM4_DFP/1.0.1/Device/M480/Include
   add-path-asm:
     - ${CMSIS_PACK_ROOT}/Nuvoton/NuMicroM4_DFP/1.0.1/Device/M480/Include
@@ -80,6 +82,26 @@ build:
         - file: ../../../../../main.c
           category: sourceC
         - file: ../../../../../ble_mesh_at.c
+          category: sourceC
+    - group: ModbusRTU
+      files:
+        - file: ../../../../../modbus_rtu/modbus_crc.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/modbus_timing.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/modbus_rtu_protocol.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/modbus_rtu_client.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/modbus_rtu_server.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/uart_rs485_driver.c
+          category: sourceC
+        - file: ../../../../../modbus_rtu/modbus_rtu_test.c
+          category: sourceC
+        - file: ../../../../../modbus_sensor_manager.c
+          category: sourceC
+        - file: ../../../../../../../Library/StdDriver/src/crc.c
           category: sourceC
   licenses:
     - license: <unknown>
