@@ -28,6 +28,7 @@ extern "C"
     typedef void (*mesh_led_pulse_callback_t)(uint32_t duration_ms);
     typedef void (*mesh_led_binding_callback_t)(bool is_bound);
     typedef void (*mesh_led_yellow_callback_t)(bool on);
+    typedef void (*mesh_agent_response_callback_t)(const uint8_t *data, uint8_t length);
 
     // Mesh 回調函數結構
     typedef struct
@@ -38,6 +39,7 @@ extern "C"
         mesh_led_pulse_callback_t led_pulse_red;
         mesh_led_binding_callback_t led_binding;
         mesh_led_yellow_callback_t led_yellow;
+        mesh_agent_response_callback_t agent_response;
     } mesh_handler_callbacks_t;
 
     // Mesh 處理函數

@@ -89,6 +89,7 @@ project:
         - file: ../led_indicator.c
         - file: ../digital_io.c
         - file: ../mesh_handler.c
+        - file: ../mesh_modbus_agent.c
     - group: ModbusRTU
       files:
         - file: ../modbus_rtu/modbus_crc.c

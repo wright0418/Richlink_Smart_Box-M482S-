@@ -89,6 +89,8 @@ build:
           category: sourceC
         - file: ../../../../../mesh_handler.c
           category: sourceC
+        - file: ../../../../../mesh_modbus_agent.c
+          category: sourceC
     - group: ModbusRTU
       files:
         - file: ../../../../../modbus_rtu/modbus_crc.c

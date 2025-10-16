@@ -273,6 +273,41 @@ void mesh_handler_process_line(const char *line)
     else if (my_strstr(tokens[0], key3) != (char *)0 && g_mesh_callbacks.led_flash != (void *)0)
         g_mesh_callbacks.led_flash(3); // MDTS 黃燈閃 3 次
 
+    // 檢查是否為 MESH MODBUS Agent 格式
+    // RL Mode: 0x82 0x76 開頭
+    // Bypass Mode: 0x01-0xFF 開頭（8 bytes 以上）
+    bool is_agent_message = false;
+    if (g_mesh_state.last_payload_len >= 8)
+    {
+        // 檢查 RL Mode (header = 0x82 0x76)
+        if (g_mesh_state.last_payload_len >= 11 &&
+            g_mesh_state.last_payload[0] == 0x82 &&
+            g_mesh_state.last_payload[1] == 0x76)
+        {
+            is_agent_message = true;
+        }
+        // 檢查 Bypass Mode (標準 MODBUS RTU 格式，8 bytes)
+        else if (g_mesh_state.last_payload_len == 8)
+        {
+            // 基本檢查：第一個位元組是 slave address (1-247)
+            // 第二個位元組是 function code (常見：0x03, 0x04, 0x06, 0x10)
+            uint8_t slave_addr = g_mesh_state.last_payload[0];
+            uint8_t func_code = g_mesh_state.last_payload[1];
+            if (slave_addr >= 1 && slave_addr <= 247 &&
+                (func_code == 0x03 || func_code == 0x04 || func_code == 0x06 || func_code == 0x10))
+            {
+                is_agent_message = true;
+            }
+        }
+    }
+
+    // 如果是 Agent 訊息，轉發給 Agent 回調處理
+    if (is_agent_message && g_mesh_callbacks.agent_response != (void *)0)
+    {
+        g_mesh_callbacks.agent_response(g_mesh_state.last_payload, (uint8_t)g_mesh_state.last_payload_len);
+        return; // Agent 訊息不執行後續的 PA6 控制邏輯
+    }
+
     // 解析有效負載：若為單一位元組，0x30=OFF、0x31=ON
     if (g_mesh_state.last_payload_len == 1 && g_mesh_callbacks.pa6_control != (void *)0)
     {
