@@ -304,7 +304,13 @@ void mesh_handler_process_line(const char *line)
     // 如果是 Agent 訊息，轉發給 Agent 回調處理
     if (is_agent_message && g_mesh_callbacks.agent_response != (void *)0)
     {
+        // 嘗試立即處理
         g_mesh_callbacks.agent_response(g_mesh_state.last_payload, (uint8_t)g_mesh_state.last_payload_len);
+
+        // 如果處理失敗（Agent 忙碌），緩衝這個請求
+        // 注意：這裡假設 agent_response 會立即嘗試處理
+        // 實際的緩衝邏輯在 agent_mesh_data_callback 中處理
+
         return; // Agent 訊息不執行後續的 PA6 控制邏輯
     }
 
@@ -338,4 +344,30 @@ bool mesh_handler_is_bound(void)
 const char *mesh_handler_get_device_uid(void)
 {
     return g_mesh_state.device_uid;
+}
+
+bool mesh_handler_has_pending_agent_request(void)
+{
+    return g_mesh_state.agent_request_pending;
+}
+
+bool mesh_handler_get_pending_agent_request(uint8_t *data, uint8_t *length)
+{
+    if (!g_mesh_state.agent_request_pending || data == (void *)0 || length == (void *)0)
+    {
+        return false;
+    }
+
+    // 複製待處理的請求
+    uint8_t len = g_mesh_state.pending_agent_length;
+    for (uint8_t i = 0; i < len; i++)
+    {
+        data[i] = g_mesh_state.pending_agent_data[i];
+    }
+    *length = len;
+
+    // 清除待處理標記
+    g_mesh_state.agent_request_pending = false;
+
+    return true;
 }

@@ -1,5 +1,6 @@
 #include "mesh_modbus_agent.h"
 #include "modbus_rtu/modbus_crc.h"
+#include "led_indicator.h"
 
 // 定義 NULL（避免依賴標準庫）
 #ifndef NULL
@@ -40,6 +41,7 @@ static void *my_memset(void *s, int c, unsigned int n)
 
 // 錯誤碼定義
 #define ERROR_CODE_CRC_FAILED 0xFE
+#define ERROR_CODE_BUSY 0xFD // 忙碌中，無法處理請求
 
 // 內部函數聲明
 static bool parse_rl_mode_data(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length);
@@ -136,6 +138,33 @@ bool mesh_modbus_agent_process_mesh_data(
     // 發送 MODBUS 請求
     if (!send_modbus_request(agent))
     {
+        // 立即回應「忙碌中」錯誤給 mesh 主機
+        if (agent->config.mode == MESH_MODBUS_AGENT_MODE_RL)
+        {
+            // RL Mode: 組裝 header + type + 錯誤碼
+            agent->mesh_tx_length = 0;
+            agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[0];
+            agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[1];
+            agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_type;
+            agent->mesh_tx_buffer[agent->mesh_tx_length++] = ERROR_CODE_BUSY;
+
+            if (agent->response_ready_callback != NULL)
+            {
+                agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
+            }
+        }
+        else // BYPASS mode
+        {
+            // Bypass Mode: 直接回應錯誤碼
+            agent->mesh_tx_length = 1;
+            agent->mesh_tx_buffer[0] = ERROR_CODE_BUSY;
+
+            if (agent->response_ready_callback != NULL)
+            {
+                agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
+            }
+        }
+
         return false;
     }
 
@@ -152,6 +181,11 @@ void mesh_modbus_agent_poll(mesh_modbus_agent_t *agent, uint32_t current_ms)
     {
         return;
     }
+
+    // 重要：定期呼叫 modbus_rtu_client_poll 來檢查 timeout
+    // 將 ms 轉換為 us
+    uint32_t current_us = current_ms * 1000U;
+    modbus_rtu_client_poll(agent->modbus_client, current_us);
 
     // 只處理等待回應的狀態
     if (agent->state == AGENT_STATE_WAITING_MODBUS_RESPONSE)
@@ -238,8 +272,11 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
     // 檢查 MODBUS Client 是否忙碌
     if (modbus_rtu_client_is_busy(agent->modbus_client))
     {
+        // 丟棄新收到的 mesh RTU request
+        led_flash_yellow(2); // 丟棄時只閃兩次（沒有紅燈）
         return false;
     }
+    led_flash_yellow(1); // 新 request 進來閃一次
 
     // 使用 MODBUS Client 的發送功能
     // 注意：這裡我們需要手動發送原始資料
@@ -330,6 +367,10 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
         }
     }
 
+    if (send_ok)
+    {
+        led_flash_yellow(3); // 成功送出時閃三次
+    }
     return send_ok;
 }
 
@@ -342,11 +383,6 @@ static void handle_modbus_response(mesh_modbus_agent_t *agent, uint32_t current_
         if (agent->error_callback != NULL)
         {
             agent->error_callback(0xFF); // 超時錯誤碼
-        }
-        // 閃紅燈兩次
-        if (agent->led_flash_red_callback != NULL)
-        {
-            agent->led_flash_red_callback(2);
         }
         agent->state = AGENT_STATE_IDLE;
         return;
@@ -394,12 +430,6 @@ static void handle_modbus_response(mesh_modbus_agent_t *agent, uint32_t current_
         // MODBUS 錯誤
         agent->state = AGENT_STATE_ERROR;
 
-        // 閃紅燈兩次
-        if (agent->led_flash_red_callback != NULL)
-        {
-            agent->led_flash_red_callback(2);
-        }
-
         // 在 RL Mode 下回傳錯誤訊息
         if (agent->config.mode == MESH_MODBUS_AGENT_MODE_RL)
         {
@@ -428,13 +458,6 @@ static void prepare_mesh_response(mesh_modbus_agent_t *agent, bool crc_ok)
     {
         // CRC 錯誤處理
         agent->state = AGENT_STATE_ERROR;
-
-        // 閃紅燈兩次
-        if (agent->led_flash_red_callback != NULL)
-        {
-            agent->led_flash_red_callback(2);
-        }
-
         // RL Mode: 回傳錯誤訊息
         if (agent->config.mode == MESH_MODBUS_AGENT_MODE_RL)
         {
@@ -443,30 +466,23 @@ static void prepare_mesh_response(mesh_modbus_agent_t *agent, bool crc_ok)
             agent->mesh_tx_buffer[1] = agent->rl_header[1];
             agent->mesh_tx_buffer[2] = agent->rl_type;
             agent->mesh_tx_buffer[3] = ERROR_CODE_CRC_FAILED;
-
             if (agent->response_ready_callback != NULL)
             {
                 agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
             }
         }
-        // Bypass Mode: 不回傳
-
         agent->state = AGENT_STATE_IDLE;
         return;
     }
 
     // CRC 正確：去除 CRC 後回傳
     uint16_t data_length = agent->modbus_response_length - 2; // 去除 CRC (最後2 bytes)
-
     if (agent->config.mode == MESH_MODBUS_AGENT_MODE_RL)
     {
-        // RL Mode: header + type + 資料（不含 CRC）
         agent->mesh_tx_length = 0;
         agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[0];
         agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[1];
         agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_type;
-
-        // 複製資料（不含 CRC）
         for (uint16_t i = 0; i < data_length && agent->mesh_tx_length < sizeof(agent->mesh_tx_buffer); i++)
         {
             agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->modbus_response[i];
@@ -474,20 +490,16 @@ static void prepare_mesh_response(mesh_modbus_agent_t *agent, bool crc_ok)
     }
     else // BYPASS mode
     {
-        // Bypass Mode: 僅資料（不含 CRC）
         agent->mesh_tx_length = 0;
         for (uint16_t i = 0; i < data_length && agent->mesh_tx_length < sizeof(agent->mesh_tx_buffer); i++)
         {
             agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->modbus_response[i];
         }
     }
-
-    // 呼叫回調函數
     if (agent->response_ready_callback != NULL)
     {
         agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
     }
-
     agent->state = AGENT_STATE_IDLE;
 }
 

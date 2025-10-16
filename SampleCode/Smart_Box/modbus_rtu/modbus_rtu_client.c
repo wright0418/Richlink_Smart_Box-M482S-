@@ -1,7 +1,9 @@
 #include "modbus_rtu_client.h"
+#include "../led_indicator.h"
 
 #include <string.h>
 
+#include "M480.h"
 #include "modbus_crc.h"
 #include "modbus_rtu_protocol.h"
 
@@ -277,15 +279,19 @@ static void modbus_rtu_client_finish_success(modbus_rtu_client_t *client)
     client->state = MODBUS_RTU_CLIENT_STATE_COMPLETE;
 }
 
+static void modbus_rtu_client_finish_error(modbus_rtu_client_t *client, modbus_rtu_client_state_t error_state)
+{
+    client->state = error_state;
+    led_flash_yellow(2); // 發生 error 時黃燈閃兩下
+    led_pulse_red(1000); // 紅燈亮 1000ms
+}
+
 static void modbus_rtu_client_finish_exception(modbus_rtu_client_t *client, modbus_exception_t exception)
 {
     client->exception_code = exception;
     client->state = MODBUS_RTU_CLIENT_STATE_EXCEPTION;
-}
-
-static void modbus_rtu_client_finish_error(modbus_rtu_client_t *client, modbus_rtu_client_state_t error_state)
-{
-    client->state = error_state;
+    led_flash_yellow(2); // 發生 exception 時黃燈閃兩下
+    led_pulse_red(1000); // 紅燈亮 1000ms
 }
 
 void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte, uint32_t timestamp_us)
@@ -428,7 +434,20 @@ void modbus_rtu_client_poll(modbus_rtu_client_t *client, uint32_t timestamp_us)
 
 bool modbus_rtu_client_is_busy(const modbus_rtu_client_t *client)
 {
-    return (client != NULL) && (client->state == MODBUS_RTU_CLIENT_STATE_WAITING);
+    if (client == NULL)
+    {
+        return false;
+    }
+
+    // 保護臨界區，防止中斷修改狀態
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    bool is_busy = (client->state == MODBUS_RTU_CLIENT_STATE_WAITING);
+
+    __set_PRIMASK(primask);
+
+    return is_busy;
 }
 
 modbus_rtu_client_state_t modbus_rtu_client_get_state(const modbus_rtu_client_t *client)
@@ -437,7 +456,16 @@ modbus_rtu_client_state_t modbus_rtu_client_get_state(const modbus_rtu_client_t 
     {
         return MODBUS_RTU_CLIENT_STATE_ERROR;
     }
-    return client->state;
+
+    // 保護臨界區，防止中斷修改狀態
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    modbus_rtu_client_state_t state = client->state;
+
+    __set_PRIMASK(primask);
+
+    return state;
 }
 
 uint16_t modbus_rtu_client_get_quantity(const modbus_rtu_client_t *client)

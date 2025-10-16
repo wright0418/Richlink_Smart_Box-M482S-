@@ -5,10 +5,8 @@
 #include "mesh_handler.h"
 #include <string.h>
 
-#ifdef MODBUS_RTU
 #include "modbus_sensor_manager.h"
 #include "mesh_modbus_agent.h"
-#endif
 
 #define PLL_CLOCK 192000000
 #define PROJECT_NAME "Smart_Box"
@@ -16,22 +14,20 @@
 // KeyA 按鍵設定 (PB.15)
 #define KEY_A_LONG_PRESS_MS 5000u // 5 秒長按
 
-#ifdef MODBUS_RTU
+// define for MODBUS RTU
 #define MODBUS_SENSOR_SLAVE_ADDRESS (0x01U)
 #define MODBUS_SENSOR_START_ADDRESS (0x0000U)
 #define MODBUS_SENSOR_REGISTER_QUANTITY (6U)
 #define MODBUS_SENSOR_POLL_INTERVAL_MS (1000U)
 #define MODBUS_SENSOR_RESPONSE_TIMEOUT_MS (200U)
 #define MODBUS_SENSOR_FAILURE_THRESHOLD (3U)
-#endif
 
 // 全域變數
 volatile uint32_t g_systick_ms = 0;
 
-#ifdef MODBUS_RTU
+// for MODBUS RTU
 static modbus_sensor_manager_t g_modbus_sensor_manager;
 static mesh_modbus_agent_t g_mesh_modbus_agent;
-#endif
 
 // KeyA 按鍵狀態 (PB.15 - active low)
 static volatile bool g_key_a_pressed = false;
@@ -44,13 +40,8 @@ static volatile uint32_t g_key_a_last_change_ms = 0;
 // ========================= BLE Mesh 與 LED/Mesh 指示區 =========================
 // BLE MESH AT 控制器
 static ble_mesh_at_controller_t g_ble_at;
-// 由 led_indicator 模組接管所有 LED 時序/閃爍管理
-// 僅保留綁定旗標供其他模組（例如 mesh handler）使用（可視需求後續移除）
 // 綁定 UID 紀錄（如需可保留）
 static char g_device_uid[32];
-
-// 最近一筆 Mesh 訊息解析狀態（MDTS/MDTSG/MDTPG 共用）
-// Mesh 訊息解析交由 mesh_handler 處理
 
 // PA.6 由 Mesh 指令控制的自動關閉計時
 // 規格：收到 0x31(ON) 後啟動，5 秒內再收 0x31 則自動延長 5 秒；收到 0x30(OFF) 立即關閉並清除計時
@@ -89,22 +80,18 @@ void SYS_Init(void)
     CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL1_UART0SEL_HXT, CLK_CLKDIV0_UART0(1));
     SystemCoreClockUpdate();
 
-#ifdef MODBUS_RTU
     // UART0 腳位設定 (PD2=RXD, PD3=TXD for MODBUS RTU)
     SYS->GPD_MFPL &= ~(SYS_GPD_MFPL_PD2MFP_Msk | SYS_GPD_MFPL_PD3MFP_Msk);
     SYS->GPD_MFPL |= (SYS_GPD_MFPL_PD2MFP_UART0_RXD | SYS_GPD_MFPL_PD3MFP_UART0_TXD);
     SYS->GPB_MFPH &= ~SYS_GPB_MFPH_PB14MFP_Msk;
     SYS->GPB_MFPH |= SYS_GPB_MFPH_PB14MFP_GPIO;
-#else
+
     // UART0 腳位設定 (PB12=RXD, PB13=TXD for console)
-    SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
-    SYS->GPB_MFPH |= (SYS_GPB_MFPH_PB12MFP_UART0_RXD | SYS_GPB_MFPH_PB13MFP_UART0_TXD);
-#endif
+    // SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
+    // SYS->GPB_MFPH |= (SYS_GPB_MFPH_PB12MFP_UART0_RXD | SYS_GPB_MFPH_PB13MFP_UART0_TXD);
 
     SYS_LockReg();
 }
-
-// 原始 LED 腳位初始化改由 led_indicator_init() 內部完成
 
 // 小工具：十六進位字串轉 bytes（僅接受 [0-9A-Fa-f]，長度需為偶數）
 static int hex_nibble(char c)
@@ -155,8 +142,6 @@ static uint32_t hex_to_bytes(const char *hex, uint8_t *out, uint32_t max_out)
     return out_len;
 }
 
-// Mesh 訊息解析交由 mesh_handler 處理
-
 // BLE MESH AT 事件回調函數
 void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
 {
@@ -199,7 +184,6 @@ void UART1_IRQHandler(void)
     ble_mesh_at_uart_irq_handler(&g_ble_at);
 }
 
-#ifdef MODBUS_RTU
 // MODBUS Sensor Manager 回調函數
 static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity);
 static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures);
@@ -208,19 +192,16 @@ static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t 
 static void agent_response_ready_callback(const uint8_t *data, uint8_t length);
 static void agent_error_callback(uint8_t error_code);
 static void agent_mesh_data_callback(const uint8_t *data, uint8_t length);
-
 static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity)
 {
     (void)registers;
     (void)quantity;
-    led_pulse_blue(120);
 }
 
 static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures)
 {
     (void)exception;
     (void)consecutive_failures;
-    led_pulse_red(200);
 }
 
 // MESH MODBUS Agent 回調函數實作
@@ -258,10 +239,10 @@ static void agent_response_ready_callback(const uint8_t *data, uint8_t length)
     hex_string[hex_idx] = '\0';
 
     // 透過 BLE Mesh AT 傳送 MDTS 訊息
-    // 組裝 AT+MDTS=<hex_string> 命令
-    char mdts_cmd[96]; // "AT+MDTS=" + 80 chars + null
+    // 組裝 AT+MDTS 0 <hex_string> 命令
+    char mdts_cmd[100]; // "AT+MDTS 0 " + 80 chars + null
     uint8_t cmd_idx = 0;
-    const char *prefix = "AT+MDTS=";
+    const char *prefix = "AT+MDTS 0 ";
     while (*prefix && cmd_idx < sizeof(mdts_cmd) - 1)
     {
         mdts_cmd[cmd_idx++] = *prefix++;
@@ -273,24 +254,42 @@ static void agent_response_ready_callback(const uint8_t *data, uint8_t length)
     }
     mdts_cmd[cmd_idx] = '\0';
     ble_mesh_at_send_command(&g_ble_at, mdts_cmd);
-
-    // 閃藍燈一次表示回應成功
-    led_pulse_blue(120);
 }
 
 static void agent_error_callback(uint8_t error_code)
 {
     (void)error_code;
-    // 錯誤處理已在 agent 內部完成（閃紅燈）
 }
 
 // 從 Mesh Handler 接收到 Agent 格式的資料
 static void agent_mesh_data_callback(const uint8_t *data, uint8_t length)
 {
-    // 轉發給 Agent 處理
-    mesh_modbus_agent_process_mesh_data(&g_mesh_modbus_agent, data, length);
+    bool processed = mesh_modbus_agent_process_mesh_data(&g_mesh_modbus_agent, data, length);
+
+    // 如果 Agent 忙碌，將請求存入緩衝
+    if (!processed && mesh_modbus_agent_is_busy(&g_mesh_modbus_agent))
+    {
+        const mesh_handler_state_t *state = mesh_handler_get_state();
+        if (!state->agent_request_pending)
+        {
+            mesh_handler_state_t *mutable_state = (mesh_handler_state_t *)state;
+            if (length <= sizeof(mutable_state->pending_agent_data))
+            {
+                for (uint8_t i = 0; i < length; i++)
+                {
+                    mutable_state->pending_agent_data[i] = data[i];
+                }
+                mutable_state->pending_agent_length = length;
+                mutable_state->agent_request_pending = true;
+            }
+        }
+        else
+        {
+            mesh_handler_state_t *mutable_state = (mesh_handler_state_t *)state;
+            mutable_state->agent_request_dropped++;
+        }
+    }
 }
-#endif
 
 // Mesh Handler 回調函數實作
 static void set_binding_state(bool bound)
@@ -383,10 +382,10 @@ int main()
     // 初始化 Mesh Handler 回調
     mesh_handler_callbacks_t mesh_callbacks = {
         .led_yellow = set_yellow_led,
-        .led_pulse_blue = led_pulse_blue,
-        .led_pulse_red = led_pulse_red,
+        .led_pulse_blue = NULL,
+        .led_pulse_red = NULL,
         .led_binding = set_binding_state,
-        .led_flash = flash_yellow_led,
+        .led_flash = NULL,
         .pa6_control = set_pa6_output,
 #ifdef MODBUS_RTU
         .agent_response = agent_mesh_data_callback
@@ -419,15 +418,15 @@ int main()
     // 初始化 MESH MODBUS Agent
     mesh_modbus_agent_config_t agent_config = {
         .mode = MESH_MODBUS_AGENT_MODE_RL, // 預設使用 RL Mode
-        .modbus_timeout_ms = 500,          // MODBUS 超時 500ms
-        .max_response_wait_ms = 1000       // 最大等待 1 秒
+        .modbus_timeout_ms = 300,          // MODBUS 超時 300ms (縮短以加快處理)
+        .max_response_wait_ms = 500        // 最大等待 500ms
     };
 
     if (!mesh_modbus_agent_init(&g_mesh_modbus_agent, &agent_config,
                                 &g_modbus_sensor_manager.client,
                                 agent_response_ready_callback,
                                 agent_error_callback,
-                                led_flash_yellow))
+                                NULL))
     {
         led_red_on();
     }
@@ -458,10 +457,19 @@ int main()
 
         led_indicator_update(current_time);
 
-#ifdef MODBUS_RTU
-        modbus_sensor_manager_poll(&g_modbus_sensor_manager, current_time);
+        // modbus_sensor_manager_poll(&g_modbus_sensor_manager, current_time);  // 關閉 sensor mode
         mesh_modbus_agent_poll(&g_mesh_modbus_agent, current_time);
-#endif
+
+        // 檢查並處理待處理的 Agent 請求
+        if (mesh_handler_has_pending_agent_request() && !mesh_modbus_agent_is_busy(&g_mesh_modbus_agent))
+        {
+            uint8_t pending_data[64];
+            uint8_t pending_length = 0;
+            if (mesh_handler_get_pending_agent_request(pending_data, &pending_length))
+            {
+                mesh_modbus_agent_process_mesh_data(&g_mesh_modbus_agent, pending_data, pending_length);
+            }
+        }
 
         // 更新 BLE MESH AT 模組
         ble_mesh_at_update(&g_ble_at);

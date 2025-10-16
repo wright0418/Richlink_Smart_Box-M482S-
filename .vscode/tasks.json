@@ -136,6 +136,8 @@
             },
             "args": [
                 "gdbserver",
+                "--port",
+                "3333",
                 "--probe",
                 "cmsisdap:",
                 "--connect",
@@ -143,10 +145,7 @@
                 "--persist",
                 "--reset-run",
                 "--cbuild-run",
-                "${command:cmsis-csolution.getCbuildRunFile}",
-                "--quiet",
-                "--log",
-                "*.cbuild_run,*server=info"
+                "${command:cmsis-csolution.getCbuildRunFile}"
             ],
             "problemMatcher": []
         },
