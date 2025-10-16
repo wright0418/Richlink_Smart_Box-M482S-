@@ -83,6 +83,12 @@ build:
           category: sourceC
         - file: ../../../../../ble_mesh_at.c
           category: sourceC
+        - file: ../../../../../led_indicator.c
+          category: sourceC
+        - file: ../../../../../digital_io.c
+          category: sourceC
+        - file: ../../../../../mesh_handler.c
+          category: sourceC
     - group: ModbusRTU
       files:
         - file: ../../../../../modbus_rtu/modbus_crc.c

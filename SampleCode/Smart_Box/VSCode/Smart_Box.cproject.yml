@@ -86,6 +86,9 @@ project:
       files:
         - file: ../main.c
         - file: ../ble_mesh_at.c
+        - file: ../led_indicator.c
+        - file: ../digital_io.c
+        - file: ../mesh_handler.c
     - group: ModbusRTU
       files:
         - file: ../modbus_rtu/modbus_crc.c
