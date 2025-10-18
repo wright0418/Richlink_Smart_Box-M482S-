@@ -1,0 +1,28 @@
+# Ignore VSCode build outputs for Smart_Box
+SampleCode/Smart_Box/VSCode/out/
+SampleCode/Smart_Box/VSCode/tmp/
+
+# Common temporary files
+*.log
+*.tmp
+*.temp
+
+# Compiled object files and binaries
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Ignore build system files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Ignore IDE/editor specific
+.vscode/
+.idea/
