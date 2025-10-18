@@ -1,4 +1,4 @@
-#include "NuMicro.h"
+#include "NuMicro.h" // IWYU pragma: keep
 #include "ble_mesh_at.h"
 #include "led_indicator.h"
 #include "digital_io.h"
@@ -10,6 +10,12 @@
 
 #define PLL_CLOCK 192000000
 #define PROJECT_NAME "Smart_Box"
+
+// 引用 GPIO 名稱避免靜態分析器誤判 NuMicro.h 未使用
+static inline void __main_nu_dummy_ref(void)
+{
+    (void)PA6;
+}
 
 // KeyA 按鍵設定 (PB.15)
 #define KEY_A_LONG_PRESS_MS 5000u // 5 秒長按
@@ -43,10 +49,6 @@ static ble_mesh_at_controller_t g_ble_at;
 // 綁定 UID 紀錄（如需可保留）
 static char g_device_uid[32];
 
-// PA.6 由 Mesh 指令控制的自動關閉計時
-// 規格：收到 0x31(ON) 後啟動，5 秒內再收 0x31 則自動延長 5 秒；收到 0x30(OFF) 立即關閉並清除計時
-#define PA6_ON_HOLD_MS 5000u
-static volatile uint32_t g_pa6_auto_off_deadline_ms = 0;
 // ==============================================================================
 
 // 取得系統時間函數
@@ -261,6 +263,22 @@ static void agent_error_callback(uint8_t error_code)
     (void)error_code;
 }
 
+// 當 DI(PB7) 狀態變化時，主動回報：Header + GET(TYPE=0x00) + STATUS_OK(0x80) + IO_ADDR(0x00) + DI
+static void on_di_changed(bool new_state)
+{
+    uint8_t payload[6];
+    uint8_t idx = 0;
+    payload[idx++] = 0x82;                    // Header byte1
+    payload[idx++] = 0x76;                    // Header byte2
+    payload[idx++] = 0x00;                    // TYPE: GET
+    payload[idx++] = 0x80;                    // STATUS_OK
+    payload[idx++] = 0x00;                    // IO_ADDR
+    payload[idx++] = new_state ? 0x01 : 0x00; // DI
+
+    // 轉成 Hex 並透過 AT+MDTS 送出（重用 agent_response_ready_callback 內的轉字串邏輯）
+    agent_response_ready_callback(payload, idx);
+}
+
 // 從 Mesh Handler 接收到 Agent 格式的資料
 static void agent_mesh_data_callback(const uint8_t *data, uint8_t length)
 {
@@ -302,20 +320,7 @@ static void flash_yellow_led(uint32_t count)
     led_flash_yellow(count);
 }
 
-static void set_pa6_output(bool state)
-{
-    if (state)
-    {
-        PA6 = 1;
-        // 設定 30 秒後自動關閉
-        g_pa6_auto_off_deadline_ms = g_systick_ms + (30U * 1000U);
-    }
-    else
-    {
-        PA6 = 0;
-        g_pa6_auto_off_deadline_ms = 0;
-    }
-}
+// 不再支援 Mesh Handler 直控 PA6（僅透過 Agent SET 控制）
 
 // LED 控制適配器函數
 static void set_yellow_led(bool on)
@@ -375,6 +380,8 @@ int main()
 
     // 設定 KeyA 長按回調 (5秒長按發送解綁命令)
     digital_io_set_key_callback(send_nr_command);
+    // 綁定 DI 變化主動回報
+    digital_io_set_di_callback(on_di_changed);
 
     // 初始化 LED 指示器
     led_indicator_init();
@@ -386,7 +393,7 @@ int main()
         .led_pulse_red = NULL,
         .led_binding = set_binding_state,
         .led_flash = NULL,
-        .pa6_control = set_pa6_output,
+        .pa6_control = NULL,
 #ifdef MODBUS_RTU
         .agent_response = agent_mesh_data_callback
 #else
@@ -474,11 +481,6 @@ int main()
         // 更新 BLE MESH AT 模組
         ble_mesh_at_update(&g_ble_at);
 
-        // PA6 Mesh ON 保持計時：逾時則自動關閉
-        if (g_pa6_auto_off_deadline_ms && (int32_t)(current_time - g_pa6_auto_off_deadline_ms) >= 0)
-        {
-            PA6 = 0; // 自動 OFF
-            g_pa6_auto_off_deadline_ms = 0;
-        }
+        // 不再在 main.c 中對 PA6 進行自動關閉計時（僅由 Agent 控制）
     }
 }

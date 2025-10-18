@@ -10,7 +10,7 @@
   - 接收到的資料是 Hex string 最大 20byes
   - 資料格式  header(2byte) + type (1byte) + MODBUS RTU package (8bytes)
     - header = 0x82 0x76
-    - type = 0x01 (GET) / 0x02 (SET) / 0x03 (RTU)
+    - type = 0x00 (GET) / 0x01 (SET) / 0x02 (RTU)
     - MODBUS RTU package = MODBUS RTU ID (1byte) + function code (1byte) + start address (2byte) + quantity of registers (2byte) + CRC (2byte)
     - 範例: 827601010300000002C40B
   - 將 MODBUS RTU package 透過 UART MODBUS CLIENT 發送給裝置

@@ -1,6 +1,7 @@
 #include "mesh_modbus_agent.h"
 #include "modbus_rtu/modbus_crc.h"
 #include "led_indicator.h"
+#include "digital_io.h"
 
 // 定義 NULL（避免依賴標準庫）
 #ifndef NULL
@@ -35,13 +36,17 @@ static void *my_memset(void *s, int c, unsigned int n)
 #define RL_HEADER_BYTE2 0x76
 
 // RL Mode 的 Type 定義
-#define RL_TYPE_GET 0x01
-#define RL_TYPE_SET 0x02
-#define RL_TYPE_RTU 0x03
+#define RL_TYPE_GET 0x00
+#define RL_TYPE_SET 0x01
+#define RL_TYPE_RTU 0x02
+
+// RL GET/SET ADDR 定義
+#define IO_ADDR 0x00
 
 // 錯誤碼定義
 #define ERROR_CODE_CRC_FAILED 0xFE
 #define ERROR_CODE_BUSY 0xFD // 忙碌中，無法處理請求
+#define STATUS_OK 0x80
 
 // 內部函數聲明
 static bool parse_rl_mode_data(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length);
@@ -50,6 +55,8 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent);
 static void handle_modbus_response(mesh_modbus_agent_t *agent, uint32_t current_ms);
 static void prepare_mesh_response(mesh_modbus_agent_t *agent, bool crc_ok);
 static uint16_t calculate_crc16(const uint8_t *data, uint16_t length);
+static void rl_handle_get(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length);
+static void rl_handle_set(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length);
 
 // 外部時間函數（由 main.c 提供）
 extern uint32_t get_system_time_ms(void);
@@ -135,7 +142,22 @@ bool mesh_modbus_agent_process_mesh_data(
         return false;
     }
 
-    // 發送 MODBUS 請求
+    // 若為 RL GET/SET，屬於本地處理，立即回覆，不經 MODBUS
+    if (agent->config.mode == MESH_MODBUS_AGENT_MODE_RL)
+    {
+        if (agent->rl_type == RL_TYPE_GET)
+        {
+            rl_handle_get(agent, data, length);
+            return true;
+        }
+        else if (agent->rl_type == RL_TYPE_SET)
+        {
+            rl_handle_set(agent, data, length);
+            return true;
+        }
+    }
+
+    // 發送 MODBUS 請求（僅 RL_TYPE_RTU 或 BYPASS）
     if (!send_modbus_request(agent))
     {
         // 立即回應「忙碌中」錯誤給 mesh 主機
@@ -218,9 +240,8 @@ bool mesh_modbus_agent_is_busy(const mesh_modbus_agent_t *agent)
 
 static bool parse_rl_mode_data(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length)
 {
-    // RL Mode 格式: header(2) + type(1) + MODBUS RTU package(8)
-    // 最小長度 = 2 + 1 + 8 = 11
-    if (length < 11)
+    // 檢查 header 基本長度
+    if (length < 4)
     {
         return false;
     }
@@ -244,9 +265,38 @@ static bool parse_rl_mode_data(mesh_modbus_agent_t *agent, const uint8_t *data, 
         return false;
     }
 
-    // 提取 MODBUS RTU package (從第3個位元組開始)
-    agent->modbus_request_length = length - 3;
-    my_memcpy(agent->modbus_request, &data[3], agent->modbus_request_length);
+    if (agent->rl_type == RL_TYPE_RTU)
+    {
+        // RL Mode + RTU: header(2) + type(1) + MODBUS RTU package(8) => 最小 11 bytes
+        if (length < 11)
+        {
+            return false;
+        }
+        // 提取 MODBUS RTU package (從第3個位元組開始)
+        agent->modbus_request_length = length - 3;
+        my_memcpy(agent->modbus_request, &data[3], agent->modbus_request_length);
+    }
+    else
+    {
+        // GET/SET: 先不填寫 modbus_request；僅確認長度合理
+        if (agent->rl_type == RL_TYPE_GET)
+        {
+            // header(2)+type(1)+IO_ADDR(1) => 最少 4 bytes
+            if (length < 4)
+            {
+                return false;
+            }
+        }
+        else if (agent->rl_type == RL_TYPE_SET)
+        {
+            // header(2)+type(1)+IO_ADDR(1)+VALUE(1) => 最少 5 bytes
+            if (length < 5)
+            {
+                return false;
+            }
+        }
+        agent->modbus_request_length = 0;
+    }
 
     return true;
 }
@@ -507,4 +557,65 @@ static uint16_t calculate_crc16(const uint8_t *data, uint16_t length)
 {
     // 使用 MODBUS CRC 計算函數
     return modbus_crc16_compute(data, length, MODBUS_CRC_METHOD_AUTO);
+}
+
+// ============================================================================
+// RL GET/SET handlers (local, no Modbus)
+// ============================================================================
+
+static void rl_handle_get(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length)
+{
+    // 要求：data[3] == IO_ADDR (0x00)
+    uint8_t io_addr = (length >= 4) ? data[3] : IO_ADDR;
+
+    // 讀取 DI（PB.7）
+    uint8_t di = digital_io_get_di() ? 0x01 : 0x00;
+
+    // 回傳格式：Header + TYPE + STATUS_OK(0x80) + IO_ADDR + DI
+    agent->mesh_tx_length = 0;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[0];
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[1];
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_type;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = STATUS_OK;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = io_addr;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = di;
+
+    if (agent->response_ready_callback != NULL)
+    {
+        agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
+    }
+}
+
+static void rl_handle_set(mesh_modbus_agent_t *agent, const uint8_t *data, uint8_t length)
+{
+    // 要求：data[3] == IO_ADDR (0x00), data[4] 控制繼電器
+    if (length < 5)
+    {
+        return; // 防呆
+    }
+    uint8_t io_addr = data[3];
+    uint8_t val = data[4];
+    if (io_addr == IO_ADDR)
+    {
+        // 任何非 0 視為 1
+        bool on = (val != 0) ? true : false;
+        digital_io_set_pa6(on);
+    }
+
+    // 讀回 DO（PA.6）狀態
+    uint8_t do_state = digital_io_get_do() ? 0x01 : 0x00;
+
+    // 回傳格式：Header + TYPE + STATUS_OK(0x80) + IO_ADDR + DO
+    agent->mesh_tx_length = 0;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[0];
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_header[1];
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = agent->rl_type;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = STATUS_OK;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = io_addr;
+    agent->mesh_tx_buffer[agent->mesh_tx_length++] = do_state;
+
+    if (agent->response_ready_callback != NULL)
+    {
+        agent->response_ready_callback(agent->mesh_tx_buffer, agent->mesh_tx_length);
+    }
 }

@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// 定義 NULL 為 (void*)0 以支援 C99
+// 定義 NULL 為 (void*)0 以支援 C99（若尚未定義）
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 
 // 簡單的 string 函數實作（避免依賴 string.h）
 static char *my_strstr(const char *haystack, const char *needle)
@@ -275,16 +277,27 @@ void mesh_handler_process_line(const char *line)
 
     // 檢查是否為 MESH MODBUS Agent 格式
     // RL Mode: 0x82 0x76 開頭
+    //   - TYPE_GET(0x00): 最少 4 bytes => [82 76 00 IO_ADDR]
+    //   - TYPE_SET(0x01): 最少 5 bytes => [82 76 01 IO_ADDR VALUE]
+    //   - TYPE_RTU(0x02): 最少 11 bytes => [82 76 02 <MODBUS ADU(>=8)>]
     // Bypass Mode: 0x01-0xFF 開頭（8 bytes 以上）
     bool is_agent_message = false;
-    if (g_mesh_state.last_payload_len >= 8)
+    if (g_mesh_state.last_payload_len >= 4)
     {
         // 檢查 RL Mode (header = 0x82 0x76)
-        if (g_mesh_state.last_payload_len >= 11 &&
-            g_mesh_state.last_payload[0] == 0x82 &&
+        if (g_mesh_state.last_payload[0] == 0x82 &&
             g_mesh_state.last_payload[1] == 0x76)
         {
-            is_agent_message = true;
+            if (g_mesh_state.last_payload_len >= 3)
+            {
+                uint8_t rl_type = g_mesh_state.last_payload[2];
+                if ((rl_type == 0x00 && g_mesh_state.last_payload_len >= 4) || // GET
+                    (rl_type == 0x01 && g_mesh_state.last_payload_len >= 5) || // SET
+                    (rl_type == 0x02 && g_mesh_state.last_payload_len >= 11))  // RTU
+                {
+                    is_agent_message = true;
+                }
+            }
         }
         // 檢查 Bypass Mode (標準 MODBUS RTU 格式，8 bytes)
         else if (g_mesh_state.last_payload_len == 8)
@@ -314,21 +327,7 @@ void mesh_handler_process_line(const char *line)
         return; // Agent 訊息不執行後續的 PA6 控制邏輯
     }
 
-    // 解析有效負載：若為單一位元組，0x30=OFF、0x31=ON
-    if (g_mesh_state.last_payload_len == 1 && g_mesh_callbacks.pa6_control != (void *)0)
-    {
-        uint8_t b = g_mesh_state.last_payload[0];
-        if (b == 0x30u)
-        {
-            // OFF 命令
-            g_mesh_callbacks.pa6_control(false);
-        }
-        else if (b == 0x31u)
-        {
-            // ON 命令
-            g_mesh_callbacks.pa6_control(true);
-        }
-    }
+    // 需求更新：移除單 byte 0x30/0x31 直控 PA6 的行為（改由 Agent GET/SET/RTU 路由處理）
 }
 
 const mesh_handler_state_t *mesh_handler_get_state(void)
