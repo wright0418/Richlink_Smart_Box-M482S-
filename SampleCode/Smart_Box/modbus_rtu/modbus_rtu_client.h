@@ -11,9 +11,13 @@
 #define MODBUS_RTU_CLIENT_MAX_REGISTERS (125U)
 #define MODBUS_RTU_CLIENT_MAX_WRITE_MULTIPLE_REGISTERS (123U)
 
+#define MODBUS_RTU_FUNCTION_READ_COILS (0x01U)
+#define MODBUS_RTU_FUNCTION_READ_DISCRETE_INPUTS (0x02U)
 #define MODBUS_RTU_FUNCTION_READ_HOLDING (0x03U)
 #define MODBUS_RTU_FUNCTION_READ_INPUT (0x04U)
+#define MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL (0x05U)
 #define MODBUS_RTU_FUNCTION_WRITE_SINGLE (0x06U)
+#define MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS (0x0FU)
 #define MODBUS_RTU_FUNCTION_WRITE_MULTIPLE (0x10U)
 
 typedef enum
@@ -66,6 +70,18 @@ bool modbus_rtu_client_start_read_holding(modbus_rtu_client_t *client,
                                           uint16_t quantity,
                                           uint32_t timeout_ms);
 
+bool modbus_rtu_client_start_read_coils(modbus_rtu_client_t *client,
+                                        uint8_t slave_address,
+                                        uint16_t start_address,
+                                        uint16_t quantity,
+                                        uint32_t timeout_ms);
+
+bool modbus_rtu_client_start_read_discrete_inputs(modbus_rtu_client_t *client,
+                                                  uint8_t slave_address,
+                                                  uint16_t start_address,
+                                                  uint16_t quantity,
+                                                  uint32_t timeout_ms);
+
 bool modbus_rtu_client_start_read_input(modbus_rtu_client_t *client,
                                         uint8_t slave_address,
                                         uint16_t start_address,
@@ -78,12 +94,32 @@ bool modbus_rtu_client_start_write_single(modbus_rtu_client_t *client,
                                           uint16_t value,
                                           uint32_t timeout_ms);
 
+bool modbus_rtu_client_start_write_single_coil(modbus_rtu_client_t *client,
+                                               uint8_t slave_address,
+                                               uint16_t coil_address,
+                                               uint16_t on_off_value,
+                                               uint32_t timeout_ms);
+
 bool modbus_rtu_client_start_write_multiple(modbus_rtu_client_t *client,
                                             uint8_t slave_address,
                                             uint16_t start_address,
                                             uint16_t quantity,
                                             const uint16_t *values,
                                             uint32_t timeout_ms);
+
+bool modbus_rtu_client_start_write_multiple_coils(modbus_rtu_client_t *client,
+                                                  uint8_t slave_address,
+                                                  uint16_t start_address,
+                                                  uint16_t quantity,
+                                                  const uint8_t *coil_bytes,
+                                                  uint8_t byte_count,
+                                                  uint32_t timeout_ms);
+
+// Raw request API for generic/unknown function codes
+bool modbus_rtu_client_start_raw(modbus_rtu_client_t *client,
+                                 const uint8_t *request_frame,
+                                 uint16_t frame_length,
+                                 uint32_t timeout_ms);
 
 void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte, uint32_t timestamp_us);
 void modbus_rtu_client_poll(modbus_rtu_client_t *client, uint32_t timestamp_us);

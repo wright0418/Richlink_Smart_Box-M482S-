@@ -299,15 +299,14 @@ void mesh_handler_process_line(const char *line)
                 }
             }
         }
-        // 檢查 Bypass Mode (標準 MODBUS RTU 格式，8 bytes)
-        else if (g_mesh_state.last_payload_len == 8)
+        // 檢查 Bypass Mode (標準 MODBUS RTU 格式，8 bytes 或更長)
+        else if (g_mesh_state.last_payload_len >= 8)
         {
             // 基本檢查：第一個位元組是 slave address (1-247)
-            // 第二個位元組是 function code (常見：0x03, 0x04, 0x06, 0x10)
+            // 第二個位元組是 function code (1-127, 標準 Modbus 範圍)
             uint8_t slave_addr = g_mesh_state.last_payload[0];
             uint8_t func_code = g_mesh_state.last_payload[1];
-            if (slave_addr >= 1 && slave_addr <= 247 &&
-                (func_code == 0x03 || func_code == 0x04 || func_code == 0x06 || func_code == 0x10))
+            if (slave_addr >= 1 && slave_addr <= 247 && func_code >= 1 && func_code <= 127)
             {
                 is_agent_message = true;
             }

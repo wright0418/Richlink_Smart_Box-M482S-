@@ -345,7 +345,35 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
     // 根據 function code 決定使用哪個 API
     bool send_ok = false;
 
-    if (func_code == MODBUS_RTU_FUNCTION_READ_HOLDING)
+    if (func_code == MODBUS_RTU_FUNCTION_READ_COILS)
+    {
+        // Read Coils (0x01)
+        if (agent->modbus_request_length >= 6)
+        {
+            uint16_t quantity = (uint16_t)((agent->modbus_request[4] << 8) | agent->modbus_request[5]);
+            send_ok = modbus_rtu_client_start_read_coils(
+                agent->modbus_client,
+                slave_addr,
+                start_addr,
+                quantity,
+                agent->config.modbus_timeout_ms);
+        }
+    }
+    else if (func_code == MODBUS_RTU_FUNCTION_READ_DISCRETE_INPUTS)
+    {
+        // Read Discrete Inputs (0x02)
+        if (agent->modbus_request_length >= 6)
+        {
+            uint16_t quantity = (uint16_t)((agent->modbus_request[4] << 8) | agent->modbus_request[5]);
+            send_ok = modbus_rtu_client_start_read_discrete_inputs(
+                agent->modbus_client,
+                slave_addr,
+                start_addr,
+                quantity,
+                agent->config.modbus_timeout_ms);
+        }
+    }
+    else if (func_code == MODBUS_RTU_FUNCTION_READ_HOLDING)
     {
         // Read Holding Registers (0x03)
         if (agent->modbus_request_length >= 6)
@@ -373,6 +401,20 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
                 agent->config.modbus_timeout_ms);
         }
     }
+    else if (func_code == MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL)
+    {
+        // Write Single Coil (0x05)
+        if (agent->modbus_request_length >= 6)
+        {
+            uint16_t value = (uint16_t)((agent->modbus_request[4] << 8) | agent->modbus_request[5]);
+            send_ok = modbus_rtu_client_start_write_single_coil(
+                agent->modbus_client,
+                slave_addr,
+                start_addr,
+                value,
+                agent->config.modbus_timeout_ms);
+        }
+    }
     else if (func_code == MODBUS_RTU_FUNCTION_WRITE_SINGLE)
     {
         // Write Single Register (0x06)
@@ -385,6 +427,30 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
                 start_addr,
                 value,
                 agent->config.modbus_timeout_ms);
+        }
+    }
+    else if (func_code == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS)
+    {
+        // Write Multiple Coils (0x0F)
+        // 格式: slave(1) + func(1) + start_addr(2) + quantity(2) + byte_count(1) + coil_bytes(N) + crc(2)
+        if (agent->modbus_request_length >= 9)
+        {
+            uint16_t quantity = (uint16_t)((agent->modbus_request[4] << 8) | agent->modbus_request[5]);
+            uint8_t byte_count = agent->modbus_request[6];
+            const uint8_t *coil_bytes = &agent->modbus_request[7];
+
+            // 基本長度防呆
+            if ((uint16_t)(7U + byte_count) <= agent->modbus_request_length)
+            {
+                send_ok = modbus_rtu_client_start_write_multiple_coils(
+                    agent->modbus_client,
+                    slave_addr,
+                    start_addr,
+                    quantity,
+                    coil_bytes,
+                    byte_count,
+                    agent->config.modbus_timeout_ms);
+            }
         }
     }
     else if (func_code == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE)
@@ -415,6 +481,16 @@ static bool send_modbus_request(mesh_modbus_agent_t *agent)
                 values,
                 agent->config.modbus_timeout_ms);
         }
+    }
+    else
+    {
+        // Unknown function code: use raw passthrough
+        // Send the complete RTU frame as-is (includes CRC)
+        send_ok = modbus_rtu_client_start_raw(
+            agent->modbus_client,
+            agent->modbus_request,
+            agent->modbus_request_length,
+            agent->config.modbus_timeout_ms);
     }
 
     if (send_ok)
