@@ -27,7 +27,6 @@ build:
       - -D__MICROLIB
       - -o0
       - -gdwarf-4
-      - -DMODBUS_RTU
     Link:
       - --library_type=microlib
       - --map
@@ -81,6 +80,8 @@ build:
       files:
         - file: ../../../../../main.c
           category: sourceC
+        - file: ../../../../../hex_utils.c
+          category: sourceC
         - file: ../../../../../ble_mesh_at.c
           category: sourceC
         - file: ../../../../../led_indicator.c
@@ -88,6 +89,8 @@ build:
         - file: ../../../../../digital_io.c
           category: sourceC
         - file: ../../../../../mesh_handler.c
+          category: sourceC
+        - file: ../../../../../mesh_modbus_agent.c
           category: sourceC
     - group: ModbusRTU
       files:

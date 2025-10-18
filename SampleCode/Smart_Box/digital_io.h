@@ -5,7 +5,8 @@
 #include <stdbool.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 // 按鍵去抖常數
@@ -15,37 +16,45 @@ extern "C" {
 // PA6 自動關閉常數
 #define PA6_ON_HOLD_MS 5000u
 
-// 數位 I/O 狀態結構
-typedef struct {
-    // KeyA 按鍵狀態 (PB.15 - active low)
-    volatile bool key_a_pressed;
-    volatile uint32_t key_a_press_start_ms;
-    volatile bool key_a_long_press_sent;
-    volatile uint32_t key_a_last_change_ms;
-    
-    // PA.6 由 Mesh 指令控制的自動關閉計時
-    volatile uint32_t pa6_auto_off_deadline_ms;
-} digital_io_state_t;
+    // 數位 I/O 狀態結構
+    typedef struct
+    {
+        // KeyA 按鍵狀態 (PB.15 - active low)
+        volatile bool key_a_pressed;
+        volatile uint32_t key_a_press_start_ms;
+        volatile bool key_a_long_press_sent;
+        volatile uint32_t key_a_last_change_ms;
 
-// 回調函數類型定義
-typedef void (*key_a_long_press_callback_t)(void);
+        // PA.6 由 Mesh 指令控制的自動關閉計時
+        volatile uint32_t pa6_auto_off_deadline_ms;
+    } digital_io_state_t;
 
-// 數位 I/O 控制函數
-void digital_io_init(void);
-void digital_io_update(uint32_t current_time);
+    // 回調函數類型定義
+    typedef void (*key_a_long_press_callback_t)(void);
+    typedef void (*di_change_callback_t)(bool new_state);
 
-// 按鍵處理
-void digital_io_set_key_callback(key_a_long_press_callback_t callback);
+    // 數位 I/O 控制函數
+    void digital_io_init(void);
+    void digital_io_update(uint32_t current_time);
 
-// PA6 控制（由 Mesh 指令控制）
-void digital_io_set_pa6(bool state);
-void digital_io_set_pa6_with_auto_off(bool state);
+    // 按鍵處理
+    void digital_io_set_key_callback(key_a_long_press_callback_t callback);
+    void digital_io_set_di_callback(di_change_callback_t callback);
 
-// 數位 I/O 測試函數
-void digital_io_test(void);
+    // PA6 控制（由 Mesh 指令控制）
+    void digital_io_set_pa6(bool state);
+    void digital_io_set_pa6_with_auto_off(bool state);
 
-// 獲取狀態
-const digital_io_state_t *digital_io_get_state(void);
+    // 讀取 DI/DO 狀態
+    // 回傳 true 代表邏輯高(1)，false 代表邏輯低(0)
+    bool digital_io_get_di(void);
+    bool digital_io_get_do(void);
+
+    // 數位 I/O 測試函數
+    void digital_io_test(void);
+
+    // 獲取狀態
+    const digital_io_state_t *digital_io_get_state(void);
 
 #ifdef __cplusplus
 }

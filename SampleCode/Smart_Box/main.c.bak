@@ -2,7 +2,7 @@
  * @file main.c
  * @brief Smart Box Main Application
  * @date 2025-10-18
- *
+ * 
  * Main application for Smart Box with BLE Mesh, LED indicators,
  * Digital I/O control, and Modbus RTU sensor integration.
  */
@@ -18,7 +18,6 @@
 #include "modbus_sensor_manager.h"
 #include "mesh_modbus_agent.h"
 #include "hex_utils.h"
-#include <stdio.h>
 #include <string.h>
 
 /* =============================================================================
@@ -27,6 +26,10 @@
 // System Configuration
 #define PLL_CLOCK 192000000
 #define PROJECT_NAME "Smart_Box"
+
+// Key Configuration (PB.15 - active low)
+#define KEY_DEBOUNCE_MS 30u
+#define KEY_A_LONG_PRESS_MS 5000u // 5 seconds long press
 
 // Modbus RTU Configuration
 #define MODBUS_SENSOR_SLAVE_ADDRESS (0x01U)
@@ -51,14 +54,22 @@ static ble_mesh_at_controller_t s_ble_at;
 // Device UID storage
 static char s_device_uid[32];
 
+// Key state (PB.15 - active low)
+static volatile bool s_key_a_pressed = false;
+static volatile uint32_t s_key_a_press_start_ms = 0;
+static volatile bool s_key_a_long_press_sent = false;
+static volatile uint32_t s_key_a_last_change_ms = 0;
+
+#ifdef MODBUS_RTU
 // Modbus sensor manager and agent
 static modbus_sensor_manager_t s_modbus_sensor_manager;
 static mesh_modbus_agent_t s_mesh_modbus_agent;
+#endif
 
 /* =============================================================================
  * Static Function Declarations
  * ===========================================================================*/
-// System initialization
+// System
 static void sys_init(void);
 
 // Callbacks - BLE Mesh
@@ -66,12 +77,14 @@ static void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data);
 
 // Callbacks - Mesh Handler
 static void mesh_set_binding_state_callback(bool bound);
+static void mesh_flash_yellow_led_callback(uint32_t count);
 static void mesh_set_yellow_led_callback(bool on);
 
 // Callbacks - Digital IO
 static void send_nr_command(void);
 static void on_di_changed_callback(bool new_state);
 
+#ifdef MODBUS_RTU
 // Callbacks - Modbus Sensor Manager
 static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity);
 static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures);
@@ -80,7 +93,7 @@ static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t 
 static void agent_response_ready_callback(const uint8_t *data, uint8_t length);
 static void agent_error_callback(uint8_t error_code);
 static void agent_mesh_data_callback(const uint8_t *data, uint8_t length);
-static void process_pending_agent_request(void);
+#endif
 
 /* =============================================================================
  * Public Utility Functions
@@ -114,44 +127,7 @@ void UART1_IRQHandler(void)
 }
 
 /* =============================================================================
- * System Initialization
- * ===========================================================================*/
-/**
- * @brief System initialization (clock, UART, GPIO)
- */
-static void sys_init(void)
-{
-    SYS_UnlockReg();
-
-    // Disable PF.2 and PF.3 digital input path
-    PF->MODE &= ~(GPIO_MODE_MODE2_Msk | GPIO_MODE_MODE3_Msk);
-
-    // Enable HXT clock
-    CLK_EnableXtalRC(CLK_PWRCTL_HXTEN_Msk);
-    CLK_WaitClockReady(CLK_STATUS_HXTSTB_Msk);
-
-    // Set core clock to 192MHz
-    CLK_SetCoreClock(PLL_CLOCK);
-    CLK->PCLKDIV = (CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2);
-
-    // Enable UART0 module clock
-    CLK_EnableModuleClock(UART0_MODULE);
-    CLK_SetModuleClock(UART0_MODULE, CLK_CLKSEL1_UART0SEL_HXT, CLK_CLKDIV0_UART0(1));
-    SystemCoreClockUpdate();
-
-    // Set UART0 multi-function pins (PD2=RXD, PD3=TXD for MODBUS RTU)
-    SYS->GPD_MFPL &= ~(SYS_GPD_MFPL_PD2MFP_Msk | SYS_GPD_MFPL_PD3MFP_Msk);
-    SYS->GPD_MFPL |= (SYS_GPD_MFPL_PD2MFP_UART0_RXD | SYS_GPD_MFPL_PD3MFP_UART0_TXD);
-
-    // Set PB14 as GPIO (RS485 direction control)
-    SYS->GPB_MFPH &= ~SYS_GPB_MFPH_PB14MFP_Msk;
-    SYS->GPB_MFPH |= SYS_GPB_MFPH_PB14MFP_GPIO;
-
-    SYS_LockReg();
-}
-
-/* =============================================================================
- * BLE Mesh Callbacks
+ * Static Helper Functions - BLE Mesh Callbacks
  * ===========================================================================*/
 /**
  * @brief Send unbind command (KeyA long press callback)
@@ -168,14 +144,14 @@ static void send_nr_command(void)
  */
 static void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
 {
-    // Forward event to mesh handler
+    // 將�?件傳?�給 mesh handler ?��?
     mesh_handler_event(event, data);
 
-    // Handle specific events in main
+    // 保�?一些主程�??�要�??��??��?
     switch (event)
     {
     case BLE_MESH_AT_EVENT_PROV_BOUND:
-        // Store device UID
+        // 記�? UID
         {
             const char *uid = ble_mesh_at_get_uid(&s_ble_at);
             size_t k = 0;
@@ -186,7 +162,7 @@ static void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
             }
             s_device_uid[k] = '\0';
         }
-        // Update LED state
+        // LED ?�?�交??led_indicator ?�管
         led_set_binding_state(true);
         led_set_provisioning_wait(false);
         break;
@@ -202,85 +178,34 @@ static void on_ble_mesh_at_event(ble_mesh_at_event_t event, const char *data)
     }
 }
 
-/* =============================================================================
- * Mesh Handler Callbacks
- * ===========================================================================*/
-/**
- * @brief Set binding state LED callback
- */
-static void mesh_set_binding_state_callback(bool bound)
+void UART1_IRQHandler(void)
 {
-    led_set_binding_state(bound);
+    ble_mesh_at_uart_irq_handler(&s_ble_at);
 }
 
-/**
- * @brief Set yellow LED callback
- */
-static void mesh_set_yellow_led_callback(bool on)
-{
-    led_set_yellow_status(on);
-}
+// MODBUS Sensor Manager ?�調?�數
+static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity);
+static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures);
 
-/* =============================================================================
- * Digital I/O Callbacks
- * ===========================================================================*/
-/**
- * @brief Digital input changed callback - report via BLE Mesh
- * @param new_state New DI state (true=high, false=low)
- *
- * Sends: Header + GET(TYPE=0x00) + STATUS_OK(0x80) + IO_ADDR(0x00) + DI
- */
-static void on_di_changed_callback(bool new_state)
-{
-    uint8_t payload[6];
-    uint8_t idx = 0;
-
-    payload[idx++] = 0x82;                    // Header byte1
-    payload[idx++] = 0x76;                    // Header byte2
-    payload[idx++] = 0x00;                    // TYPE: GET
-    payload[idx++] = 0x80;                    // STATUS_OK
-    payload[idx++] = 0x00;                    // IO_ADDR
-    payload[idx++] = new_state ? 0x01 : 0x00; // DI state
-
-    // Convert to hex string and send via AT+MDTS
-    char hex_string[16];
-    if (bytes_to_hex(payload, idx, hex_string, sizeof(hex_string)) > 0)
-    {
-        char mdts_cmd[32];
-        snprintf(mdts_cmd, sizeof(mdts_cmd), "AT+MDTS 0 %s", hex_string);
-        ble_mesh_at_send_command(&s_ble_at, mdts_cmd);
-    }
-}
-
-/* =============================================================================
- * Modbus Sensor Manager Callbacks
- * ===========================================================================*/
-/**
- * @brief Modbus sensor read success callback
- */
+// MESH MODBUS Agent ?�調?�數
+static void agent_response_ready_callback(const uint8_t *data, uint8_t length);
+static void agent_error_callback(uint8_t error_code);
+static void agent_mesh_data_callback(const uint8_t *data, uint8_t length);
 static void modbus_sensor_success_callback(const uint16_t *registers, uint16_t quantity)
 {
     (void)registers;
     (void)quantity;
 }
 
-/**
- * @brief Modbus sensor read error callback
- */
 static void modbus_sensor_error_callback(modbus_exception_t exception, uint32_t consecutive_failures)
 {
     (void)exception;
     (void)consecutive_failures;
 }
 
-/* =============================================================================
- * Mesh Modbus Agent Callbacks
- * ===========================================================================*/
-/**
- * @brief Agent response ready callback - send via BLE Mesh
- * @param data Response data bytes
- * @param length Response data length
- */
+// MESH MODBUS Agent ?�調?�數實�?
+
+// Agent ?��?準�?好�?轉�? Hex String 並透�? BLE Mesh ?�傳
 static void agent_response_ready_callback(const uint8_t *data, uint8_t length)
 {
     if (data == NULL || length == 0)
@@ -288,37 +213,75 @@ static void agent_response_ready_callback(const uint8_t *data, uint8_t length)
         return;
     }
 
-    // Convert bytes to hex string
-    char hex_string[80]; // Max 40 bytes * 2 = 80 chars
-    if (bytes_to_hex(data, length, hex_string, sizeof(hex_string)) == 0)
-    {
-        return;
-    }
+    // �?bytes 轉�? Hex String
+    char hex_string[80]; // ?��?40 bytes * 2 = 80 chars
+    uint8_t hex_idx = 0;
 
-    // Send via AT+MDTS command
-    char mdts_cmd[100];
-    snprintf(mdts_cmd, sizeof(mdts_cmd), "AT+MDTS 0 %s", hex_string);
+    for (uint8_t i = 0; i < length && hex_idx < sizeof(hex_string) - 2; i++)
+    {
+        uint8_t b = data[i];
+        uint8_t hi = (b >> 4) & 0x0F;
+        uint8_t lo = b & 0x0F;
+
+        // �?4 �?
+        if (hi < 10)
+            hex_string[hex_idx++] = '0' + hi;
+        else
+            hex_string[hex_idx++] = 'A' + (hi - 10);
+
+        // �?4 �?
+        if (lo < 10)
+            hex_string[hex_idx++] = '0' + lo;
+        else
+            hex_string[hex_idx++] = 'A' + (lo - 10);
+    }
+    hex_string[hex_idx] = '\0';
+
+    // ?��? BLE Mesh AT ?��?MDTS 訊息
+    // 組�? AT+MDTS 0 <hex_string> ?�令
+    char mdts_cmd[100]; // "AT+MDTS 0 " + 80 chars + null
+    uint8_t cmd_idx = 0;
+    const char *prefix = "AT+MDTS 0 ";
+    while (*prefix && cmd_idx < sizeof(mdts_cmd) - 1)
+    {
+        mdts_cmd[cmd_idx++] = *prefix++;
+    }
+    uint8_t hex_pos = 0;
+    while (hex_string[hex_pos] && cmd_idx < sizeof(mdts_cmd) - 1)
+    {
+        mdts_cmd[cmd_idx++] = hex_string[hex_pos++];
+    }
+    mdts_cmd[cmd_idx] = '\0';
     ble_mesh_at_send_command(&s_ble_at, mdts_cmd);
 }
 
-/**
- * @brief Agent error callback
- */
 static void agent_error_callback(uint8_t error_code)
 {
     (void)error_code;
 }
 
-/**
- * @brief Agent mesh data callback - process incoming requests
- * @param data Incoming mesh data
- * @param length Data length
- */
+// ??DI(PB7) ?�?��??��?，主?��??��?Header + GET(TYPE=0x00) + STATUS_OK(0x80) + IO_ADDR(0x00) + DI
+static void on_di_changed(bool new_state)
+{
+    uint8_t payload[6];
+    uint8_t idx = 0;
+    payload[idx++] = 0x82;                    // Header byte1
+    payload[idx++] = 0x76;                    // Header byte2
+    payload[idx++] = 0x00;                    // TYPE: GET
+    payload[idx++] = 0x80;                    // STATUS_OK
+    payload[idx++] = 0x00;                    // IO_ADDR
+    payload[idx++] = new_state ? 0x01 : 0x00; // DI
+
+    // 轉�? Hex 並透�? AT+MDTS ?�出（�???agent_response_ready_callback ?��?轉�?串�?輯�?
+    agent_response_ready_callback(payload, idx);
+}
+
+// �?Mesh Handler ?�收??Agent ?��??��???
 static void agent_mesh_data_callback(const uint8_t *data, uint8_t length)
 {
     bool processed = mesh_modbus_agent_process_mesh_data(&s_mesh_modbus_agent, data, length);
 
-    // Buffer request if agent is busy
+    // 如�? Agent 忙�?，�?請�?存入緩�?
     if (!processed && mesh_modbus_agent_is_busy(&s_mesh_modbus_agent))
     {
         const mesh_handler_state_t *state = mesh_handler_get_state();
@@ -337,65 +300,110 @@ static void agent_mesh_data_callback(const uint8_t *data, uint8_t length)
         }
         else
         {
-            // Drop request if buffer is full
             mesh_handler_state_t *mutable_state = (mesh_handler_state_t *)state;
             mutable_state->agent_request_dropped++;
         }
     }
 }
 
-/**
- * @brief Handle pending agent request from mesh handler queue
- */
-static void process_pending_agent_request(void)
+// Mesh Handler ?�調?�數實�?
+static void set_binding_state(bool bound)
 {
-    if (!mesh_handler_has_pending_agent_request() || mesh_modbus_agent_is_busy(&s_mesh_modbus_agent))
-    {
-        return;
-    }
+    led_set_binding_state(bound);
+}
 
-    uint8_t pending_data[64];
-    uint8_t pending_length = 0;
-    if (mesh_handler_get_pending_agent_request(pending_data, &pending_length))
+static void flash_yellow_led(uint32_t count)
+{
+    led_flash_yellow(count);
+}
+
+// 不�??�援 Mesh Handler ?�控 PA6（�??��? Agent SET ?�制�?
+
+// LED ?�制?��??�函??
+static void set_yellow_led(bool on)
+{
+    led_set_yellow_status(on);
+}
+
+// KeyA ?�鍵?��??�數 (?�入?��??�能)
+void key_a_update(void)
+{
+    uint32_t current_time = g_systick_ms;
+    bool key_pressed = (PB15 == 0); // active low
+
+    // 檢查?�鍵?�?�是?�改�?
+    bool state_changed = (key_pressed != s_key_a_pressed);
+
+    if (state_changed)
     {
-        mesh_modbus_agent_process_mesh_data(&s_mesh_modbus_agent, pending_data, pending_length);
+        // ?�?�改變�?檢查?��??��?
+        if ((int32_t)(current_time - s_key_a_last_change_ms - KEY_DEBOUNCE_MS) >= 0)
+        {
+            // ?��??��?已�?，接?��??�改�?
+            s_key_a_last_change_ms = current_time;
+
+            if (key_pressed && !s_key_a_pressed)
+            {
+                // ?�鍵?�被?��?
+                s_key_a_pressed = true;
+                s_key_a_press_start_ms = current_time;
+                s_key_a_long_press_sent = false;
+            }
+            else if (!key_pressed && s_key_a_pressed)
+            {
+                // ?�鍵?�被?�放
+                s_key_a_pressed = false;
+                s_key_a_long_press_sent = false;
+            }
+        }
+        // ?��?忽略此次?�?�改變�??�去?��??�內�?
+    }
+    else if (key_pressed && s_key_a_pressed && !s_key_a_long_press_sent)
+    {
+        // ?�鍵?��??��?，檢?�是?��??�長?��???
+        if ((int32_t)(current_time - s_key_a_press_start_ms - KEY_A_LONG_PRESS_MS) >= 0)
+        {
+            // ?��? 5 秒�??��?AT+NR �???�令
+            (void)ble_mesh_at_send_nr(&s_ble_at);
+            s_key_a_long_press_sent = true; // ?�止?��??��?
+        }
     }
 }
 
-/* =============================================================================
- * Main Function
- * ===========================================================================*/
-/**
- * @brief Main application entry point
- */
-int main(void)
+int main()
 {
-    // System initialization
-    sys_init();
+    SYS_Init();
     digital_io_init();
 
-    // Set digital I/O callbacks
+    // 設�? KeyA ?��??�調 (5秒長?�發?�解綁命�?
     digital_io_set_key_callback(send_nr_command);
-    digital_io_set_di_callback(on_di_changed_callback);
+    // 綁�? DI 變�?主�??�報
+    digital_io_set_di_callback(on_di_changed);
 
-    // Initialize LED indicator
+    // ?��???LED ?�示??
     led_indicator_init();
 
-    // Initialize Mesh Handler callbacks
+    // ?��???Mesh Handler ?�調
     mesh_handler_callbacks_t mesh_callbacks = {
-        .led_yellow = mesh_set_yellow_led_callback,
+        .led_yellow = set_yellow_led,
         .led_pulse_blue = NULL,
         .led_pulse_red = NULL,
-        .led_binding = mesh_set_binding_state_callback,
+        .led_binding = set_binding_state,
         .led_flash = NULL,
         .pa6_control = NULL,
-        .agent_response = agent_mesh_data_callback};
+#ifdef MODBUS_RTU
+        .agent_response = agent_mesh_data_callback
+#else
+        .agent_response = NULL
+#endif
+    };
     mesh_handler_init(&mesh_callbacks);
 
-    // Configure SysTick for 1ms interrupt
-    SysTick_Config(SystemCoreClock / 1000);
+    // 設�? SysTick ??1 毫�?精度
+    SysTick_Config(SystemCoreClock / 1000); // 1 毫�?中斷一�?
 
-    // Initialize Modbus Sensor Manager
+#ifdef MODBUS_RTU
+    // ?�接?��???MODBUS Sensor Manager
     modbus_sensor_config_t sensor_config = {
         .slave_address = MODBUS_SENSOR_SLAVE_ADDRESS,
         .start_address = MODBUS_SENSOR_START_ADDRESS,
@@ -411,11 +419,12 @@ int main(void)
         led_red_on();
     }
 
-    // Initialize Mesh Modbus Agent
+    // ?��???MESH MODBUS Agent
     mesh_modbus_agent_config_t agent_config = {
-        .mode = MESH_MODBUS_AGENT_MODE_RL,
-        .modbus_timeout_ms = 300,
-        .max_response_wait_ms = 500};
+        .mode = MESH_MODBUS_AGENT_MODE_RL, // ?�設使用 RL Mode
+        .modbus_timeout_ms = 300,          // MODBUS 超�? 300ms (縮短以�?快�???
+        .max_response_wait_ms = 500        // ?�大�?�?500ms
+    };
 
     if (!mesh_modbus_agent_init(&s_mesh_modbus_agent, &agent_config,
                                 &s_modbus_sensor_manager.client,
@@ -425,8 +434,9 @@ int main(void)
     {
         led_red_on();
     }
+#endif
 
-    // Initialize BLE Mesh AT module
+    // ?��???BLE MESH AT 模�?
     ble_mesh_at_config_t ble_config = {
         .baudrate = 115200,
         .tx_pin_port = 0, // PA
@@ -437,29 +447,37 @@ int main(void)
     ble_mesh_at_init(&s_ble_at, &ble_config, on_ble_mesh_at_event, get_system_time_ms);
     led_yellow_off();
 
-    // Send reboot command and enter provisioning state
+    // 上電後�???REBOOT，並?�入等�?綁�??�?��??��?心跳�?
     (void)ble_mesh_at_send_reboot(&s_ble_at);
     s_device_uid[0] = '\0';
     led_set_binding_state(false);
     led_set_provisioning_wait(true);
 
-    // Main loop
     while (1)
     {
         uint32_t current_time = g_systick_ms;
 
-        // Update digital I/O (keys and DI/DO)
         digital_io_update(current_time);
 
-        // Update LED indicators
         led_indicator_update(current_time);
 
+        // modbus_sensor_manager_poll(&s_modbus_sensor_manager, current_time);  // ?��? sensor mode
         mesh_modbus_agent_poll(&s_mesh_modbus_agent, current_time);
 
-        // Process pending agent requests
-        process_pending_agent_request();
+        // 檢查並�??��??��???Agent 請�?
+        if (mesh_handler_has_pending_agent_request() && !mesh_modbus_agent_is_busy(&s_mesh_modbus_agent))
+        {
+            uint8_t pending_data[64];
+            uint8_t pending_length = 0;
+            if (mesh_handler_get_pending_agent_request(pending_data, &pending_length))
+            {
+                mesh_modbus_agent_process_mesh_data(&s_mesh_modbus_agent, pending_data, pending_length);
+            }
+        }
 
-        // Update BLE Mesh AT module
+        // ?�新 BLE MESH AT 模�?
         ble_mesh_at_update(&s_ble_at);
+
+        // 不�???main.c 中�? PA6 ?��??��??��?計�?（�???Agent ?�制�?
     }
 }

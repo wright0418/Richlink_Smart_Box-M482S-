@@ -15,7 +15,6 @@ project:
           -D__MICROLIB,
           -o0,
           -gdwarf-4,
-          -DMODBUS_RTU,
         ]
       ASM: [-D__MICROLIB]
       Link:
@@ -46,7 +45,6 @@ project:
           -mthumb,
           -Wno-main,
           -gdwarf-4,
-          -DMODBUS_RTU,
         ]
       Link:
         - -Xlinker
@@ -85,10 +83,12 @@ project:
     - group: User
       files:
         - file: ../main.c
+        - file: ../hex_utils.c
         - file: ../ble_mesh_at.c
         - file: ../led_indicator.c
         - file: ../digital_io.c
         - file: ../mesh_handler.c
+        - file: ../mesh_modbus_agent.c
     - group: ModbusRTU
       files:
         - file: ../modbus_rtu/modbus_crc.c

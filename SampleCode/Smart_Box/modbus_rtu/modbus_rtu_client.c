@@ -1,7 +1,9 @@
 #include "modbus_rtu_client.h"
+#include "../led_indicator.h"
 
 #include <string.h>
 
+#include "M480.h"
 #include "modbus_crc.h"
 #include "modbus_rtu_protocol.h"
 
@@ -117,6 +119,100 @@ bool modbus_rtu_client_start_read_holding(modbus_rtu_client_t *client,
     return true;
 }
 
+bool modbus_rtu_client_start_read_coils(modbus_rtu_client_t *client,
+                                        uint8_t slave_address,
+                                        uint16_t start_address,
+                                        uint16_t quantity,
+                                        uint32_t timeout_ms)
+{
+    if ((client == NULL) || (quantity == 0U))
+    {
+        return false;
+    }
+
+    if ((client->state == MODBUS_RTU_CLIENT_STATE_WAITING) || (client->config.tx_handler == NULL))
+    {
+        return false;
+    }
+
+    uint8_t frame[MODBUS_RTU_MAX_ADU_LENGTH];
+    frame[0] = slave_address;
+    frame[1] = MODBUS_RTU_FUNCTION_READ_COILS;
+    frame[2] = (uint8_t)((start_address >> 8) & 0xFFU);
+    frame[3] = (uint8_t)(start_address & 0xFFU);
+    frame[4] = (uint8_t)((quantity >> 8) & 0xFFU);
+    frame[5] = (uint8_t)(quantity & 0xFFU);
+
+    if (!modbus_rtu_client_send_frame(client, frame, 6U))
+    {
+        return false;
+    }
+
+    client->slave_address = slave_address;
+    client->function_code = MODBUS_RTU_FUNCTION_READ_COILS;
+    client->start_address = start_address;
+    client->quantity = quantity;
+    client->timeout_us = timeout_ms * 1000U;
+    if (client->timeout_us == 0U)
+    {
+        client->timeout_us = 1000U;
+    }
+
+    client->write_value = 0U;
+
+    modbus_timing_update(&client->timing, client->config.baudrate);
+    modbus_timing_reset(&client->timing);
+    modbus_rtu_client_prepare_for_request(client);
+    return true;
+}
+
+bool modbus_rtu_client_start_read_discrete_inputs(modbus_rtu_client_t *client,
+                                                  uint8_t slave_address,
+                                                  uint16_t start_address,
+                                                  uint16_t quantity,
+                                                  uint32_t timeout_ms)
+{
+    if ((client == NULL) || (quantity == 0U))
+    {
+        return false;
+    }
+
+    if ((client->state == MODBUS_RTU_CLIENT_STATE_WAITING) || (client->config.tx_handler == NULL))
+    {
+        return false;
+    }
+
+    uint8_t frame[MODBUS_RTU_MAX_ADU_LENGTH];
+    frame[0] = slave_address;
+    frame[1] = MODBUS_RTU_FUNCTION_READ_DISCRETE_INPUTS;
+    frame[2] = (uint8_t)((start_address >> 8) & 0xFFU);
+    frame[3] = (uint8_t)(start_address & 0xFFU);
+    frame[4] = (uint8_t)((quantity >> 8) & 0xFFU);
+    frame[5] = (uint8_t)(quantity & 0xFFU);
+
+    if (!modbus_rtu_client_send_frame(client, frame, 6U))
+    {
+        return false;
+    }
+
+    client->slave_address = slave_address;
+    client->function_code = MODBUS_RTU_FUNCTION_READ_DISCRETE_INPUTS;
+    client->start_address = start_address;
+    client->quantity = quantity;
+    client->timeout_us = timeout_ms * 1000U;
+    if (client->timeout_us == 0U)
+    {
+        client->timeout_us = 1000U;
+    }
+
+    client->write_value = 0U;
+
+    modbus_timing_update(&client->timing, client->config.baudrate);
+    modbus_timing_reset(&client->timing);
+    modbus_rtu_client_prepare_for_request(client);
+    return true;
+}
+
 bool modbus_rtu_client_start_read_input(modbus_rtu_client_t *client,
                                         uint8_t slave_address,
                                         uint16_t start_address,
@@ -210,6 +306,52 @@ bool modbus_rtu_client_start_write_single(modbus_rtu_client_t *client,
     return true;
 }
 
+bool modbus_rtu_client_start_write_single_coil(modbus_rtu_client_t *client,
+                                               uint8_t slave_address,
+                                               uint16_t coil_address,
+                                               uint16_t on_off_value,
+                                               uint32_t timeout_ms)
+{
+    if (client == NULL)
+    {
+        return false;
+    }
+
+    if ((client->state == MODBUS_RTU_CLIENT_STATE_WAITING) || (client->config.tx_handler == NULL))
+    {
+        return false;
+    }
+
+    uint8_t frame[MODBUS_RTU_MAX_ADU_LENGTH];
+    frame[0] = slave_address;
+    frame[1] = MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL;
+    frame[2] = (uint8_t)((coil_address >> 8) & 0xFFU);
+    frame[3] = (uint8_t)(coil_address & 0xFFU);
+    frame[4] = (uint8_t)((on_off_value >> 8) & 0xFFU);
+    frame[5] = (uint8_t)(on_off_value & 0xFFU);
+
+    if (!modbus_rtu_client_send_frame(client, frame, 6U))
+    {
+        return false;
+    }
+
+    client->slave_address = slave_address;
+    client->function_code = MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL;
+    client->start_address = coil_address;
+    client->quantity = 1U;
+    client->write_value = on_off_value;
+    client->timeout_us = timeout_ms * 1000U;
+    if (client->timeout_us == 0U)
+    {
+        client->timeout_us = 1000U;
+    }
+
+    modbus_timing_update(&client->timing, client->config.baudrate);
+    modbus_timing_reset(&client->timing);
+    modbus_rtu_client_prepare_for_request(client);
+    return true;
+}
+
 bool modbus_rtu_client_start_write_multiple(modbus_rtu_client_t *client,
                                             uint8_t slave_address,
                                             uint16_t start_address,
@@ -272,20 +414,126 @@ bool modbus_rtu_client_start_write_multiple(modbus_rtu_client_t *client,
     return true;
 }
 
+bool modbus_rtu_client_start_write_multiple_coils(modbus_rtu_client_t *client,
+                                                  uint8_t slave_address,
+                                                  uint16_t start_address,
+                                                  uint16_t quantity,
+                                                  const uint8_t *coil_bytes,
+                                                  uint8_t byte_count,
+                                                  uint32_t timeout_ms)
+{
+    if ((client == NULL) || (coil_bytes == NULL) || (quantity == 0U) || (byte_count == 0U))
+    {
+        return false;
+    }
+
+    if ((client->state == MODBUS_RTU_CLIENT_STATE_WAITING) || (client->config.tx_handler == NULL))
+    {
+        return false;
+    }
+
+    uint16_t payload_length = (uint16_t)(7U + byte_count);
+    if ((payload_length + 2U) > MODBUS_RTU_MAX_ADU_LENGTH)
+    {
+        return false;
+    }
+
+    uint8_t frame[MODBUS_RTU_MAX_ADU_LENGTH];
+    frame[0] = slave_address;
+    frame[1] = MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS;
+    frame[2] = (uint8_t)((start_address >> 8) & 0xFFU);
+    frame[3] = (uint8_t)(start_address & 0xFFU);
+    frame[4] = (uint8_t)((quantity >> 8) & 0xFFU);
+    frame[5] = (uint8_t)(quantity & 0xFFU);
+    frame[6] = byte_count;
+
+    for (uint16_t i = 0U; i < byte_count; ++i)
+    {
+        frame[7U + i] = coil_bytes[i];
+    }
+
+    if (!modbus_rtu_client_send_frame(client, frame, payload_length))
+    {
+        return false;
+    }
+
+    client->slave_address = slave_address;
+    client->function_code = MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS;
+    client->start_address = start_address;
+    client->quantity = quantity;
+    client->write_value = 0U;
+    client->timeout_us = timeout_ms * 1000U;
+    if (client->timeout_us == 0U)
+    {
+        client->timeout_us = 1000U;
+    }
+
+    modbus_timing_update(&client->timing, client->config.baudrate);
+    modbus_timing_reset(&client->timing);
+    modbus_rtu_client_prepare_for_request(client);
+    return true;
+}
+
+bool modbus_rtu_client_start_raw(modbus_rtu_client_t *client,
+                                 const uint8_t *request_frame,
+                                 uint16_t frame_length,
+                                 uint32_t timeout_ms)
+{
+    if ((client == NULL) || (request_frame == NULL) || (frame_length < 4U))
+    {
+        return false;
+    }
+
+    if ((client->state == MODBUS_RTU_CLIENT_STATE_WAITING) || (client->config.tx_handler == NULL))
+    {
+        return false;
+    }
+
+    // Extract slave address and function code from raw frame (without CRC)
+    uint8_t slave_address = request_frame[0];
+    uint8_t function_code = request_frame[1];
+
+    // Send raw frame directly (already includes CRC)
+    if (!client->config.tx_handler(request_frame, frame_length, client->config.tx_context))
+    {
+        return false;
+    }
+
+    client->slave_address = slave_address;
+    client->function_code = function_code;
+    client->start_address = 0U;
+    client->quantity = 0U;
+    client->write_value = 0U;
+    client->timeout_us = timeout_ms * 1000U;
+    if (client->timeout_us == 0U)
+    {
+        client->timeout_us = 1000U;
+    }
+
+    modbus_timing_update(&client->timing, client->config.baudrate);
+    modbus_timing_reset(&client->timing);
+    modbus_rtu_client_prepare_for_request(client);
+    return true;
+}
+
 static void modbus_rtu_client_finish_success(modbus_rtu_client_t *client)
 {
     client->state = MODBUS_RTU_CLIENT_STATE_COMPLETE;
+}
+
+static void modbus_rtu_client_finish_error(modbus_rtu_client_t *client, modbus_rtu_client_state_t error_state)
+{
+    client->state = error_state;
+    led_flash_yellow(2); // 發生 error 時黃燈閃兩下
+    led_pulse_red(1000); // 紅燈亮 1000ms
 }
 
 static void modbus_rtu_client_finish_exception(modbus_rtu_client_t *client, modbus_exception_t exception)
 {
     client->exception_code = exception;
     client->state = MODBUS_RTU_CLIENT_STATE_EXCEPTION;
-}
-
-static void modbus_rtu_client_finish_error(modbus_rtu_client_t *client, modbus_rtu_client_state_t error_state)
-{
-    client->state = error_state;
+    led_flash_yellow(2); // 發生 exception 時黃燈閃兩下
+    led_pulse_red(1000); // 紅燈亮 1000ms
 }
 
 void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte, uint32_t timestamp_us)
@@ -338,7 +586,10 @@ void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte,
         }
         else
         {
-            if ((client->function_code == MODBUS_RTU_FUNCTION_WRITE_SINGLE) || (client->function_code == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE))
+            if ((client->function_code == MODBUS_RTU_FUNCTION_WRITE_SINGLE) ||
+                (client->function_code == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE) ||
+                (client->function_code == MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL) ||
+                (client->function_code == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS))
             {
                 client->expected_length = 8U;
             }
@@ -363,6 +614,32 @@ void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte,
                 return;
             }
             client->expected_length = (uint16_t)(3U + byte_count + 2U);
+        }
+        else if ((client->function_code == MODBUS_RTU_FUNCTION_READ_COILS) || (client->function_code == MODBUS_RTU_FUNCTION_READ_DISCRETE_INPUTS))
+        {
+            uint8_t byte_count = client->response_buffer[2];
+            uint16_t expected_data_bytes = (uint16_t)((client->quantity + 7U) / 8U);
+            if (byte_count != expected_data_bytes)
+            {
+                modbus_rtu_client_finish_error(client, MODBUS_RTU_CLIENT_STATE_ERROR);
+                return;
+            }
+            client->expected_length = (uint16_t)(3U + byte_count + 2U);
+        }
+        else
+        {
+            // Raw mode: unknown function code, use byte count if available
+            // Assume response format: slave + func + byte_count + data[N] + CRC
+            // This works for most read-type functions
+            if (client->response_length >= 3U)
+            {
+                uint8_t byte_count = client->response_buffer[2];
+                // Sanity check: byte_count should be reasonable (1-250)
+                if (byte_count > 0U && byte_count <= 250U)
+                {
+                    client->expected_length = (uint16_t)(3U + byte_count + 2U);
+                }
+            }
         }
     }
 
@@ -402,6 +679,26 @@ void modbus_rtu_client_handle_rx_byte(modbus_rtu_client_t *client, uint8_t byte,
                     return;
                 }
             }
+            else if (function_field == MODBUS_RTU_FUNCTION_WRITE_SINGLE_COIL)
+            {
+                uint16_t resp_address = modbus_rtu_protocol_read_u16(&client->response_buffer[2]);
+                uint16_t resp_value = modbus_rtu_protocol_read_u16(&client->response_buffer[4]);
+                if ((resp_address != client->start_address) || (resp_value != client->write_value))
+                {
+                    modbus_rtu_client_finish_error(client, MODBUS_RTU_CLIENT_STATE_ERROR);
+                    return;
+                }
+            }
+            else if (function_field == MODBUS_RTU_FUNCTION_WRITE_MULTIPLE_COILS)
+            {
+                uint16_t resp_address = modbus_rtu_protocol_read_u16(&client->response_buffer[2]);
+                uint16_t resp_quantity = modbus_rtu_protocol_read_u16(&client->response_buffer[4]);
+                if ((resp_address != client->start_address) || (resp_quantity != client->quantity))
+                {
+                    modbus_rtu_client_finish_error(client, MODBUS_RTU_CLIENT_STATE_ERROR);
+                    return;
+                }
+            }
             modbus_rtu_client_finish_success(client);
         }
     }
@@ -428,7 +725,20 @@ void modbus_rtu_client_poll(modbus_rtu_client_t *client, uint32_t timestamp_us)
 
 bool modbus_rtu_client_is_busy(const modbus_rtu_client_t *client)
 {
-    return (client != NULL) && (client->state == MODBUS_RTU_CLIENT_STATE_WAITING);
+    if (client == NULL)
+    {
+        return false;
+    }
+
+    // 保護臨界區，防止中斷修改狀態
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    bool is_busy = (client->state == MODBUS_RTU_CLIENT_STATE_WAITING);
+
+    __set_PRIMASK(primask);
+
+    return is_busy;
 }
 
 modbus_rtu_client_state_t modbus_rtu_client_get_state(const modbus_rtu_client_t *client)
@@ -437,7 +747,16 @@ modbus_rtu_client_state_t modbus_rtu_client_get_state(const modbus_rtu_client_t 
     {
         return MODBUS_RTU_CLIENT_STATE_ERROR;
     }
-    return client->state;
+
+    // 保護臨界區，防止中斷修改狀態
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    modbus_rtu_client_state_t state = client->state;
+
+    __set_PRIMASK(primask);
+
+    return state;
 }
 
 uint16_t modbus_rtu_client_get_quantity(const modbus_rtu_client_t *client)

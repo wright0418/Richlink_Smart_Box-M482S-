@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// 定義 NULL 為 (void*)0 以支援 C99
+// 定義 NULL 為 (void*)0 以支援 C99（若尚未定義）
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 
 // 簡單的 string 函數實作（避免依賴 string.h）
 static char *my_strstr(const char *haystack, const char *needle)
@@ -273,21 +275,58 @@ void mesh_handler_process_line(const char *line)
     else if (my_strstr(tokens[0], key3) != (char *)0 && g_mesh_callbacks.led_flash != (void *)0)
         g_mesh_callbacks.led_flash(3); // MDTS 黃燈閃 3 次
 
-    // 解析有效負載：若為單一位元組，0x30=OFF、0x31=ON
-    if (g_mesh_state.last_payload_len == 1 && g_mesh_callbacks.pa6_control != (void *)0)
+    // 檢查是否為 MESH MODBUS Agent 格式
+    // RL Mode: 0x82 0x76 開頭
+    //   - TYPE_GET(0x00): 最少 4 bytes => [82 76 00 IO_ADDR]
+    //   - TYPE_SET(0x01): 最少 5 bytes => [82 76 01 IO_ADDR VALUE]
+    //   - TYPE_RTU(0x02): 最少 11 bytes => [82 76 02 <MODBUS ADU(>=8)>]
+    // Bypass Mode: 0x01-0xFF 開頭（8 bytes 以上）
+    bool is_agent_message = false;
+    if (g_mesh_state.last_payload_len >= 4)
     {
-        uint8_t b = g_mesh_state.last_payload[0];
-        if (b == 0x30u)
+        // 檢查 RL Mode (header = 0x82 0x76)
+        if (g_mesh_state.last_payload[0] == 0x82 &&
+            g_mesh_state.last_payload[1] == 0x76)
         {
-            // OFF 命令
-            g_mesh_callbacks.pa6_control(false);
+            if (g_mesh_state.last_payload_len >= 3)
+            {
+                uint8_t rl_type = g_mesh_state.last_payload[2];
+                if ((rl_type == 0x00 && g_mesh_state.last_payload_len >= 4) || // GET
+                    (rl_type == 0x01 && g_mesh_state.last_payload_len >= 5) || // SET
+                    (rl_type == 0x02 && g_mesh_state.last_payload_len >= 11))  // RTU
+                {
+                    is_agent_message = true;
+                }
+            }
         }
-        else if (b == 0x31u)
+        // 檢查 Bypass Mode (標準 MODBUS RTU 格式，8 bytes 或更長)
+        else if (g_mesh_state.last_payload_len >= 8)
         {
-            // ON 命令
-            g_mesh_callbacks.pa6_control(true);
+            // 基本檢查：第一個位元組是 slave address (1-247)
+            // 第二個位元組是 function code (1-127, 標準 Modbus 範圍)
+            uint8_t slave_addr = g_mesh_state.last_payload[0];
+            uint8_t func_code = g_mesh_state.last_payload[1];
+            if (slave_addr >= 1 && slave_addr <= 247 && func_code >= 1 && func_code <= 127)
+            {
+                is_agent_message = true;
+            }
         }
     }
+
+    // 如果是 Agent 訊息，轉發給 Agent 回調處理
+    if (is_agent_message && g_mesh_callbacks.agent_response != (void *)0)
+    {
+        // 嘗試立即處理
+        g_mesh_callbacks.agent_response(g_mesh_state.last_payload, (uint8_t)g_mesh_state.last_payload_len);
+
+        // 如果處理失敗（Agent 忙碌），緩衝這個請求
+        // 注意：這裡假設 agent_response 會立即嘗試處理
+        // 實際的緩衝邏輯在 agent_mesh_data_callback 中處理
+
+        return; // Agent 訊息不執行後續的 PA6 控制邏輯
+    }
+
+    // 需求更新：移除單 byte 0x30/0x31 直控 PA6 的行為（改由 Agent GET/SET/RTU 路由處理）
 }
 
 const mesh_handler_state_t *mesh_handler_get_state(void)
@@ -303,4 +342,30 @@ bool mesh_handler_is_bound(void)
 const char *mesh_handler_get_device_uid(void)
 {
     return g_mesh_state.device_uid;
+}
+
+bool mesh_handler_has_pending_agent_request(void)
+{
+    return g_mesh_state.agent_request_pending;
+}
+
+bool mesh_handler_get_pending_agent_request(uint8_t *data, uint8_t *length)
+{
+    if (!g_mesh_state.agent_request_pending || data == (void *)0 || length == (void *)0)
+    {
+        return false;
+    }
+
+    // 複製待處理的請求
+    uint8_t len = g_mesh_state.pending_agent_length;
+    for (uint8_t i = 0; i < len; i++)
+    {
+        data[i] = g_mesh_state.pending_agent_data[i];
+    }
+    *length = len;
+
+    // 清除待處理標記
+    g_mesh_state.agent_request_pending = false;
+
+    return true;
 }
