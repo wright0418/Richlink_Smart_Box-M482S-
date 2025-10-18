@@ -36,13 +36,6 @@
 
 ## 基本用法
 
-### 1. 包含標頭檔
-```c
-#ifdef MODBUS_RTU
-#include "modbus_rtu_test.h"
-#endif
-```
-
 ### 2. 系統初始化
 ```c
 void SYS_Init(void)

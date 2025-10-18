@@ -27,7 +27,6 @@ build:
       - -D__MICROLIB
       - -o0
       - -gdwarf-4
-      - -DMODBUS_RTU
     Link:
       - --library_type=microlib
       - --map
@@ -80,6 +79,8 @@ build:
     - group: User
       files:
         - file: ../../../../../main.c
+          category: sourceC
+        - file: ../../../../../hex_utils.c
           category: sourceC
         - file: ../../../../../ble_mesh_at.c
           category: sourceC

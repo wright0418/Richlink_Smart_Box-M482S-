@@ -39,11 +39,9 @@ void digital_io_init(void)
     g_di_state_cached = (PB7 == 0);
     g_di_last_change_ms = g_systick_ms;
 
-#ifdef MODBUS_RTU
     // PB.14 作為 RS485 DIR 控制腳
     GPIO_SetMode(PB, BIT14, GPIO_MODE_OUTPUT);
     PB14 = 0; // 預設接收模式
-#endif
 
     // KeyA (PB.15) 設定為輸入 (active low)
     GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
