@@ -92,6 +92,8 @@ build:
           category: sourceC
         - file: ../../../../../mesh_modbus_agent.c
           category: sourceC
+        - file: ../../../../../modbus_auto_detect.c
+          category: sourceC
     - group: ModbusRTU
       files:
         - file: ../../../../../modbus_rtu/modbus_crc.c

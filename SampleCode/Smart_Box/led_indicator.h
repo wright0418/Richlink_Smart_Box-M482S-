@@ -10,6 +10,8 @@ extern "C"
 #endif
 
 // LED 控制常數
+#define RED_FLASH_ON_MS 100u
+#define RED_FLASH_OFF_MS 150u
 #define YELLOW_FLASH_ON_MS 100u
 #define YELLOW_FLASH_OFF_MS 150u
 #define BLUE_HEARTBEAT_PERIOD_MS 2000u
@@ -20,6 +22,9 @@ extern "C"
     {
         volatile uint32_t red_on_until_ms;
         volatile uint32_t blue_on_until_ms;
+        volatile uint32_t red_flash_count;
+        volatile uint32_t red_flash_next_ms;
+        volatile bool red_flash_on;
         volatile uint32_t yellow_flash_count;
         volatile uint32_t yellow_flash_next_ms;
         volatile bool yellow_flash_on;
@@ -44,6 +49,7 @@ extern "C"
     // LED 脈衝和閃爍控制
     void led_pulse_red(uint32_t duration_ms);
     void led_pulse_blue(uint32_t duration_ms);
+    void led_flash_red(uint32_t count);
     void led_flash_yellow(uint32_t count);
 
     // LED 狀態管理

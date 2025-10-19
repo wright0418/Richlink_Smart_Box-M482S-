@@ -89,6 +89,7 @@ project:
         - file: ../digital_io.c
         - file: ../mesh_handler.c
         - file: ../mesh_modbus_agent.c
+        - file: ../modbus_auto_detect.c
     - group: ModbusRTU
       files:
         - file: ../modbus_rtu/modbus_crc.c

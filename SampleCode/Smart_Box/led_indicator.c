@@ -19,6 +19,9 @@ void led_indicator_init(void)
     // 初始化狀態
     g_led_state.red_on_until_ms = 0;
     g_led_state.blue_on_until_ms = 0;
+    g_led_state.red_flash_count = 0;
+    g_led_state.red_flash_next_ms = 0;
+    g_led_state.red_flash_on = false;
     g_led_state.yellow_flash_count = 0;
     g_led_state.yellow_flash_next_ms = 0;
     g_led_state.yellow_flash_on = false;
@@ -45,6 +48,29 @@ void led_indicator_update(uint32_t current_time)
             led_blue_off();
         }
         g_led_state.blue_on_until_ms = 0;
+    }
+
+    // 紅燈快閃狀態機（Modbus 偵測結果指示）
+    if (g_led_state.red_flash_count > 0 && (int32_t)(current_time - g_led_state.red_flash_next_ms) >= 0)
+    {
+        if (!g_led_state.red_flash_on)
+        {
+            // 開始一次閃爍
+            led_red_on();
+            g_led_state.red_flash_on = true;
+            g_led_state.red_flash_next_ms = current_time + RED_FLASH_ON_MS;
+        }
+        else
+        {
+            // 結束一次閃爍
+            led_red_off();
+            g_led_state.red_flash_on = false;
+            g_led_state.red_flash_count--;
+            if (g_led_state.red_flash_count > 0)
+            {
+                g_led_state.red_flash_next_ms = current_time + RED_FLASH_OFF_MS;
+            }
+        }
     }
 
     // 黃燈快閃狀態機（MDTSG/MDTPG 指示）
@@ -143,6 +169,27 @@ void led_flash_yellow(uint32_t count)
         if (g_led_state.yellow_flash_count > 10)
         {
             g_led_state.yellow_flash_count = 10; // 最多排隊10次
+        }
+    }
+}
+
+// 紅燈快閃 N 次（Modbus 偵測結果指示）
+void led_flash_red(uint32_t count)
+{
+    if (g_led_state.red_flash_count == 0)
+    {
+        // 新開始閃爍
+        g_led_state.red_flash_count = count;
+        g_led_state.red_flash_next_ms = g_systick_ms + 10; // 立即開始
+        g_led_state.red_flash_on = false;
+    }
+    else
+    {
+        // 累加閃爍次數，但限制最大值避免無限排隊
+        g_led_state.red_flash_count += count;
+        if (g_led_state.red_flash_count > 10)
+        {
+            g_led_state.red_flash_count = 10; // 最多排隊10次
         }
     }
 }
