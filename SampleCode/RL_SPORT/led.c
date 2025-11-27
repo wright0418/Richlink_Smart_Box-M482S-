@@ -109,7 +109,7 @@ void SetGreenLed(uint8_t state)
     SetGreenLedRaw(state);
 }
 
-// LED狀態更新，根據週期與duty切換LED
+// Update LED state: toggle according to period and duty
 static void Led_Update(void)
 {
     /* Use precomputed tick targets (set by SetGreenLedMode) to avoid

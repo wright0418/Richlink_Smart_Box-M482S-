@@ -90,7 +90,7 @@ void GPB_IRQHandler(void)
     if (GPIO_GET_INT_FLAG(PB, BIT8))
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);
-        // 可加 g_jump_flag2 = 1; 若有需要
+        // Optionally set g_jump_flag2 = 1 if required
     }
     if (GPIO_GET_INT_FLAG(PB, BIT15))
     {

@@ -32,13 +32,13 @@
 #define RXBUFSIZE 512
 #define BUF_SIZE 512
 
-// GPIO Pins (待移到gpio.h)
+// GPIO Pins (move to gpio.h)
 #define PIN_KEYA PB15
 #define PIN_JUMP1 PB7
 #define PIN_JUMP2 PB8
 #define PIN_GSENSOR_INT PC5
 
-// BLE Command Strings (已在ble.h定義)
+// BLE Command Strings (already defined in ble.h)
 #define BLE_CMD_NAME_QUERY "AT+NAME=?\r\n"
 #define BLE_CMD_ADDR_QUERY "AT+ADDR=?\r\n"
 #define BLE_CMD_MODE_DATA "AT+MODE_DATA\r\n"
@@ -50,7 +50,7 @@
 #define BLE_CMD_DLPS_OFF "AT+DLPS_EN=0\r\n"
 #define BLE_CMD_CCMD "!CCMD@"
 
-// BLE command enum (已在ble.c實作)
+// BLE command enum (implemented in ble.c)
 typedef enum
 {
   BLE_CMD_NONE = 0,
@@ -65,6 +65,16 @@ typedef enum
   BLE_CMD_MAC_ADDR,
   BLE_CMD_DEVICE_NAME
 } BleCmdType;
+/*
+ * Module implementation notes:
+ * - BLE (BLEParseCommand, UART IRQ/RX handling, BLE transport) implemented in ble.c, declared in ble.h
+ * - System status and global `g_sys` live in system_status.c and are initialized by Sys_Init()
+ * - GPIO interrupts, buttons and board-level pin config are in gpio.c
+ * - LED, Buzzer, Timer and G-sensor drivers live in led.c, buzzer.c, timer.c and gsensor.c
+ *
+ * Rationale: keep main.c focused on initialization and high-level flow; use module public APIs
+ * (see respective headers: ble.h, gpio.h, led.h, gsensor.h).
+ */
 
 // BLE command string table
 static const struct
@@ -83,28 +93,6 @@ static const struct
     {BLE_CMD_MAC_ADDR, "MAC_ADDR"},
     {BLE_CMD_DEVICE_NAME, "DEVICE_NAME"}};
 
-/* BLEParseCommand moved to ble.c; use the implementation from there. */
-
-/* Note: g_sys is now defined in system_status.c and initialized by Sys_Init() */
-
-/* UART receive buffers are now defined in ble.c and declared in ble.h */
-
-/* Forward declarations for functions still in main.c */
-
-// LED control function
-/**
- * @brief 控制綠色 LED 開關
- * @param state ON 或 OFF
- */
-/* Green LED control implemented in led.c (SetGreenLed). */
-
-/**
- * @brief 設定 SPD 模式下的 GPIO 腳位為輸入
- */
-/**
- * @brief 設定 SPD 模式下的 GPIO 腳位為輸入
- */
-/* SPD-mode GPIO setup is provided by gpio.c if needed. */
 /*---------------------------------------------------------------------------------------------------------*/
 /*  Function for System Entry to Power Down Mode and Wake up source by GPIO Wake-up pin                    */
 /*---------------------------------------------------------------------------------------------------------*/
@@ -170,59 +158,17 @@ void WakeUpPinFunction(uint32_t u32PDMode)
 }
 #endif
 
-/* TMR0_IRQHandler is now in timer.c, which calls Led_TimerCallback() */
-
-/* UART IRQ handler and BLE receive processing are implemented in ble.c */
-
-/* BLE_UART_SEND is implemented in ble.c; main.c should use the prototype in ble.h */
-
 /**
- * @brief BLE 指令傳送封裝，減少重複流程
- */
-/* BLE helper functions implemented in ble.c */
-
-/* GPIO interrupt handlers are implemented in gpio.c */
-
-/* GPIO interrupt handlers are implemented in gpio.c */
-
-/**
- * @brief 播放蜂鳴器
- * @param freq 頻率
- * @param time_ms 時間（毫秒）
- */
-/* BuzzerPlay implemented in buzzer.c */
-
-/**
- * @brief 讀取 Gsensor 三軸資料
- * @param axis 三軸資料儲存陣列
- */
-
-void ReadGsensorAxis(int16_t *axis)
-{
-  uint8_t data_reg[6];
-  int i;
-
-  I2C_ReadMultiBytesOneReg(I2C0, Gsensor_Addr, 0x03, data_reg, 6);
-
-  for (i = 0; i < 3; i++)
-  {
-    axis[i] = (int16_t)(data_reg[2 * i] << 8 | data_reg[2 * i + 1]) >> 4;
-  }
-}
-
-/* G-sensor power control implemented in gsensor.c */
-
-/**
- * @brief 處理 KeyA 事件，將 g_keyA_state 歸零
+ * @brief Handle KeyA event: clear g_keyA_state
  */
 
 void ProcessKeyAEvent(void)
 {
   if (g_sys.keyA_state == 1)
   {
-    // 可在此加入按鍵處理邏輯
+    // Optional: add key handling logic here
   }
-  g_sys.keyA_state = 0; // 已處理
+  g_sys.keyA_state = 0; // processed
 }
 
 void SYS_Init(void)
@@ -273,30 +219,20 @@ void SYS_Init(void)
   /* Lock protected registers (if desired) is left to caller */
 }
 
-/* BLE helper functions (BLE_DISCONNECT, BLE_to_DLPS, BLEToRunMode,
-   BLEDisconnect, BLESetName) are implemented in ble.c and declared in
-   ble.h. Use those public APIs instead of local definitions. */
-
-/**
- * @brief BLE傳送資料
- */
-/* BLESendData and Gsensor power control functions are implemented in
-   ble.c and gsensor.c respectively. Use those module APIs. */
-
-/**
- * @brief 讀取Gsensor三軸資料
- */
-/* GsensorReadAxis implemented in gsensor.c */
-
-/**
- * @brief 播放蜂鳴器
+/*
+ * Module API summary:
+ * - Use the helper BLE APIs in ble.h/ble.c for BLE-related helpers
+ *   (e.g. BLE_DISCONNECT, BLE_to_DLPS, BLEToRunMode) and UART transport.
+ * - Use gsensor.h/gsensor.c for G-sensor reads and power management.
+ * - Use buzzer.h/buzzer.c for buzzer and MCU DLPS-related GPIO and helpers.
+ * - Use led.h/led.c for LED configuration (e.g. SetGreenLedMode).
+ *
+ * Avoid duplicating low-level hardware behavior in main.c; call module
+ * public APIs instead.
  */
 
-/* MCU_DLPS_GPIO implemented in buzzer.c */
-
-/* SetGreenLedMode is now provided by led.h module */
 /**
- * @brief 初始化 GPIO 腳位（LED、按鍵、Gsensor、Buzzer）
+ * @brief Initialize GPIO pins (LED, buttons, G-sensor, Buzzer)
  */
 void InitGpio(void)
 {
@@ -310,18 +246,13 @@ void InitGpio(void)
 }
 
 /**
- * @brief 初始化 LED/Buzzer 狀態
+ * @brief Initialize LED and Buzzer state
  */
 void InitLedBuzzer(void)
 {
   SetGreenLedMode(2, 50);
   BuzzerPlay(1000, 100); // 2KHz ,50ms
 }
-
-/**
- * @brief BLE模組初始化流程
- */
-/* BleSetup implemented in ble.c */
 
 void InitSystem(void)
 {
@@ -436,9 +367,5 @@ int main()
     }
   }
 }
-
-/* Game logic functions moved to game_logic.c */
-/* ProcessGameStart -> Game_ProcessRunning */
-/* ProcessBleDisconnected -> Game_ProcessDisconnected */
 
 /*** (C) COPYRIGHT 2016 Richlink Technology Corp. ***/

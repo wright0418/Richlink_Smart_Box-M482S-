@@ -25,7 +25,7 @@ typedef enum
     GAME_START = 1
 } GameState;
 
-/* System status structure (封裝所有全域狀態/旗標) */
+/* System status structure (encapsulates all global status/flags) */
 typedef struct
 {
     volatile BleState ble_state;
@@ -45,7 +45,7 @@ typedef struct
 extern SystemStatus g_sys;
 
 /***************************************************************************
- * Accessor APIs (封裝狀態存取，減少直接操作 g_sys)
+ * Accessor APIs (encapsulate state access to avoid direct g_sys manipulation)
  ***************************************************************************/
 
 /* BLE state accessors */

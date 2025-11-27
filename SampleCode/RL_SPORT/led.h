@@ -65,7 +65,8 @@ extern volatile float g_LedDuty;
 #define LED_TIMER_FREQ_HZ_INT (1000 / LED_TIMER_TICK_MS)
 #define LED_TIMER_FREQ_HZ_F (1000.0f / (float)LED_TIMER_TICK_MS)
 
-// SetGreenLedRaw/Led_Update 為 static，僅在 led.c 使用，不需在 header 宣告
+// SetGreenLedRaw / Led_Update are static helpers used only within led.c;
+// they do not require (and should not have) declarations in this header.
 /* led.h - Green LED control module */
 
 /* Avoid including device headers (NuMicro.h) here to keep header portable

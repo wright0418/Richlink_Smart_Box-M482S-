@@ -4,7 +4,7 @@
  *
  * This header exposes board-level GPIO helpers used by `main.c` and
  * other modules. It focuses on configuring buttons, G-sensor pins and
- * power-down wake-up pin behavior.
+ * wake-up pin behavior for low-power modes.
  */
 #ifndef _GPIO_H_
 #define _GPIO_H_
@@ -14,36 +14,59 @@
 /**
  * @brief Initialize push-buttons and G-sensor GPIOs.
  *
- * Sets up PB7, PB8, PB15 and PC5 as required by the board. Enables
- * interrupts and debounce for key input (keyA on PB15).
+ * Configures PB7, PB8, PB15 (buttons) and PC5 (G-sensor interrupt)
+ * as inputs, enables appropriate interrupt triggering and debounce for
+ * the user key (PB15). Also enables NVIC IRQs for GPB/GPC lines.
  */
 void Init_Buttons_Gsensor(void);
 
 /**
- * @brief Configure pins used for SPD power-down (PB7/PB8/PB15/PC5).
+ * @brief Configure pins for SPD (Super Power Down) input state.
+ *
+ * Sets the listed pins to the low-leakage input configuration required
+ * while the MCU is in SPD mode. This function does not enable wake-up
+ * logic; it only configures the GPIO states.
  */
 void InitSpdPins(void);
 
 /**
- * @brief Configure wake-up pin for Deep Power-Down (DPD).
- * @param edgeType Edge selection for wake-up (platform-specific).
+ * @brief Configure Deep Power-Down (DPD) wake-up pin.
+ * @param edgeType Edge selection for wake-up (platform-specific flag
+ *                 forwarded to the clock/power controller).
+ *
+ * Configures the MCU pin used to wake from DPD and programs the
+ * hardware to trigger on the specified edge type.
  */
 void Gpio_ConfigDPDWakeup(uint32_t edgeType);
 
 /**
- * @brief Configure wake-up pins for SPD mode.
+ * @brief Configure SPD (Super Power Down) wake-up pins.
+ *
+ * Typically selects PB15 (or other board-specific pins) as the SPD
+ * wake-up source and programs debounce/wakeup filtering as required.
  */
 void Gpio_ConfigSPDWakeup(void);
 
-/* GPIO operation macros (module-owned, exposed for others) */
-#define GPIO_SET(port, bit)   ((port)->DOUT |= (bit))
-#define GPIO_CLR(port, bit)   ((port)->DOUT &= ~(bit))
+/**
+ * @brief Simple GPIO helpers for direct pin manipulation.
+ *
+ * These macros perform a direct set/clear on a port DOUT register and are
+ * provided as convenience helpers. Prefer using module-level APIs where
+ * possible rather than manipulating DOUT directly.
+ */
+#define GPIO_SET(port, bit) ((port)->DOUT |= (bit))
+#define GPIO_CLR(port, bit) ((port)->DOUT &= ~(bit))
 
 /**
- * @brief Enable I2C pin Schmitt trigger (board helper).
+ * @brief Enable Schmitt trigger on I2C pins (board helper).
+ *
+ * Some boards require the I2C SCL/SDA Schmitt trigger to be enabled to
+ * meet signal integrity requirements. This helper configures the pin
+ * attribute accordingly.
  */
 void EnableI2C_Schmitt(void);
 
+/** Board-level helpers used by startup code in main.c */
 /** Board-level helpers used by startup code in main.c */
 void Board_ConfigPCLKDiv(void);
 void Board_ConfigMultiFuncPins(void);
