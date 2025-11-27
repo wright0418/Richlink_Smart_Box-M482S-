@@ -26,6 +26,10 @@
 #include "gsensor.h"
 #include "i2c.h"
 
+#if USE_GSENSOR_JUMP_DETECT
+#include "gsensor_jump_detect.h"
+#endif
+
 /* Application-specific configuration */
 #define STANDBY_TIME (60 * 1000) // 60Sec = 60000ms
 #define Gsensor_Addr 0x15
@@ -164,11 +168,21 @@ void WakeUpPinFunction(uint32_t u32PDMode)
 
 void ProcessKeyAEvent(void)
 {
-  if (g_sys.keyA_state == 1)
+#if USE_GSENSOR_JUMP_DETECT
+  /* Start G-Sensor calibration when button pressed */
+  /* No game state restriction - allow calibration anytime when not already calibrating */
+  if (!JumpDetect_IsCalibrating())
   {
-    // Optional: add key handling logic here
+    DBG_PRINT("[Main] Starting G-Sensor calibration...\n");
+    JumpDetect_StartCalibration();
   }
-  g_sys.keyA_state = 0; // processed
+  else
+  {
+    DBG_PRINT("[Main] Calibration already in progress\n");
+  }
+#else
+  // Optional: add key handling logic here for HALL sensor mode
+#endif
 }
 
 void SYS_Init(void)
@@ -282,6 +296,15 @@ void InitPeripheral(void)
   SetGreenLedMode(2, 50);
   Sys_Init();  /* Initialize system status */
   Game_Init(); /* Initialize game logic */
+
+#if USE_GSENSOR_JUMP_DETECT
+  /* Initialize G-Sensor jump detection module */
+  JumpDetect_Init();
+  DBG_PRINT("[Main] G-Sensor jump detection mode enabled\n");
+  DBG_PRINT("[Main] Press button (PB15) to start calibration\n");
+#else
+  DBG_PRINT("[Main] HALL Sensor jump detection mode enabled\n");
+#endif
 }
 
 int main()
@@ -338,12 +361,37 @@ int main()
 #endif
   while (1)
   {
+#if USE_GSENSOR_JUMP_DETECT
+    /* G-Sensor jump detection: poll at 50Hz (20ms interval) */
+    static uint32_t last_gsensor_time = 0;
+    uint32_t now = get_ticks_ms();
 
-#if enable_Gsensor_Mode
-    /* Read G-sensor axis data if in G-sensor mode */
-    GsensorReadAxis(axis);
-    DBG_PRINT("X,%d ,Y,%d ,Z,%d\n", axis[0], axis[1], axis[2]);
+    if (get_elapsed_ms(last_gsensor_time) >= 20) /* 50Hz = 20ms */
+    {
+      last_gsensor_time = now;
+
+      int16_t axis[3];
+      GsensorReadAxis(axis);
+
+      /* Process calibration or jump detection */
+      if (JumpDetect_IsCalibrating())
+      {
+        JumpDetect_ProcessCalibration(axis);
+      }
+      else if (JumpDetect_IsReady())
+      {
+        JumpDetect_Process(axis);
+      }
+    }
+
 #endif
+    /* Process button events */
+    if (Sys_GetKeyAFlag())
+    {
+      Sys_SetKeyAFlag(0);
+      ProcessKeyAEvent();
+    }
+
     /* Process BLE messages */
     CheckBleRecvMsg();
 

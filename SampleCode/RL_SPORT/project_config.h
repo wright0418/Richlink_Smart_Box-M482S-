@@ -5,8 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 192000000
 
-/* Debug logging */
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
@@ -56,5 +55,27 @@
 #define STANDBY_TIME (60 * 1000) /* 60 sec */
 #define BUF_SIZE 512			 /* Size of DBG_PRINT buffer */
 #define enable_Gsensor_Mode 1
+
+/* G-Sensor Jump Detection Configuration */
+/* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
+#define USE_GSENSOR_JUMP_DETECT 1
+
+#if USE_GSENSOR_JUMP_DETECT
+/* FIR Low-pass Filter Configuration */
+#define JUMP_FIR_ORDER 7		  /* Filter order (number of taps) */
+#define JUMP_FIR_CUTOFF_HZ 6.0f	  /* Cutoff frequency in Hz */
+#define JUMP_SAMPLE_RATE_HZ 50.0f /* G-Sensor sampling rate (50Hz = 20ms period) */
+
+/* Jump Detection Thresholds */
+#define JUMP_THRESHOLD_MULTIPLIER 1.5f /* Threshold = baseline + (multiplier * std_dev) */
+#define JUMP_MIN_INTERVAL_MS 200	   /* Minimum time between jumps (debounce) */
+/* Require signal to drop below baseline + hysteresis before next jump is allowed */
+#define JUMP_RESET_HYSTERESIS_G 0.20f /* Hysteresis (in g) to prevent double count on up/down */
+
+/* Calibration Configuration */
+#define JUMP_CALIB_STATIC_TIME_MS 2000 /* Static baseline collection time (2 seconds) */
+#define JUMP_CALIB_DYNAMIC_JUMPS 8	   /* Number of jumps for dynamic calibration */
+#define JUMP_CALIB_TIMEOUT_MS 30000	   /* Maximum calibration time (30 seconds) */
+#endif								   /* USE_GSENSOR_JUMP_DETECT */
 
 #endif // _PROJECT_CONFIG_H_

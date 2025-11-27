@@ -2,14 +2,23 @@
 #include "gpio.h"
 #include "NuMicro.h"
 #include "system_status.h"
+#include "project_config.h"
 
 void Init_Buttons_Gsensor(void)
 {
     /* PB GPIO */
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+
+#ifndef USE_GSENSOR_JUMP_DETECT
+    /* HALL sensors used for jump counting: enable PB7/PB8 inputs and interrupt */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
     GPIO_EnableInt(PB, 7, GPIO_INT_FALLING);
+#else
+    /* In G-Sensor mode, PB7/PB8 are not used for counting; keep as inputs but do not enable HALL interrupts */
+    GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
+#endif
     GPIO_EnableInt(PB, 15, GPIO_INT_FALLING);
 
     GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
@@ -78,20 +87,40 @@ void Gpio_ConfigSPDWakeup(void)
 void GPB_IRQHandler(void)
 {
     // Set flags only, handle in main loop
+#ifndef USE_GSENSOR_JUMP_DETECT
+    /* HALL Sensor jump counting (PB7, PB8) - disabled when using G-sensor */
     if (GPIO_GET_INT_FLAG(PB, BIT7))
     {
         GPIO_CLR_INT_FLAG(PB, BIT7);
         if (Sys_GetGameState() == GAME_START)
         {
             Sys_IncrementJumpTimes();
+            DBG_PRINT("[GPIO] HALL PB7 increment - total=%d\n", Sys_GetJumpTimes());
         }
         Sys_SetJumpFlag(1);
     }
     if (GPIO_GET_INT_FLAG(PB, BIT8))
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);
+        /* HALL PB8 - not used for counting by default */
+        DBG_PRINT("[GPIO] HALL PB8 interrupt (cleared)\n");
         // Optionally set g_jump_flag2 = 1 if required
     }
+#else
+    /* G-sensor mode: HALL sensors not used for counting, but still clear flags */
+    if (GPIO_GET_INT_FLAG(PB, BIT7))
+    {
+        GPIO_CLR_INT_FLAG(PB, BIT7);
+        DBG_PRINT("[GPIO] PB7 interrupt cleared (G-Sensor mode active)\n");
+    }
+    if (GPIO_GET_INT_FLAG(PB, BIT8))
+    {
+        GPIO_CLR_INT_FLAG(PB, BIT8);
+        DBG_PRINT("[GPIO] PB8 interrupt cleared (G-Sensor mode active)\n");
+    }
+#endif /* USE_GSENSOR_JUMP_DETECT */
+
+    /* Button (PB15) handling - always active */
     if (GPIO_GET_INT_FLAG(PB, BIT15))
     {
         GPIO_CLR_INT_FLAG(PB, BIT15);

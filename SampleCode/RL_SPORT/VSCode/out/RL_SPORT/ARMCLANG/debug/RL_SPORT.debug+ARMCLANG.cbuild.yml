@@ -38,6 +38,9 @@ build:
       - --summary_stderr
       - --info summarysizes
       - --diag_suppress=6314
+  define:
+    - ARM_MATH_CM4
+    - __FPU_PRESENT
   add-path:
     - ../../../../../../../Library/Device/Nuvoton/M480/Include
     - ../../../../../../../Library/StdDriver/inc
@@ -80,6 +83,8 @@ build:
           category: sourceC
         - file: ../../../../../../../Library/StdDriver/src/timer.c
           category: sourceC
+        - file: ../../../../../../../Library/CMSIS/Lib/ARM/arm_cortexM4lf_math.lib
+          category: library
     - group: User
       files:
         - file: ../../../../../main.c
@@ -101,6 +106,8 @@ build:
         - file: ../../../../../gpio.c
           category: sourceC
         - file: ../../../../../gsensor.c
+          category: sourceC
+        - file: ../../../../../gsensor_jump_detect.c
           category: sourceC
         - file: ../../../../../i2c.c
           category: sourceC

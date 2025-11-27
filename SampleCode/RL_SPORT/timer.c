@@ -4,6 +4,7 @@
  */
 #include "timer.h"
 #include "NuMicro.h"
+#include "project_config.h"
 
 /* System tick counter (incremented by Timer0 ISR at 1kHz) */
 static volatile uint32_t g_system_ticks_ms = 0;

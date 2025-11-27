@@ -35,6 +35,9 @@ project:
   setups:
     - output:
         type: ["elf", "bin"]
+    - define:
+        - ARM_MATH_CM4
+        - __FPU_PRESENT
   # linker: GCC linker script removed; AC6 will use its own scatter file configuration
   add-path:
     - ../../../Library/Device/Nuvoton/M480/Include
@@ -55,6 +58,8 @@ project:
         - file: ../../../Library/StdDriver/src/gpio.c
         - file: ../../../Library/StdDriver/src/i2c.c
         - file: ../../../Library/StdDriver/src/timer.c
+        - file: ../../../Library/CMSIS/Lib/ARM/arm_cortexM4lf_math.lib
+          for-compiler: AC6
     - group: User
       files:
         - file: ../main.c
@@ -67,5 +72,6 @@ project:
         - file: ../buzzer.c
         - file: ../gpio.c
         - file: ../gsensor.c
+        - file: ../gsensor_jump_detect.c
         - file: ../i2c.c
         - file: ../pwm_timer.c
