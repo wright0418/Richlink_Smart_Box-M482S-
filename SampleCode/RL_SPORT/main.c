@@ -337,7 +337,8 @@ void InitPeripheral(void)
 {
   Timer_Init(); /* Use new timer module */
   /* Initialize I2C and G-sensor via gsensor module */
-  GsensorInit(100000);
+  /* Initialize G-sensor: I2C 100kHz and default full-scale range 2G */
+  GsensorInit(100000, FSR_2G);
   InitGpio();
   /* Open debug UART0 for retarget/printf */
   UART_Open(UART0, 115200);
@@ -400,10 +401,18 @@ int main()
 #endif
 
 #if enable_Gsensor_Mode
-  MXC400_to_wakeup();
+  /* Ensure the sensor is awake (uses configured fsr) */
+  GsensorWakeup();
+
 #endif
   while (1)
   {
+
+#if enable_Gsensor_Mode
+    /* Read G-sensor axis data if in G-sensor mode */
+    GsensorReadAxis(axis);
+    DBG_PRINT("X,%d ,Y,%d ,Z,%d\n", axis[0], axis[1], axis[2]);
+#endif
     /* Process BLE messages */
     CheckBleRecvMsg();
 
