@@ -1,0 +1,113 @@
+/**
+ * @file power_mgmt.c
+ * @brief Power management module implementation
+ */
+#include "power_mgmt.h"
+#include "NuMicro.h"
+#include "project_config.h"
+
+/* Local helper to wait for UARTs to finish transmission */
+static void wait_uart_tx_empty(void)
+{
+    /* Wait for UART0 and UART1 to finish transmission */
+    while (!UART_IS_TX_EMPTY(UART0))
+    {
+    }
+    while (!UART_IS_TX_EMPTY(UART1))
+    {
+    }
+}
+
+void PowerMgmt_ConfigGpioForSPD(void)
+{
+    /* Set GPIO pins as input to reduce leakage current in SPD mode */
+    GPIO_SetMode(PB, BIT3, GPIO_MODE_INPUT);  // GREEN LED PB3
+    GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);  // JUMP1
+    GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);  // JUMP2
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT); // KeyA
+    GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT);  // G-sensor INT
+    GPIO_SetMode(PC, BIT7, GPIO_MODE_INPUT);  // Buzzer
+}
+
+void PowerMgmt_ReleaseIOHold(void)
+{
+    /* Release I/O hold status (required after SPD wake-up) */
+    SYS_UnlockReg();
+    CLK->IOPDCTL = 1;
+    SYS_LockReg();
+}
+
+void PowerMgmt_EnterDPD(WakeupEdge edge)
+{
+    DBG_PRINT("Enter to DPD Power-Down mode......\n");
+
+    /* Wait for all UART transmissions to complete */
+    wait_uart_tx_empty();
+
+    SYS_UnlockReg();
+
+    /* Select Deep Power-Down mode */
+    CLK_SetPowerDownMode(CLK_PMUCTL_PDMSEL_DPD);
+
+    /* Configure PC0 as input for DPD wake-up */
+    GPIO_SetMode(PC, BIT0, GPIO_MODE_INPUT);
+
+    /* Set wake-up pin trigger type */
+    uint32_t edgeType = (edge == PWR_WAKEUP_RISING) ? CLK_DPDWKPIN_RISING : CLK_DPDWKPIN_FALLING;
+    CLK_EnableDPDWKPin(edgeType);
+
+    /* Enter to Power-down mode (system will reset on wake-up) */
+    CLK_PowerDown();
+
+    /* Wait for reset (should not reach here) */
+    while (1)
+    {
+    }
+}
+
+void PowerMgmt_EnterSPD(PowerMode mode)
+{
+    uint32_t pd_mode;
+
+    /* Map PowerMode enum to CLK_PMUCTL_PDMSEL values */
+    switch (mode)
+    {
+    case PWR_MODE_SPD0:
+        pd_mode = CLK_PMUCTL_PDMSEL_SPD0;
+        break;
+    case PWR_MODE_SPD1:
+        pd_mode = CLK_PMUCTL_PDMSEL_SPD1;
+        break;
+    default:
+        pd_mode = CLK_PMUCTL_PDMSEL_SPD0;
+        break;
+    }
+
+    if ((SYS->CSERVER & SYS_CSERVER_VERSION_Msk) == 0x0)
+        DBG_PRINT("Enter to SPD%d Power-Down mode......\n", (pd_mode - 4));
+    else
+        DBG_PRINT("Enter to SPD Power-Down mode......\n");
+
+    /* Wait for all UART transmissions to complete */
+    wait_uart_tx_empty();
+
+    SYS_UnlockReg();
+
+    /* Select Shallow Power-Down mode */
+    CLK_SetPowerDownMode(pd_mode);
+
+    /* Configure GPIOs for low power */
+    PowerMgmt_ConfigGpioForSPD();
+
+    /* Configure PB15 (KeyA) as SPD wake-up pin (falling edge, no debounce) */
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
+
+    /* Enter to Power-down mode (system will reset on wake-up) */
+    CLK_PowerDown();
+
+    /* Wait for reset (should not reach here) */
+    while (1)
+    {
+    }
+}

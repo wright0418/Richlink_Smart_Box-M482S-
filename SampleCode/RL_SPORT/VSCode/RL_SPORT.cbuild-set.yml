@@ -1,5 +1,4 @@
 cbuild-set:
   generated-by: vscode-cmsis-csolution version 1.56.0
   contexts:
-    - context: Smart_Box.debug+ARMCLANG
-  compiler: AC6
+    - context: RL_SPORT.debug+ARMCLANG

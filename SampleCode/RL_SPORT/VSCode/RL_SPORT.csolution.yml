@@ -1,0 +1,26 @@
+solution:
+  created-by: uv2csolution@1.5.0
+  created-for: CMSIS-Toolbox@2.4.0
+  select-compiler:
+    - compiler: AC6@>=5.19.0
+  build-types:
+    - type: debug
+      optimize: debug
+    - type: release
+      optimize: balanced
+  target-types:
+    - type: ARMCLANG
+      compiler: AC6
+      device: Nuvoton::M487JIDAE
+      target-set:
+        - set:
+          images:
+            - project-context: RL_SPORT.debug
+          debugger:
+            name: Nu-Link@pyOCD
+            port: 3333
+            protocol: swd
+            clock: 10000000
+    # GNUC target removed; only ARMCLANG (AC6) is supported for this solution
+  projects:
+    - project: RL_SPORT.cproject.yml

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+    <storageModule moduleId="org.eclipse.cdt.core.settings">
+        <cconfiguration id="RL_SPORT.config">
+            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="RL_SPORT.config" moduleId="org.eclipse.cdt.core.settings" name="Release">
+                <storageModule>
+                    <!-- Minimal cproject created for RL_SPORT -->
+                </storageModule>
+            </storageModule>
+        </cconfiguration>
+    </storageModule>
+    <storageModule moduleId="cdtBuildSystem" version="4.0.0">
+        <project id="RL_SPORT.project" name="Executable" projectType="ilg.gnuarmeclipse.managedbuild.cross.target.elf"/>
+    </storageModule>
+</cproject>

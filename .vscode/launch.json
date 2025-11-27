@@ -23,8 +23,8 @@
             "name": "CMSIS_DAP@pyOCD (attach)",
             "type": "gdbtarget",
             "request": "attach",
-            "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode",
-            "program": "Smart_Box/ARMCLANG/debug/Smart_Box.axf",
+            "cwd": "${workspaceFolder}/SampleCode\\RL_SPORT\\VSCode",
+            "program": "RL_SPORT/ARMCLANG/debug/RL_SPORT.axf",
             "gdb": "arm-none-eabi-gdb",
             "initCommands": [
                 ""
