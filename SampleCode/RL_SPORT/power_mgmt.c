@@ -5,6 +5,54 @@
 #include "power_mgmt.h"
 #include "NuMicro.h"
 #include "project_config.h"
+#include "gpio.h"  /* For GPIO helpers */
+#include "timer.h" /* For get_ticks if needed */
+
+/* Wake flag masks (from clk_reg.h) for readability */
+#ifndef CLK_PMUSTS_GPBWK_Msk
+#define CLK_PMUSTS_GPAWK_Msk (1u << 8)
+#define CLK_PMUSTS_GPBWK_Msk (1u << 9)
+#define CLK_PMUSTS_GPCWK_Msk (1u << 10)
+#define CLK_PMUSTS_GPDWK_Msk (1u << 11)
+#endif
+
+/* Forward declaration */
+static void PowerMgmt_DebugWakeFlags(void);
+
+/* Print which group woke the device (called after reset) */
+static void PowerMgmt_DebugWakeFlags(void)
+{
+    uint32_t sts = CLK->PMUSTS;
+    if (sts & CLK_PMUSTS_GPAWK_Msk)
+        DBG_PRINT("[Power] Wake flag: GPA\n");
+    if (sts & CLK_PMUSTS_GPBWK_Msk)
+        DBG_PRINT("[Power] Wake flag: GPB\n");
+    if (sts & CLK_PMUSTS_GPCWK_Msk)
+        DBG_PRINT("[Power] Wake flag: GPC\n");
+    if (sts & CLK_PMUSTS_GPDWK_Msk)
+        DBG_PRINT("[Power] Wake flag: GPD\n");
+}
+
+/* Handle wake after SPD: release IO hold, clear flags, reconfigure key GPIO */
+void PowerMgmt_HandleWake(void)
+{
+    uint32_t sts = CLK->PMUSTS;
+    if (sts & (CLK_PMUSTS_GPAWK_Msk | CLK_PMUSTS_GPBWK_Msk | CLK_PMUSTS_GPCWK_Msk | CLK_PMUSTS_GPDWK_Msk))
+    {
+        DBG_PRINT("[Power] SPD wake detected (PMUSTS=0x%08lX)\n", (unsigned long)sts);
+        /* Release IO hold */
+        PowerMgmt_ReleaseIOHold();
+        /* Clear all wake flags */
+        CLK->PMUSTS |= (1u << 31); /* Set CLRWK bit */
+        PowerMgmt_DebugWakeFlags();
+        /* Reconfigure PB15 button interrupt (falling edge) */
+        GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+        GPIO_EnableInt(PB, 15, GPIO_INT_FALLING);
+        GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
+        GPIO_ENABLE_DEBOUNCE(PB, BIT15);
+        NVIC_EnableIRQ(GPB_IRQn);
+    }
+}
 
 /* Local helper to wait for UARTs to finish transmission */
 static void wait_uart_tx_empty(void)
@@ -99,8 +147,10 @@ void PowerMgmt_EnterSPD(PowerMode mode)
     /* Configure GPIOs for low power */
     PowerMgmt_ConfigGpioForSPD();
 
-    /* Configure PB15 (KeyA) as SPD wake-up pin (falling edge, no debounce) */
+    /* Configure PB15 (KeyA) as SPD wake-up pin - */
     GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+
+    /* Try enabling PB15 (group 1, pin15) wake (falling edge press) */
     CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
 
     /* Enter to Power-down mode (system will reset on wake-up) */

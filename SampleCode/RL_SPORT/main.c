@@ -101,67 +101,6 @@ static const struct
 /*  Function for System Entry to Power Down Mode and Wake up source by GPIO Wake-up pin                    */
 /*---------------------------------------------------------------------------------------------------------*/
 
-#ifdef DPD_PC0 // for V2 Board
-void WakeUpPinFunction(uint32_t u32PDMode, uint32_t u32EdgeType)
-{
-  DBG_PRINT("Enter to DPD Power-Down mode......\n");
-
-  /* Check if all the debug messages are finished */
-  while (!UART_IS_TX_EMPTY(UART0))
-    ;
-  while (!UART_IS_TX_EMPTY(UART1))
-    ;
-
-  /* Select Power-down mode */
-  CLK_SetPowerDownMode(u32PDMode);
-
-  /* Configure GPIO as Input mode */
-  GPIO_SetMode(PC, BIT0, GPIO_MODE_INPUT);
-
-  // Set Wake-up pin trigger type at Deep Power down mode
-  CLK_EnableDPDWKPin(u32EdgeType);
-
-  /* Enter to Power-down mode */
-  CLK_PowerDown();
-
-  /* Wait for Power-down mode wake-up reset happen */
-  while (1)
-    ;
-}
-
-#else // for SDP Mode
-
-void WakeUpPinFunction(uint32_t u32PDMode)
-{
-  if ((SYS->CSERVER & SYS_CSERVER_VERSION_Msk) == 0x0)
-    DBG_PRINT("Enter to SPD%d Power-Down mode......\n", (u32PDMode - 4));
-  else
-    DBG_PRINT("Enter to SPD Power-Down mode......\n");
-
-  // Check if all the debug messages are finished
-  while (!UART_IS_TX_EMPTY(UART0))
-    ;
-  while (!UART_IS_TX_EMPTY(UART1))
-    ;
-  SYS_UnlockReg();
-  // Select Power-down mode
-  CLK_SetPowerDownMode(u32PDMode);
-
-  Led_SpdModeGpio();
-
-  // GPIO SPD Power-down Wake-up Pin Select and Debounce Disable
-  GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
-  CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
-
-  // Enter to Power-down mode
-  CLK_PowerDown();
-
-  // Wait for Power-down mode wake-up reset happen
-  while (1)
-    ;
-}
-#endif
-
 /**
  * @brief Handle KeyA event: clear g_keyA_state
  */
@@ -314,6 +253,8 @@ int main()
   uint8_t mac[5], device_name[5];
 
   InitSystem();
+  /* Handle potential SPD wake (release IO hold, clear flags, restore button interrupt) */
+  PowerMgmt_HandleWake();
   InitPeripheral();
 
   DBG_PRINT("System Up\n");
