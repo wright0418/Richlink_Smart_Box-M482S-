@@ -75,3 +75,6 @@ project:
         - file: ../gsensor_jump_detect.c
         - file: ../i2c.c
         - file: ../pwm_timer.c
+        - file: ../movement.c
+        - file: ../ble_helpers.c
+        - file: ../powerdown.c
