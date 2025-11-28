@@ -183,8 +183,16 @@ static void Game_CheckMovementAndMaybePowerDown(uint8_t ble_connected)
 
 void Game_ProcessRunning(void)
 {
-    /* Set LED to fast blink (1Hz, 10% duty) during game */
+    /* Set LED to fast blink (1Hz, 10% duty) during game -- but do not override
+       calibration LED pattern while calibration is running. */
+#if USE_GSENSOR_JUMP_DETECT
+    if (!JumpDetect_IsCalibrating())
+    {
+        SetGreenLedMode(1, 0.1);
+    }
+#else
     SetGreenLedMode(1, 0.1);
+#endif
 
 #if enable_Gsensor_Mode
     /* G-sensor mode: read axis data and send to BLE */
@@ -211,8 +219,17 @@ void Game_ProcessRunning(void)
 
 void Game_ProcessIdle(void)
 {
-    /* BLE connected but game stopped: slow LED blink (0.5Hz, 50% duty) */
+    /* BLE connected but game stopped: slow LED blink (0.5Hz, 50% duty).
+       Do not override LED when G-sensor calibration is active so the
+       calibration module's visual feedback remains visible. */
+#if USE_GSENSOR_JUMP_DETECT
+    if (!JumpDetect_IsCalibrating())
+    {
+        SetGreenLedMode(0.5, 0.5);
+    }
+#else
     SetGreenLedMode(0.5, 0.5);
+#endif
     /* Reset standby timer when BLE is connected */
     Game_ResetStandbyTimer();
 
@@ -226,7 +243,14 @@ void Game_ProcessDisconnected(void)
     Sys_ResetJumpTimes();
 
     /* Set LED to slow blink (0.5Hz, 50% duty) */
+#if USE_GSENSOR_JUMP_DETECT
+    if (!JumpDetect_IsCalibrating())
+    {
+        SetGreenLedMode(0.5, 0.5);
+    }
+#else
     SetGreenLedMode(0.5, 0.5);
+#endif
 
     /* Check movement and possibly enter power-down (BLE disconnected case) */
     Game_CheckMovementAndMaybePowerDown(0);
