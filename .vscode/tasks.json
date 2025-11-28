@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "pyocd",
             "options": {
-                "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode"
+                "cwd": "${workspaceFolder}/SampleCode\\RL_SPORT\\VSCode"
             },
             "windows": {
                 "options": {
@@ -54,7 +54,7 @@
             "type": "shell",
             "command": "pyocd",
             "options": {
-                "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode"
+                "cwd": "${workspaceFolder}/SampleCode\\RL_SPORT\\VSCode"
             },
             "windows": {
                 "options": {
@@ -101,7 +101,7 @@
             "type": "shell",
             "command": "pyocd",
             "options": {
-                "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode"
+                "cwd": "${workspaceFolder}/SampleCode\\RL_SPORT\\VSCode"
             },
             "windows": {
                 "options": {
@@ -162,7 +162,7 @@
             "type": "shell",
             "command": "pyocd",
             "options": {
-                "cwd": "${workspaceFolder}/SampleCode\\Smart_Box\\VSCode"
+                "cwd": "${workspaceFolder}/SampleCode\\RL_SPORT\\VSCode"
             },
             "windows": {
                 "options": {

@@ -113,6 +113,12 @@ build:
           category: sourceC
         - file: ../../../../../pwm_timer.c
           category: sourceC
+        - file: ../../../../../movement.c
+          category: sourceC
+        - file: ../../../../../ble_helpers.c
+          category: sourceC
+        - file: ../../../../../powerdown.c
+          category: sourceC
   licenses:
     - license: <unknown>
       packs:

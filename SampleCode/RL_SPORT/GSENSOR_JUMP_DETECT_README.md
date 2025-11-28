@@ -17,181 +17,49 @@
 ## 編譯切換方式
 
 ### 啟用 G-Sensor 跳繩計數模式
+# RL_SPORT — G-Sensor 跳繩計數演算法使用指南
 
-編輯 `SampleCode/RL_SPORT/project_config.h`：
+## 概述
 
-```c
-/* Set to 1 to enable G-Sensor jump detection */
-#define USE_GSENSOR_JUMP_DETECT 1
-```
+本模組實作基於 MXC4005XC 三軸加速度感測器的跳繩計數演算法，取代原有的 HALL Sensor 磁感應方式。透過 CMSIS DSP 函式庫進行信號處理，包含 FIR 低通濾波與峰值偵測，可自動適應不同配戴方向與跳繩特性。
 
-### 使用 HALL Sensor 模式（預設）
+主要特點：
+- 使用 `#ifdef USE_GSENSOR_JUMP_DETECT` 條件編譯，可與 HALL Sensor 模式共存
+- 按鈕觸發校正流程，蜂鳴器提供聲音回饋
+- CMSIS DSP 加速的 FIR 低通濾波器（7 階低通，截止頻率 6Hz）
+- 自動計算動態閾值，適應不同跳繩強度
+- 50Hz 採樣率（Timer ISR 中斷處理）
+- 防抖機制（最小間隔 200ms）
 
-```c
-/* Set to 0 to use HALL sensor jump detection */
-#define USE_GSENSOR_JUMP_DETECT 0
-```
+詳盡的系統使用說明（建置、參數、測試流程、除錯）請參閱本檔與專案根目錄下的 `README.md` 或 `GSENSOR_JUMP_README.md`。
 
-編譯後會自動選擇對應的跳繩計數邏輯。
+## 參數位置
 
----
+所有行為與門檻主要定義於：
 
-## 校正操作步驟
+`SampleCode/RL_SPORT/project_config.h`
 
-### 前置準備
+請優先在該檔調整參數，包含移動偵測與跳躍偵測相關的常數（如 `MOVEMENT_*`, `JUMP_*`, `NO_MOVEMENT_TIMEOUT_*` 等）。
 
-1. **配戴位置**：將裝置固定於跳繩繩柄或手腕（建議 Z 軸朝手掌方向）
-2. **電源連接**：確保裝置已供電並執行韌體
-3. **BLE 連線**：建議先連線 BLE 以接收 Debug 訊息（可選）
+## 演算法要點
 
-### 校正流程
+1. 取三軸原始值並計算向量模長（單位 g）：
+   magnitude = sqrt(X^2 + Y^2 + Z^2)
+2. 使用 FIR 濾波（7 taps）平滑 magnitude
+3. 採用峰值偵測與閾值（threshold = baseline + multiplier * stddev）判定跳躍
+4. 檢查防抖時間（`JUMP_MIN_INTERVAL_MS`）以避免重複計數
+5. 校正分成靜態（baseline）與動態（stddev/peak）階段
 
-#### 步驟 1：觸發校正
-- **操作**：按下按鈕 PB15（KEY）
-- **條件**：遊戲狀態必須為 `GAME_STOP`（未開始跳繩）
-- **回饋**：單短音（2kHz, 100ms）
+### FIR 係數
+可使用 SciPy 的 `firwin` 設計（7 taps, cutoff 6Hz, fs=50Hz）取得示例係數。
 
-#### 步驟 2：靜態校正（2 秒）
-- **指示**：聽到單短音後，立即保持靜止
-- **動作**：將裝置放置於自然跳繩握持位置，不要移動
-- **時長**：2 秒（`JUMP_CALIB_STATIC_TIME_MS`）
-- **目的**：測量靜態重力向量基準值
+## 故障排除（精要）
+- 如果無法編譯或出現 `undefined reference`：確認 `movement.c`、`ble_helpers.c`、`powerdown.c` 已加入 `VSCode/RL_SPORT.cproject.yml`。
+- 如果校正失敗：確保 `Timer_Init()` 與 `GsensorInit()` 已呼叫，並避免校正過程中移動。
 
-#### 步驟 3：動態校正（8-10 次跳繩）
-- **指示**：聽到雙短音（2 次短音間隔 150ms）
-- **動作**：開始進行標準跳繩動作，至少跳 8 次
-- **要求**：跳躍幅度與實際使用時相同，不要過慢或過快
-- **目的**：測量跳躍時的加速度峰值特性
-
-#### 步驟 4：校正完成
-- **回饋**：三短音（3 次短音間隔 150ms）
-- **狀態**：裝置進入就緒狀態，可開始正式跳繩計數
-- **資料**：校正參數已儲存於 RAM（斷電後需重新校正）
-
-### 錯誤處理
-
-| 情境 | 症狀 | 解決方式 |
-|------|------|----------|
-| 校正超時 | 單短音 → 停頓 200ms → 單短音 | 30 秒內未完成校正，請重新按鈕觸發 |
-| 靜態階段移動 | 基準值異常（非 ~1g） | 靜態階段需完全靜止，請重新校正 |
-| 動態跳繩次數不足 | 長時間未聽到三短音 | 確保至少跳 8 次，幅度需明顯 |
-
----
-
-## 演算法參數調校
-
-所有參數定義於 `project_config.h` 的 `#if USE_GSENSOR_JUMP_DETECT` 區塊內。
-
-### 濾波器參數
-
-```c
-#define JUMP_FIR_ORDER 7              /* FIR 濾波器階數（7 階） */
-#define JUMP_FIR_CUTOFF_HZ 6.0f       /* 截止頻率（6Hz） */
-#define JUMP_SAMPLE_RATE_HZ 50.0f     /* 採樣率（50Hz = 20ms 週期） */
-```
-
-**調校建議：**
-- **跳繩頻率範圍**：100-200 次/分鐘 = 1.6-3.3 Hz
-- **截止頻率**：建議設為跳繩頻率上限的 2 倍（6Hz 涵蓋 3Hz 主頻）
-- **階數**：增加階數可提高濾波效果，但會增加延遲與運算量（7 階為最佳平衡）
-- **採樣率**：50Hz 符合 Nyquist 定理（>2×6Hz），降至 30-40Hz 可降低功耗但可能影響準確性
-
-### 偵測閾值
-
-```c
-#define JUMP_THRESHOLD_MULTIPLIER 1.5f  /* 閾值倍數（建議 1.2-2.0） */
-#define JUMP_MIN_INTERVAL_MS 200        /* 防抖間隔（200ms） */
-```
-
-**調校建議：**
-- **閾值計算公式**：`threshold = baseline + (multiplier × std_dev)`
-  - `baseline`：靜態校正得到的重力加速度（約 1g）
-  - `std_dev`：動態校正得到的峰值標準差
-- **過高（>2.0）**：可能漏計輕微跳躍
-- **過低（<1.2）**：可能誤判為跳繩（如手臂揮動）
-- **防抖間隔**：200ms = 最高 5 跳/秒 = 300 次/分，符合運動員極限
-
-### 校正設定
-
-```c
-#define JUMP_CALIB_STATIC_TIME_MS 2000   /* 靜態校正時長（2 秒） */
-#define JUMP_CALIB_DYNAMIC_JUMPS 8       /* 動態校正跳繩次數（8 次） */
-#define JUMP_CALIB_TIMEOUT_MS 30000      /* 校正總超時時間（30 秒） */
-```
-
-**調校建議：**
-- **靜態時長**：2 秒可收集約 100 個樣本（50Hz），足夠計算穩定平均值
-- **動態次數**：8 次跳繩提供足夠統計樣本，增加至 10-12 次可提高準確性
-- **超時時間**：30 秒為合理操作時間，避免使用者忘記校正導致系統卡住
-
----
-
-## 技術細節
-
-### FIR 濾波器設計
-
-**係數生成方式**（Python scipy）：
-```python
-from scipy.signal import firwin
-coeffs = firwin(7, 6, fs=50, window='hamming')
-# Output: [0.0385, 0.1095, 0.2020, 0.2500, 0.2020, 0.1095, 0.0385]
-```
-
-**頻率響應**：
-- 通帶（0-5Hz）：< 1dB 衰減
-- 截止頻率（6Hz）：-3dB
-- 阻帶（>10Hz）：> -20dB 衰減
-
-### 峰值偵測邏輯
-
-1. **計算向量模長**：`magnitude = sqrt(X² + Y² + Z²)` (g 為單位)
-2. **FIR 濾波**：使用 `arm_fir_f32()` 平滑數據
-3. **斜率檢測**：
-   - 上升沿（`prev < current`）：標記 `peak_detected = 1`
-   - 下降沿（`prev > current` 且 `peak_detected == 1`）：檢查 `prev > threshold`
-4. **防抖**：檢查 `last_jump_time` 間隔 ≥ `JUMP_MIN_INTERVAL_MS`
-5. **計數**：呼叫 `Sys_IncrementJumpTimes()`
-
-### CMSIS DSP API 使用
-
-| 函式 | 用途 |
-|------|------|
-| `arm_fir_init_f32()` | 初始化 FIR 濾波器實例 |
-| `arm_fir_f32()` | 處理單樣本濾波 |
-| `arm_sqrt_f32()` | 快速平方根（向量模長計算） |
-| `arm_mean_f32()` | 計算平均值（基準值） |
-| `arm_var_f32()` | 計算變異數 |
-| `arm_std_f32()` | 計算標準差（閾值） |
-
----
-
-## 功耗與效能
-
-### CPU 負載
-
-- **採樣頻率**：50Hz（每 20ms 執行一次）
-- **ISR 執行時間**：約 100-150 µs（192MHz 核心）
-  - I2C 讀取 G-Sensor：~50 µs
-  - FIR 濾波（7 階）：~30 µs
-  - 峰值檢測邏輯：~20 µs
-- **負載率**：(150 µs / 20 ms) × 100% = **0.75%**
-
-### 記憶體使用
-
-| 項目 | 大小 |
-|------|------|
-| FIR 狀態緩衝 | 32 bytes (8 × float32) |
-| 校正靜態數據 | 600 bytes (150 × float32) |
-| 校正峰值數據 | 200 bytes (50 × float32) |
-| 其他變數 | ~100 bytes |
-| **總計** | **~932 bytes RAM** |
-| CMSIS DSP 函式庫 | ~30KB Flash (.lib) |
-
----
-
-## 故障排除
-
-### 問題 1：跳繩不計數
+## 版本與作者
+- v1.1 (2025-11-29) — 調整並合併 README 內容。
+- 作者：Richlink 開發團隊 / AI Copilot 協助撰寫
 
 **可能原因：**
 1. 未完成校正（`JumpDetect_IsReady() == 0`）
