@@ -68,6 +68,18 @@ void GsensorWakeup(void);
 void GsensorReadAxis(int16_t *axis);
 
 /**
+ * @brief Compute acceleration magnitude in g from raw axis counts.
+ * @param axis Pointer to int16_t array with {X, Y, Z} raw samples.
+ * @return Magnitude in units of g (floating point).
+ *
+ * This helper converts the raw 12-bit left-aligned counts returned by
+ * GsensorReadAxis() into physical units using the currently configured
+ * full-scale range (FSR) and returns the vector magnitude in g. The
+ * function uses the module's configured FSR (set by GsensorInit()).
+ */
+float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis);
+
+/**
  * @brief Sensor-specific low-level power-down helper.
  *
  * Writes the sensor control register to place the device into power-down

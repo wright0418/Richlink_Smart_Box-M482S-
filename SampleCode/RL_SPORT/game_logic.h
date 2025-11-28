@@ -52,4 +52,13 @@ void Game_ProcessIdle(void);
  */
 void Game_ResetStandbyTimer(void);
 
+/**
+ * @brief Reset movement inactivity timer.
+ *
+ * Call this when a real user activity or a BLE reconnect occurs so that the
+ * movement-based power-down timer is restarted. This should NOT be called
+ * from the periodic idle path.
+ */
+void Game_ResetMovementTimer(void);
+
 #endif // _GAME_LOGIC_H_

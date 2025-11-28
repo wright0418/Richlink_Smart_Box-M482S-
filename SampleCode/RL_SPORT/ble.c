@@ -37,6 +37,7 @@ void *memcpy(void *dest, const void *src, size_t n);
 #include "system_status.h"
 #include "buzzer.h"
 #include "led.h"
+#include "game_logic.h"
 
 /* Reuse buffer sizes from header */
 volatile uint8_t g_u8RecData[RXBUFSIZE] = {0};
@@ -166,6 +167,9 @@ void CheckBleRecvMsg(void)
     {
     case BLE_CMD_CONNECTED:
       g_sys.ble_state = BLE_CONNECTED;
+      /* Reset movement inactivity timer on BLE connect so user hold doesn't
+         immediately trigger power-down. */
+      Game_ResetMovementTimer();
       break;
     case BLE_CMD_DISCONNECTED:
       g_sys.ble_state = BLE_DISCONNECTED;

@@ -1,6 +1,7 @@
 #include "NuMicro.h"
 #include "gsensor.h"
 #include "i2c.h"
+#include <math.h>
 
 /* Store the configured full-scale range so power mode functions know which
   register value to write when entering/exiting PD. */
@@ -109,4 +110,31 @@ void GsensorWakeup()
 void GsensorReadAxis(int16_t *axis)
 {
   ReadGsensorAxis(axis);
+}
+
+/* Helper: convert raw axis counts to magnitude in g using current FSR */
+float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
+{
+  float counts_per_g;
+  switch (g_current_fsr)
+  {
+  case FSR_2G:
+    counts_per_g = 1024.0f; /* 1024 counts per g at 2G full-scale */
+    break;
+  case FSR_4G:
+    counts_per_g = 512.0f; /* approximate */
+    break;
+  case FSR_8G:
+    counts_per_g = 256.0f; /* approximate */
+    break;
+  default:
+    counts_per_g = 1024.0f;
+    break;
+  }
+
+  float xg = ((float)axis[0]) / counts_per_g;
+  float yg = ((float)axis[1]) / counts_per_g;
+  float zg = ((float)axis[2]) / counts_per_g;
+
+  return sqrtf(xg * xg + yg * yg + zg * zg);
 }

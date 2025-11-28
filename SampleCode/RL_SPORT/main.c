@@ -122,6 +122,8 @@ void ProcessKeyAEvent(void)
 #else
   // Optional: add key handling logic here for HALL sensor mode
 #endif
+  /* Reset movement inactivity timer on any user key activity */
+  Game_ResetMovementTimer();
 }
 
 void SYS_Init(void)
@@ -228,6 +230,7 @@ void InitPeripheral(void)
   UART_Open(UART0, 115200);
   /* Initialize BLE transport (UART1) inside ble module */
   Ble_Init(115200);
+
   /* Initialize peripherals for LED and buzzer via their modules */
   Led_Init();
   Buzzer_Init();
@@ -258,7 +261,7 @@ int main()
   InitPeripheral();
 
   DBG_PRINT("System Up\n");
-
+  BLEToRunMode();
 // for make BLE setting NAME + MacAddr
 #if 1
   delay_ms(200);

@@ -56,6 +56,21 @@
 #define BUF_SIZE 512			 /* Size of DBG_PRINT buffer */
 #define enable_Gsensor_Mode 1
 
+/* Movement-based power-down configuration
+	 - When BLE is connected and device is stationary for NO_MOVEMENT_TIMEOUT_CONNECTED_MS,
+		 enter low-power (disconnect BLE then SPD/DPD).
+	 - When BLE is disconnected and device is stationary for NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS,
+		 directly enter low-power.
+*/
+#define NO_MOVEMENT_TIMEOUT_CONNECTED_MS (60 * 1000)	/* 60 seconds when BLE connected */
+#define NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS (30 * 1000) /* 30 seconds when BLE disconnected */
+
+/* Movement sampling and detection parameters */
+#define MOVEMENT_SAMPLE_INTERVAL_MS 500	  /* sample every 500 ms */
+#define MOVEMENT_WINDOW_SAMPLES 8		  /* sliding window size */
+#define MOVEMENT_STDDEV_THRESHOLD_G 0.02f /* stddev threshold in g to consider 'no movement' */
+#define MOVEMENT_MAG_TOLERANCE_G 0.4f	  /* magnitude deviation from 1g considered stable (relaxed for sensor calibration) */
+
 /* G-Sensor Jump Detection Configuration */
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
 #define USE_GSENSOR_JUMP_DETECT 1
