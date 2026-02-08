@@ -26,3 +26,31 @@ cmake_install.cmake
 # Ignore IDE/editor specific
 .vscode/
 .idea/
+
+# Ignore VSCode build/temp outputs for sample code
+SampleCode/*/VSCode/out/
+SampleCode/*/VSCode/tmp/
+SampleCode/*/VSCode/tmp/**
+
+# General build outputs and temporary project files
+**/out/
+**/tmp/
+**/build/
+**/.ninja_log
+**/.ninja_deps
+**/build.ninja
+**/compile_commands.json
+
+# Toolchain / linker / binary outputs
+*.axf
+*.axf.map
+*.map
+*.bin
+*.hex
+*.elf
+*.cbuild-run.yml
+
+# CMake artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
