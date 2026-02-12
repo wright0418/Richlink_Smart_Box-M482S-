@@ -55,7 +55,7 @@ void delay_ms(uint32_t ms)
     /* Wait until the required time has elapsed */
     while ((g_system_ticks_ms - start) < ms)
     {
-        /* Busy-wait (could add __WFI() for power saving) */
+        __WFI();  /* Allow CPU to sleep during wait (power efficiency) */
     }
 }
 

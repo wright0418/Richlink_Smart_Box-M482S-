@@ -31,7 +31,6 @@ typedef struct
 #include "system_status.h"
 #include "timer.h"
 #include "buzzer.h"
-#include "led.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -216,9 +215,6 @@ void JumpDetect_StartCalibration(void)
     /* Single beep: Start static calibration */
     PlayCalibrationBeeps(1);
 
-    /* Visual feedback: fast blink during static calibration (5Hz) */
-    SetGreenLedMode(5, 0.5);
-
     DBG_PRINT("[JumpDetect] Calibration started - Hold still for %d seconds\n",
               JUMP_CALIB_STATIC_TIME_MS / 1000);
 }
@@ -237,11 +233,6 @@ CalibrationState JumpDetect_ProcessCalibration(int16_t *axis)
         PlayCalibrationBeeps(1); /* Error beep */
         delay_ms(200);
         PlayCalibrationBeeps(1);
-
-        /* Visual feedback: rapid flash for error (20Hz) */
-        SetGreenLedMode(20, 0.5);
-        delay_ms(2000);
-        SetGreenLedMode(0.5, 0.5); /* Return to idle blink */
 
         return g_calib_state;
     }
@@ -273,9 +264,6 @@ CalibrationState JumpDetect_ProcessCalibration(int16_t *axis)
 
             /* Double beep: Start dynamic calibration */
             PlayCalibrationBeeps(2);
-
-            /* Visual feedback: very fast blink during dynamic calibration (10Hz) */
-            SetGreenLedMode(10, 0.5);
 
             g_calib_state = CALIB_DYNAMIC_COLLECTING;
             g_calib_phase_start_time = get_ticks_ms();
@@ -352,12 +340,6 @@ CalibrationState JumpDetect_ProcessCalibration(int16_t *axis)
 
             /* Triple beep: Calibration complete */
             PlayCalibrationBeeps(3);
-
-            /* Visual feedback: solid ON for 1 second to indicate success */
-            SetGreenLedMode(0, 0); /* Stop blinking */
-            SetGreenLed(1);        /* Turn on solid */
-            delay_ms(1000);
-            SetGreenLedMode(1, 0.1); /* Return to slow blink (ready state) */
 
             /* CRITICAL: Reset all detection states to prevent residual from calibration */
             g_peak_detected = 0;
@@ -447,9 +429,6 @@ void JumpDetect_Process(int16_t *axis)
 
                     /* After counting, require reset below baseline+hysteresis before next */
                     g_wait_reset = 1;
-
-                    /* Visual feedback: brief flash on each jump */
-                    SetGreenLed(1);
 
                     DBG_PRINT("[JumpDetect] Jump! mag=%.3fg, count=%d\n",
                               g_prev_magnitude, Sys_GetJumpTimes());

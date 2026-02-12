@@ -28,7 +28,8 @@ static void ReadGsensorAxis(int16_t *axis)
       Y_OUT_Low 0x05 ; Y_OUT_High 0x06
       Z_OUT_Low 0x07 ; Z_OUT_High 0x08  */
 
-  I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x03, data_reg, 6);
+  uint32_t rx = RL_I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x03, data_reg, 6);
+  (void)rx;
 
   for (i = 0; i < 3; i++)
   {
@@ -42,8 +43,8 @@ static void ReadGsensorTemp(int16_t *temp)
   uint8_t temp_reg;
   /* MXC400xXC Gsensor address
       TEMP_OUT 0x09 */
-  I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x09, &temp_reg, 1);
-
+  uint32_t rx = RL_I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x09, &temp_reg, 1);
+  (void)rx;
   *temp = (int16_t)temp_reg;
 }
 
@@ -70,7 +71,8 @@ void MXC400_to_PD(Gsensor_FSR fsr)
     reg_value |= 0x00 << 5;
     break;
   }
-  I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  (void)wr;
 }
 
 /* MXC400 set full-scale range 2G/4G/8G  address 0x0D
@@ -94,7 +96,8 @@ void MXC400_to_wakeup(Gsensor_FSR fsr)
     reg_value |= 0x00 << 5;
     break;
   }
-  I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  (void)wr;
 }
 
 void GsensorPowerDown()

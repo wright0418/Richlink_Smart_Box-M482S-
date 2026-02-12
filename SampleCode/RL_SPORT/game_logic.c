@@ -6,10 +6,8 @@
 #include "system_status.h"
 #include "timer.h"
 #include "led.h"
-#include "buzzer.h"
 #include "ble.h"
 #include "gsensor.h"
-#include "power_mgmt.h"
 #include "project_config.h"
 #include <stdio.h>
 #include <math.h>
@@ -17,11 +15,7 @@
 #include "gsensor_jump_detect.h"
 #endif
 
-/* Enable G-sensor mode (0=disabled, 1=enabled) */
-#define enable_Gsensor_Mode 0
-
 /* Internal state */
-static uint32_t standby_timer_start = 0;
 static uint32_t last_ble_send_time = 0;
 
 /* Movement detection state */
@@ -37,9 +31,9 @@ void Game_Init(void)
     /* Reset game state */
     Sys_SetGameState(GAME_STOP);
     Sys_ResetJumpTimes();
+    Sys_SetIdleState(0);
 
-    /* Initialize standby timer and movement detection */
-    standby_timer_start = get_ticks_ms();
+    /* Initialize movement detection */
     last_ble_send_time = 0;
 
     movement_initialized = 1;
@@ -49,16 +43,6 @@ void Game_Init(void)
     movement_window_count = 0;
     for (int i = 0; i < MOVEMENT_WINDOW_SAMPLES; i++)
         movement_window[i] = 0.0f;
-}
-
-void Game_ResetStandbyTimer(void)
-{
-    /* Reset only the standby timer. Do NOT reset movement timer here —
-       Game_ProcessIdle is called repeatedly while BLE is connected and
-       resetting last_movement_time here would prevent movement-based
-       power-down from ever triggering. Use a dedicated movement reset
-       when actual user activity or BLE reconnect occurs. */
-    standby_timer_start = get_ticks_ms();
 }
 
 void Game_ResetMovementTimer(void)
@@ -72,9 +56,9 @@ void Game_ResetMovementTimer(void)
         movement_window[i] = 0.0f;
 }
 
-/* Internal helper: check movement and enter power-down when appropriate
-   ble_connected: true when BLE is connected (use connected timeout), false otherwise */
-static void Game_CheckMovementAndMaybePowerDown(uint8_t ble_connected)
+/* Internal helper: check movement and update idle state
+    ble_connected: true when BLE is connected (use connected timeout), false otherwise */
+static void Game_CheckMovementAndUpdateIdle(uint8_t ble_connected)
 {
     uint32_t now = get_ticks_ms();
 
@@ -127,6 +111,11 @@ static void Game_CheckMovementAndMaybePowerDown(uint8_t ble_connected)
     {
         /* movement detected -> reset last movement time */
         last_movement_time = now;
+        if (Sys_GetIdleState())
+        {
+            Sys_SetIdleState(0);
+            DBG_PRINT("[Game] Movement resumed\n");
+        }
         return;
     }
 
@@ -134,90 +123,46 @@ static void Game_CheckMovementAndMaybePowerDown(uint8_t ble_connected)
     uint32_t timeout_ms = ble_connected ? NO_MOVEMENT_TIMEOUT_CONNECTED_MS : NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS;
     if (is_timeout(last_movement_time, timeout_ms))
     {
-        /* Timeout expired: prepare for power-down */
-        SetGreenLedMode(1, 0); // Turn off LED
-        DBG_PRINT("Enter to Power-Down (no movement) ......\n");
-
-        /* Put G-sensor to power-down */
-        GsensorPowerDown();
-
-        /* If BLE is connected, disconnect first and wait briefly for the
-           module to acknowledge disconnect so the link is clean before
-           power-down. */
-        if (ble_connected)
+        if (!Sys_GetIdleState())
         {
-            BLE_DISCONNECT();
-            /* Wait up to 1 second for BLE state to become DISCONNECTED */
-            uint32_t wait_start = get_ticks_ms();
-            while (!is_timeout(wait_start, 1000))
-            {
-                if (Sys_GetBleState() == BLE_DISCONNECTED)
-                    break;
-                delay_ms(50);
-            }
+            Sys_SetIdleState(1);
+            DBG_PRINT("[Game] Idle detected (no movement)\n");
         }
-
-        BLE_to_DLPS();
-        delay_ms(100);
-        /* Play notification beep (3 short beeps at 4000 Hz) */
-        BuzzerPlay(4000, 100);
-        delay_ms(500); /* Wait for beep to finish + gap */
-        BuzzerPlay(4000, 100);
-        delay_ms(500);
-        BuzzerPlay(4000, 100);
-        delay_ms(500);
-
-        /* Enter power-down mode (DPD or SPD based on board config) */
-#ifdef DPD_PC0
-        PowerMgmt_EnterDPD(PWR_WAKEUP_RISING);
-#else
-        PowerMgmt_EnterSPD(PWR_MODE_SPD0);
-#endif
-
-        /* Should not reach here (system resets on wake-up) */
-        while (1)
-        {
-        }
+        return;
     }
 }
 
 void Game_ProcessRunning(void)
 {
-    /* Set LED to fast blink (1Hz, 10% duty) during game */
-    SetGreenLedMode(1, 0.1);
+    /* Safety: Verify we are still in valid state (BLE connected + game running) */
+    if (Sys_GetBleState() != BLE_CONNECTED || Sys_GetGameState() != GAME_START)
+    {
+        return;
+    }
 
-#if enable_Gsensor_Mode
-    /* G-sensor mode: read axis data and send to BLE */
-    int16_t axis[3];
-    GsensorReadAxis(axis);
-    DBG_PRINT("X,%d ,Y,%d ,Z,%d\n", axis[0], axis[1], axis[2]);
-
-    char bleData[64];
-    snprintf(bleData, sizeof(bleData), "send,%d,%d,%d,%d\n",
-             Sys_GetJumpTimes() >> 1, axis[0], axis[1], axis[2]);
-    BLESendData(bleData);
-#else
-    /* Normal mode: send jump count periodically (every 100ms) */
+    /* Send jump count periodically (every 100ms) */
     uint32_t now = get_ticks_ms();
     if (is_timeout(last_ble_send_time, 100))
     {
+        uint16_t total = Sys_GetJumpTimes();
         char bleData[32];
-        snprintf(bleData, sizeof(bleData), "send,%d\n", Sys_GetJumpTimes());
+        snprintf(bleData, sizeof(bleData), "send,%u\n", (unsigned)total);
+        DBG_PRINT("[BLE] send total=%u\n", (unsigned)total);
         BLESendData(bleData);
         last_ble_send_time = now;
     }
-#endif
+}
+
+void Game_ResetBleTimer(void)
+{
+    /* Clear BLE send timeout so next send happens immediately on reconnect */
+    last_ble_send_time = 0;
 }
 
 void Game_ProcessIdle(void)
 {
-    /* BLE connected but game stopped: slow LED blink (0.5Hz, 50% duty) */
-    SetGreenLedMode(0.5, 0.5);
-    /* Reset standby timer when BLE is connected */
-    Game_ResetStandbyTimer();
-
-    /* Check movement and possibly enter power-down (BLE connected case) */
-    Game_CheckMovementAndMaybePowerDown(1);
+    /* Check movement and update idle state (BLE connected case) */
+    Game_CheckMovementAndUpdateIdle(1);
 }
 
 void Game_ProcessDisconnected(void)
@@ -225,9 +170,6 @@ void Game_ProcessDisconnected(void)
     /* Reset game state */
     Sys_ResetJumpTimes();
 
-    /* Set LED to slow blink (0.5Hz, 50% duty) */
-    SetGreenLedMode(0.5, 0.5);
-
-    /* Check movement and possibly enter power-down (BLE disconnected case) */
-    Game_CheckMovementAndMaybePowerDown(0);
+    /* Check movement and update idle state (BLE disconnected case) */
+    Game_CheckMovementAndUpdateIdle(0);
 }

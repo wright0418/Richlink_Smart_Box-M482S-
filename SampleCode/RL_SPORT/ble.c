@@ -89,7 +89,7 @@ BleCmdType BLEParseCommand(const char *msg)
   return BLE_CMD_NONE;
 }
 
-extern SystemStatus g_sys; /* defined in main.c via system_status.h */
+extern SystemStatus g_sys; /* defined in system_status.c via system_status.h */
 
 void UART1_IRQHandler(void)
 {
@@ -168,8 +168,9 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_CONNECTED:
       g_sys.ble_state = BLE_CONNECTED;
       /* Reset movement inactivity timer on BLE connect so user hold doesn't
-         immediately trigger power-down. */
+        immediately trigger idle state. */
       Game_ResetMovementTimer();
+      Game_ResetBleTimer();  /* Reset BLE send timer on reconnect */
       break;
     case BLE_CMD_DISCONNECTED:
       g_sys.ble_state = BLE_DISCONNECTED;

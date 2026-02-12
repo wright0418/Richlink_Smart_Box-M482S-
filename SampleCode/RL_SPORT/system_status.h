@@ -36,12 +36,12 @@ typedef struct
     volatile uint16_t lest_time_ms;
     volatile uint8_t mac_addr[24];
     volatile uint8_t device_name[30];
-    volatile uint8_t jump_flag;
     volatile uint8_t keyA_flag;
-    volatile uint8_t gsensor_flag;
+    volatile uint8_t hall_pb7_irq_flag;
+    volatile uint8_t idle_state; /* 0: moving, 1: idle */
 } SystemStatus;
 
-/* Global instance (defined in main.c) */
+/* Global instance (defined in system_status.c) */
 extern SystemStatus g_sys;
 
 /***************************************************************************
@@ -67,10 +67,10 @@ static inline void Sys_ResetJumpTimes(void) { g_sys.jump_times = 0; }
 /* Button/sensor flag accessors */
 static inline uint8_t Sys_GetKeyAFlag(void) { return g_sys.keyA_flag; }
 static inline void Sys_SetKeyAFlag(uint8_t flag) { g_sys.keyA_flag = flag; }
-static inline uint8_t Sys_GetJumpFlag(void) { return g_sys.jump_flag; }
-static inline void Sys_SetJumpFlag(uint8_t flag) { g_sys.jump_flag = flag; }
-static inline uint8_t Sys_GetGsensorFlag(void) { return g_sys.gsensor_flag; }
-static inline void Sys_SetGsensorFlag(uint8_t flag) { g_sys.gsensor_flag = flag; }
+static inline uint8_t Sys_GetHallPb7IrqFlag(void) { return g_sys.hall_pb7_irq_flag; }
+static inline void Sys_SetHallPb7IrqFlag(uint8_t flag) { g_sys.hall_pb7_irq_flag = flag; }
+static inline uint8_t Sys_GetIdleState(void) { return g_sys.idle_state; }
+static inline void Sys_SetIdleState(uint8_t state) { g_sys.idle_state = state; }
 
 /* MAC address and device name accessors */
 const char *Sys_GetMacAddr(void);

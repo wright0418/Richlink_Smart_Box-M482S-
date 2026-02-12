@@ -19,9 +19,9 @@ void Sys_Init(void)
     g_sys.lest_time_ms = 0;
     memset((void *)g_sys.mac_addr, 0, sizeof(g_sys.mac_addr));
     memset((void *)g_sys.device_name, 0, sizeof(g_sys.device_name));
-    g_sys.jump_flag = 0;
     g_sys.keyA_flag = 0;
-    g_sys.gsensor_flag = 0;
+    g_sys.hall_pb7_irq_flag = 0;
+    g_sys.idle_state = 0;
 }
 
 const char *Sys_GetMacAddr(void)

@@ -9,11 +9,12 @@ void Init_Buttons_Gsensor(void)
     /* PB GPIO */
     GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
 
-#ifndef USE_GSENSOR_JUMP_DETECT
-    /* HALL sensors used for jump counting: enable PB7/PB8 inputs and interrupt */
+#if !USE_GSENSOR_JUMP_DETECT
+    /* HALL sensors used for jump counting: enable PB7 input and interrupt only */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
     GPIO_EnableInt(PB, 7, GPIO_INT_FALLING);
+    /* PB8 interrupt disabled */
 #else
     /* In G-Sensor mode, PB7/PB8 are not used for counting; keep as inputs but do not enable HALL interrupts */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
@@ -22,13 +23,13 @@ void Init_Buttons_Gsensor(void)
     GPIO_EnableInt(PB, 15, GPIO_INT_FALLING);
 
     GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
-    GPIO_ENABLE_DEBOUNCE(PB, BIT15);
+    GPIO_ENABLE_DEBOUNCE(PB, BIT7);  /* Enable debounce for Hall sensor */
+    GPIO_ENABLE_DEBOUNCE(PB, BIT15); /* Enable debounce for button */
     NVIC_EnableIRQ(GPB_IRQn);
 
     /* PC GPIO */
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT); // G sensor interrupt
-    GPIO_EnableInt(PC, 5, GPIO_INT_FALLING);
-    NVIC_EnableIRQ(GPC_IRQn);
+    /* PC5 interrupt disabled (G-sensor INT) */
 }
 
 void EnableI2C_Schmitt(void)
@@ -43,22 +44,75 @@ void Board_ConfigPCLKDiv(void)
     CLK->PCLKDIV = (CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2);
 }
 
-void Board_ConfigMultiFuncPins(void)
+static void Board_ConfigI2C0Pins(void)
 {
-    /* Configure I2C and UART multi-function pins (previously in SYS_Init) */
     SYS->GPB_MFPL = (SYS->GPB_MFPL & ~(SYS_GPB_MFPL_PB4MFP_Msk | SYS_GPB_MFPL_PB5MFP_Msk)) |
                     (SYS_GPB_MFPL_PB4MFP_I2C0_SDA | SYS_GPB_MFPL_PB5MFP_I2C0_SCL);
+}
 
+static void Board_ConfigBatteryAdcPin(void)
+{
+    SYS->GPB_MFPL = (SYS->GPB_MFPL & ~SYS_GPB_MFPL_PB1MFP_Msk) | SYS_GPB_MFPL_PB1MFP_EADC0_CH1;
+    PB->MODE &= ~GPIO_MODE_MODE1_Msk;
+    GPIO_DISABLE_DIGITAL_PATH(PB, BIT1);
+}
+
+static void Board_ConfigUartPins(void)
+{
     SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
     SYS->GPB_MFPH |= (SYS_GPB_MFPH_PB12MFP_UART0_RXD | SYS_GPB_MFPH_PB13MFP_UART0_TXD);
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA8MFP_Msk | SYS_GPA_MFPH_PA9MFP_Msk);
     SYS->GPA_MFPH |= (SYS_GPA_MFPH_PA8MFP_UART1_RXD | SYS_GPA_MFPH_PA9MFP_UART1_TXD);
 }
 
+static void Board_ConfigPowerPins(void)
+{
+    SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk | SYS_GPA_MFPH_PA12MFP_Msk);
+}
+
+void Board_ConfigMultiFuncPins(void)
+{
+    /* Configure I2C, UART, ADC, and power-related GPIO MFPs */
+    Board_ConfigI2C0Pins();
+    Board_ConfigBatteryAdcPin();
+    Board_ConfigUartPins();
+    Board_ConfigPowerPins();
+}
+
 void Board_ReleaseIOPD(void)
 {
     /* Release I/O hold status for SPD Mode (was in InitSystem) */
     CLK->IOPDCTL = 1;
+}
+
+void PowerLock_Init(void)
+{
+    /* Configure PA11 as output and assert lock (high). */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
+    PA->DOUT |= BIT11;
+}
+
+void PowerLock_Set(uint8_t on)
+{
+    if (on)
+    {
+        PA->DOUT |= BIT11;
+    }
+    else
+    {
+        PA->DOUT &= ~BIT11;
+    }
+}
+
+void USBDetect_Init(void)
+{
+    /* Configure PA12 as input for USB charge detect */
+    GPIO_SetMode(PA, BIT12, GPIO_MODE_INPUT);
+}
+
+uint8_t USBDetect_IsHigh(void)
+{
+    return (PA->PIN & BIT12) ? 1u : 0u;
 }
 
 void InitSpdPins(void)
@@ -84,39 +138,60 @@ void Gpio_ConfigSPDWakeup(void)
     CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
 }
 
+void GPIO_ResetHallEdgeCount(void)
+{
+    /* Note: Static hall_pb7_edge_count in ISR is auto-reset on state change.
+       This function serves as explicit reset API for future extensibility. */
+}
+
 void GPB_IRQHandler(void)
 {
-    // Set flags only, handle in main loop
-#ifndef USE_GSENSOR_JUMP_DETECT
-    /* HALL Sensor jump counting (PB7, PB8) - disabled when using G-sensor */
+#if !USE_GSENSOR_JUMP_DETECT
+    /* ============================================================================
+     * Hall Sensor Jump Detection (PB7 only)
+     * 
+     * Logic: Rope jumping produces 2 falling edges per jump on the Hall sensor.
+     * Edge counting:
+     *  - Count every falling-edge interrupt on PB7
+     *  - Increment jump counter only after 2 edges received in GAME_START state
+     *  - Reset counter after each 2-edge pair to prepare for next jump
+     * 
+     * Safety: Edge counter is static and local to ISR context; auto-clears between
+     * game sessions when GAME_START becomes GAME_STOP. Debounce (20ms via GPIO)
+     * filters electrical noise and contact bounce. If edge arrives while in
+     * GAME_STOP state, it is ignored but flag is set for main loop visibility.
+     * ============================================================================ */
+    static uint8_t hall_pb7_edge_count = 0u;
+    
     if (GPIO_GET_INT_FLAG(PB, BIT7))
     {
         GPIO_CLR_INT_FLAG(PB, BIT7);
         if (Sys_GetGameState() == GAME_START)
         {
-            Sys_IncrementJumpTimes();
-            DBG_PRINT("[GPIO] HALL PB7 increment - total=%d\n", Sys_GetJumpTimes());
+            hall_pb7_edge_count++;
+            if (hall_pb7_edge_count >= 2u)
+            {
+                hall_pb7_edge_count = 0u;
+                Sys_IncrementJumpTimes();
+            }
         }
-        Sys_SetJumpFlag(1);
+        Sys_SetHallPb7IrqFlag(1);  /* Signal main loop for logging */
     }
+    
     if (GPIO_GET_INT_FLAG(PB, BIT8))
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);
-        /* HALL PB8 - not used for counting by default */
-        DBG_PRINT("[GPIO] HALL PB8 interrupt (cleared)\n");
-        // Optionally set g_jump_flag2 = 1 if required
+        /* PB8 not used - interrupt disabled */
     }
 #else
-    /* G-sensor mode: HALL sensors not used for counting, but still clear flags */
+    /* G-Sensor mode active - clear any stray Hall edges without counting */
     if (GPIO_GET_INT_FLAG(PB, BIT7))
     {
         GPIO_CLR_INT_FLAG(PB, BIT7);
-        DBG_PRINT("[GPIO] PB7 interrupt cleared (G-Sensor mode active)\n");
     }
     if (GPIO_GET_INT_FLAG(PB, BIT8))
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);
-        DBG_PRINT("[GPIO] PB8 interrupt cleared (G-Sensor mode active)\n");
     }
 #endif /* USE_GSENSOR_JUMP_DETECT */
 
@@ -131,11 +206,10 @@ void GPB_IRQHandler(void)
 
 void GPC_IRQHandler(void)
 {
-    // Set flag only, handle in main loop
+    /* PC5 interrupt disabled; clear any unexpected pending flags */
     if (GPIO_GET_INT_FLAG(PC, BIT5))
     {
         GPIO_CLR_INT_FLAG(PC, BIT5);
-        g_sys.gsensor_flag = 1;
     }
     PC->INTSRC = PC->INTSRC;
 }

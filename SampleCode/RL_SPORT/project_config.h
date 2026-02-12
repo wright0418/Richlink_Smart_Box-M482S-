@@ -3,7 +3,7 @@
 #define _PROJECT_CONFIG_H_
 
 /* System/clock configuration */
-#define PLL_CLOCK 192000000
+#define PLL_CLOCK 48000000
 
 #define DEBUG 1
 #if DEBUG
@@ -52,15 +52,12 @@
 #endif
 
 /* General project flags */
-#define STANDBY_TIME (60 * 1000) /* 60 sec */
-#define BUF_SIZE 512			 /* Size of DBG_PRINT buffer */
-#define enable_Gsensor_Mode 1
 
-/* Movement-based power-down configuration
+/* Movement-based idle detection configuration
 	 - When BLE is connected and device is stationary for NO_MOVEMENT_TIMEOUT_CONNECTED_MS,
-		 enter low-power (disconnect BLE then SPD/DPD).
+		 mark idle state.
 	 - When BLE is disconnected and device is stationary for NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS,
-		 directly enter low-power.
+		 mark idle state.
 */
 #define NO_MOVEMENT_TIMEOUT_CONNECTED_MS (60 * 1000)	/* 60 seconds when BLE connected */
 #define NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS (30 * 1000) /* 30 seconds when BLE disconnected */
@@ -71,9 +68,32 @@
 #define MOVEMENT_STDDEV_THRESHOLD_G 0.02f /* stddev threshold in g to consider 'no movement' */
 #define MOVEMENT_MAG_TOLERANCE_G 0.4f	  /* magnitude deviation from 1g considered stable (relaxed for sensor calibration) */
 
+/* Battery ADC configuration (PB1 -> EADC0_CH1)
+	Assumptions: Vref=3.0V, divider=1/2 (ADC=BAT/2) */
+#define ADC_VREF_V 3.0f
+#define ADC_FULL_SCALE 4095.0f
+#define ADC_DIVIDER_RATIO 0.5f
+#define ADC_BATT_LOW_V 3.6f
+#define ADC_BATT_AVG_SAMPLES 4u
+#define ADC_CONV_TIMEOUT 10000u
+#define LOW_BATT_CHECK_INTERVAL_MS 1000u
+#define LOW_BATT_LED_FREQ_HZ 4.0f
+#define LOW_BATT_LED_DUTY 0.1f
+
 /* G-Sensor Jump Detection Configuration */
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
-#define USE_GSENSOR_JUMP_DETECT 1
+#define USE_GSENSOR_JUMP_DETECT 0
+
+/* Delayed stationary calibration configuration */
+#define GS_CAL_START_DELAY_MS 3000u
+#define GS_CAL_STABLE_REQUIRED_MS 800u
+#define GS_CAL_STABLE_SAMPLE_INTERVAL_MS 100u
+#define GS_CAL_STABLE_WINDOW_SAMPLES 8u
+#define GS_CAL_STABLE_STDDEV_THRESHOLD_G 0.02f
+#define GS_CAL_STABLE_MAG_TOLERANCE_G 0.20f
+#define GS_CAL_LED_UNCAL_FREQ_HZ 0.5f /* 2 seconds blink */
+#define GS_CAL_LED_CAL_FREQ_HZ 0.25f  /* 4 seconds blink */
+#define GS_CAL_LED_DUTY 0.05f
 
 #if USE_GSENSOR_JUMP_DETECT
 /* FIR Low-pass Filter Configuration */
