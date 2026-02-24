@@ -52,7 +52,7 @@ These rules help AI coding agents work productively in this CMSIS/Keil-style fir
 - Deep power down wakeUp Pin PC0
 - PB1 , ADC for Battery low battery voltage detetc 
 - PA11 , for System power lock , High is lock the power , low is turn off system power
-
+- support USB FS Device 
 
 ## External tools
 - Requires CMSIS-Toolbox and pyOCD on PATH; CMSIS-DAP probe expected. GDB attaches to 3333 when CMSIS Run is active.

@@ -9,6 +9,7 @@
 #include "gsensor.h"
 #include "adc.h"
 #include "gpio.h"
+#include "usb_hid_mouse.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;
 
@@ -150,6 +151,34 @@ static void Test_ADC(void)
            (double)ADC_BATT_LOW_V);
 }
 
+static void Test_USB(void)
+{
+    printf("[Test] USB FS HID Mouse: connect to PC, press 'q' to stop\n");
+    UsbHidMouse_TestStart();
+
+    uint32_t last_update = get_ticks_ms();
+    while (1)
+    {
+        char c = 0;
+        if (UART0_ReadCharNonBlocking(&c))
+        {
+            if (c == 'q' || c == 'Q' || c == '0' || c == 'x' || c == 'X')
+            {
+                break;
+            }
+        }
+
+        if (get_elapsed_ms(last_update) >= 1u)
+        {
+            last_update = get_ticks_ms();
+            UsbHidMouse_TestUpdate();
+        }
+    }
+
+    UsbHidMouse_TestStop();
+    printf("[Test] USB HID stopped\n");
+}
+
 static void RunAllTests(void)
 {
     Test_LED();
@@ -171,6 +200,7 @@ static void UART0_TestMenuLoop(void)
     printf("5) G-sensor I2C\n");
     printf("6) ADC PB1\n");
     printf("7) Run all tests\n");
+    printf("8) USB FS HID Mouse\n");
     printf("0) Exit\n");
 
     while (g_uart_test_mode)
@@ -200,6 +230,9 @@ static void UART0_TestMenuLoop(void)
             break;
         case '7':
             RunAllTests();
+            break;
+        case '8':
+            Test_USB();
             break;
         case '0':
             g_uart_test_mode = 0u;

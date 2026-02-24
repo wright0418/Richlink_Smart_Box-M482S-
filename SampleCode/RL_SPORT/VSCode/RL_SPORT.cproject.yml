@@ -59,6 +59,7 @@ project:
         - file: ../../../Library/StdDriver/src/i2c.c
         - file: ../../../Library/StdDriver/src/eadc.c
         - file: ../../../Library/StdDriver/src/timer.c
+        - file: ../../../Library/StdDriver/src/usbd.c
         - file: ../../../Library/CMSIS/Lib/ARM/arm_cortexM4lf_math.lib
           for-compiler: AC6
     - group: User
@@ -73,6 +74,8 @@ project:
         - file: ../gpio.c
         - file: ../adc.c
         - file: ../test_mode.c
+        - file: ../usb_hid_mouse.c
+        - file: ../usb_hid_mouse_desc.c
         - file: ../gsensor.c
         - file: ../gsensor_jump_detect.c
         - file: ../i2c.c

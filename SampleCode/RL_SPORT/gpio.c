@@ -149,35 +149,35 @@ void GPB_IRQHandler(void)
 #if !USE_GSENSOR_JUMP_DETECT
     /* ============================================================================
      * Hall Sensor Jump Detection (PB7 only)
-     * 
+     *
      * Logic: Rope jumping produces 2 falling edges per jump on the Hall sensor.
      * Edge counting:
      *  - Count every falling-edge interrupt on PB7
      *  - Increment jump counter only after 2 edges received in GAME_START state
      *  - Reset counter after each 2-edge pair to prepare for next jump
-     * 
+     *
      * Safety: Edge counter is static and local to ISR context; auto-clears between
      * game sessions when GAME_START becomes GAME_STOP. Debounce (20ms via GPIO)
      * filters electrical noise and contact bounce. If edge arrives while in
      * GAME_STOP state, it is ignored but flag is set for main loop visibility.
      * ============================================================================ */
     static uint8_t hall_pb7_edge_count = 0u;
-    
+
     if (GPIO_GET_INT_FLAG(PB, BIT7))
     {
         GPIO_CLR_INT_FLAG(PB, BIT7);
         if (Sys_GetGameState() == GAME_START)
         {
-            hall_pb7_edge_count++;
-            if (hall_pb7_edge_count >= 2u)
-            {
-                hall_pb7_edge_count = 0u;
-                Sys_IncrementJumpTimes();
-            }
+            // hall_pb7_edge_count++;
+            // if (hall_pb7_edge_count >= 2u)
+            // {
+            //     hall_pb7_edge_count = 0u;
+            Sys_IncrementJumpTimes();
+            // }
         }
-        Sys_SetHallPb7IrqFlag(1);  /* Signal main loop for logging */
+        Sys_SetHallPb7IrqFlag(1); /* Signal main loop for logging */
     }
-    
+
     if (GPIO_GET_INT_FLAG(PB, BIT8))
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);

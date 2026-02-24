@@ -61,6 +61,71 @@ static void RL_RunUsbChargeLoop(void)
   }
 }
 
+static uint8_t RL_IsHexChar(char c)
+{
+  return (uint8_t)((c >= '0' && c <= '9') ||
+                   (c >= 'A' && c <= 'F') ||
+                   (c >= 'a' && c <= 'f'));
+}
+
+static uint8_t RL_ExtractMacSuffix4(const char *src, char *out4)
+{
+  if (!src || !out4)
+  {
+    return 0u;
+  }
+
+  char hex_buf[16];
+  uint8_t hex_len = 0u;
+  for (size_t i = 0u; src[i] != '\0'; i++)
+  {
+    if (RL_IsHexChar(src[i]))
+    {
+      if (hex_len < (uint8_t)sizeof(hex_buf))
+      {
+        hex_buf[hex_len++] = src[i];
+      }
+    }
+  }
+
+  if (hex_len < 4u)
+  {
+    out4[0] = '\0';
+    return 0u;
+  }
+
+  out4[0] = hex_buf[hex_len - 4u];
+  out4[1] = hex_buf[hex_len - 3u];
+  out4[2] = hex_buf[hex_len - 2u];
+  out4[3] = hex_buf[hex_len - 1u];
+  out4[4] = '\0';
+  return 1u;
+}
+
+static uint8_t RL_HasValidRopeSuffix(const char *name)
+{
+  if (!name)
+  {
+    return 0u;
+  }
+
+  const char *p = strstr(name, "ROPE_");
+  if (!p)
+  {
+    return 0u;
+  }
+
+  p += 5; /* skip "ROPE_" */
+  for (uint8_t i = 0u; i < 4u; i++)
+  {
+    if (!RL_IsHexChar(p[i]))
+    {
+      return 0u;
+    }
+  }
+  return 1u;
+}
+
 static void RL_BleRenameFlow(uint8_t *device_name, uint8_t *mac)
 {
   delay_ms(200);
@@ -71,21 +136,52 @@ static void RL_BleRenameFlow(uint8_t *device_name, uint8_t *mac)
   delay_ms(20);
   CheckBleRecvMsg();
 
+  DBG_PRINT("[BLE] name raw: '%s'\r\n", Sys_GetDeviceName());
+
   memcpy(device_name, (const void *)&Sys_GetDeviceName()[12], 4);
   device_name[4] = '\0';
   DBG_PRINT("name = %s\r\n", device_name);
 
-  if (strcmp((const void *)device_name, "ROPE\0") != 0)
+  uint8_t has_valid_rope = RL_HasValidRopeSuffix(Sys_GetDeviceName());
+  DBG_PRINT("[BLE] rope suffix valid: %u\r\n", has_valid_rope);
+
+  if (!has_valid_rope)
   {
     DBG_PRINT("rename %s\n", device_name);
     BLE_UART_SEND(UART1, BLE_CMD_ADDR_QUERY);
-    delay_ms(20);
-    CheckBleRecvMsg();
-    DBG_PRINT("addr = %s\n", Sys_GetMacAddr());
-    memcpy(mac, (const void *)&Sys_GetMacAddr()[17], 4);
-    mac[4] = '\0';
-    DBG_PRINT("MAC address: %s \n", mac);
-    BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", mac);
+    for (uint8_t retry = 0u; retry < 10u; retry++)
+    {
+      delay_ms(20);
+      CheckBleRecvMsg();
+      if (strlen((const char *)Sys_GetMacAddr()) > 0u)
+      {
+        break;
+      }
+    }
+    DBG_PRINT("[BLE] addr raw: '%s'\n", Sys_GetMacAddr());
+
+    char mac_suffix[5];
+    uint8_t has_suffix = RL_ExtractMacSuffix4(Sys_GetMacAddr(), mac_suffix);
+    if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
+    {
+      memcpy(mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4);
+      mac_suffix[4] = '\0';
+      has_suffix = 1u;
+    }
+
+    DBG_PRINT("[BLE] mac suffix: '%s' (valid=%u)\n", mac_suffix, has_suffix);
+
+    if (has_suffix)
+    {
+      memcpy(mac, mac_suffix, 4);
+      mac[4] = '\0';
+      DBG_PRINT("MAC address: %s \n", mac);
+      BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", mac);
+    }
+    else
+    {
+      DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
+    }
     delay_ms(500);
     CheckBleRecvMsg();
     BLE_UART_SEND(UART1, BLE_CMD_REBOOT);
@@ -331,6 +427,9 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
   {
     *poweroff_done = 1u;
     DBG_PRINT("[Main] Idle timeout, power off\n");
+    DBG_PRINT("[Main] BLE disconnect before power off\n");
+    BLEDisconnect();
+    delay_ms(50);
     SetGreenLedMode(0, 0);
     PowerLock_Set(0);
     while (1)

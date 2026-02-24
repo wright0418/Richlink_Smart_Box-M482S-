@@ -76,6 +76,32 @@ static const struct
     {BLE_CMD_MAC_ADDR, "MAC_ADDR"},
     {BLE_CMD_DEVICE_NAME, "DEVICE_NAME"}};
 
+static size_t BLE_TrimLineLen(const char *src, size_t len)
+{
+  while (len > 0u && (src[len - 1u] == '\r' || src[len - 1u] == '\n'))
+  {
+    len--;
+  }
+  return len;
+}
+
+static void BLE_CopyClamp(volatile uint8_t *dst, size_t dst_size, const char *src, size_t len)
+{
+  if (!dst || !src || dst_size == 0u)
+  {
+    return;
+  }
+
+  size_t copy_len = len;
+  if (copy_len >= dst_size)
+  {
+    copy_len = dst_size - 1u;
+  }
+
+  memcpy((void *)dst, src, copy_len);
+  dst[copy_len] = '\0';
+}
+
 BleCmdType BLEParseCommand(const char *msg)
 {
   uint8_t i;
@@ -170,7 +196,7 @@ void CheckBleRecvMsg(void)
       /* Reset movement inactivity timer on BLE connect so user hold doesn't
         immediately trigger idle state. */
       Game_ResetMovementTimer();
-      Game_ResetBleTimer();  /* Reset BLE send timer on reconnect */
+      Game_ResetBleTimer(); /* Reset BLE send timer on reconnect */
       break;
     case BLE_CMD_DISCONNECTED:
       g_sys.ble_state = BLE_DISCONNECTED;
@@ -208,20 +234,20 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_MAC_ADDR:
     {
       size_t len = strlen((const char *)pRecData);
-      if (len > 0 && len <= sizeof(g_sys.mac_addr))
+      len = BLE_TrimLineLen((const char *)pRecData, len);
+      if (len > 0u)
       {
-        memcpy((void *)g_sys.mac_addr, (const char *)pRecData, len);
-        g_sys.mac_addr[len < sizeof(g_sys.mac_addr) ? len : sizeof(g_sys.mac_addr) - 1] = '\0';
+        BLE_CopyClamp(g_sys.mac_addr, sizeof(g_sys.mac_addr), (const char *)pRecData, len);
       }
     }
     break;
     case BLE_CMD_DEVICE_NAME:
     {
       size_t len = strlen((const char *)pRecData);
-      if (len > 0 && len <= sizeof(g_sys.device_name))
+      len = BLE_TrimLineLen((const char *)pRecData, len);
+      if (len > 0u)
       {
-        memcpy((void *)g_sys.device_name, (const char *)pRecData, len);
-        g_sys.device_name[len < sizeof(g_sys.device_name) ? len : sizeof(g_sys.device_name) - 1] = '\0';
+        BLE_CopyClamp(g_sys.device_name, sizeof(g_sys.device_name), (const char *)pRecData, len);
       }
     }
     break;
