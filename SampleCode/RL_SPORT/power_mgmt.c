@@ -161,3 +161,18 @@ void PowerMgmt_EnterSPD(PowerMode mode)
     {
     }
 }
+
+uint8_t PowerMgmt_DetectUsbCharge(void)
+{
+    USBDetect_Init();
+    CLK_SysTickDelay(50000); /* 50 ms debounce */
+    return USBDetect_IsHigh();
+}
+
+void PowerMgmt_RunChargeLoop(void)
+{
+    while (1)
+    {
+        /* USB charging auto-boot mode: no power lock, no game */
+    }
+}

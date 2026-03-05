@@ -153,21 +153,13 @@ static void Test_ADC(void)
 
 static void Test_USB(void)
 {
-    printf("[Test] USB FS HID Mouse: connect to PC, press 'q' to stop\n");
+    printf("[Test] USB FS HID Mouse auto test: 5s\n");
     UsbHidMouse_TestStart();
 
+    uint32_t start = get_ticks_ms();
     uint32_t last_update = get_ticks_ms();
-    while (1)
+    while (!is_timeout(start, 5000))
     {
-        char c = 0;
-        if (UART0_ReadCharNonBlocking(&c))
-        {
-            if (c == 'q' || c == 'Q' || c == '0' || c == 'x' || c == 'X')
-            {
-                break;
-            }
-        }
-
         if (get_elapsed_ms(last_update) >= 1u)
         {
             last_update = get_ticks_ms();
@@ -176,7 +168,7 @@ static void Test_USB(void)
     }
 
     UsbHidMouse_TestStop();
-    printf("[Test] USB HID stopped\n");
+    printf("[Test] USB auto test done\n");
 }
 
 static void RunAllTests(void)
@@ -200,7 +192,7 @@ static void UART0_TestMenuLoop(void)
     printf("5) G-sensor I2C\n");
     printf("6) ADC PB1\n");
     printf("7) Run all tests\n");
-    printf("8) USB FS HID Mouse\n");
+    printf("8) USB FS HID Mouse (auto 5s)\n");
     printf("0) Exit\n");
 
     while (g_uart_test_mode)

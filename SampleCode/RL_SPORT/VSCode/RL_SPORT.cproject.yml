@@ -80,3 +80,4 @@ project:
         - file: ../gsensor_jump_detect.c
         - file: ../i2c.c
         - file: ../board_test_gpio.c
+        - file: ../power_mgmt.c

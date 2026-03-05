@@ -4,7 +4,7 @@
 #include "system_status.h"
 #include "project_config.h"
 
-void Init_Buttons_Gsensor(void)
+void Gpio_Init(void)
 {
     /* PB GPIO */
     GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);

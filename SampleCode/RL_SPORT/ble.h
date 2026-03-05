@@ -128,6 +128,13 @@ void BLESendData(const char *data);
  */
 void BLESetName(const char *name);
 
+/**
+ * @brief Run BLE rename flow: query name/MAC and rename to ROPE_xxxx if needed.
+ * @param device_name Output buffer (at least 5 bytes) for device name suffix.
+ * @param mac Output buffer (at least 5 bytes) for MAC suffix.
+ */
+void Ble_RenameFlow(uint8_t *device_name, uint8_t *mac);
+
 /* Mode/connection helpers */
 /** Switch BLE link to disconnected state (soft disconnect). */
 void BLEDisconnect(void);

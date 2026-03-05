@@ -9,7 +9,7 @@ static Gsensor_FSR g_current_fsr = FSR_2G;
 
 /* Initialize I2C peripheral (I2C0) and any G-sensor related board settings
    This consolidates I2C_Init into the G-sensor module per request. */
-void GsensorInit(uint32_t busHz, Gsensor_FSR fsr)
+void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr)
 {
   /* Enable module clock for I2C0 should be done by SYS_Init in main; just open I2C here */
   I2C_Open(I2C0, busHz);

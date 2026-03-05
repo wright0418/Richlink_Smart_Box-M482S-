@@ -106,6 +106,6 @@ void MXC400_to_wakeup(Gsensor_FSR fsr);
  * The caller should ensure system clocks and module clocks are enabled
  * (typically done in SYS_Init()) before calling this function.
  */
-void GsensorInit(uint32_t busHz, Gsensor_FSR fsr);
+void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr);
 
 #endif // _GSENSOR_H_

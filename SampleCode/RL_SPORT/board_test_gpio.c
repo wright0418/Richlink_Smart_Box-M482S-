@@ -105,7 +105,7 @@ static void test_gsensor_i2c(void)
     printf("[BoardTest] G-sensor test: init + read via I2C\n");
 
     /* Ensure sensor is configured and awake */
-    GsensorInit(100000, FSR_2G);
+    Gsensor_Init(100000, FSR_2G);
     GsensorWakeup();
 
     /* Allow sensor to settle */

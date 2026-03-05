@@ -69,4 +69,15 @@ void PowerMgmt_ReleaseIOHold(void);
  */
 void PowerMgmt_HandleWake(void);
 
+/**
+ * @brief Detect USB charge mode at startup (check VBUS pin).
+ * @return 1 if USB VBUS detected (charge mode), 0 otherwise.
+ */
+uint8_t PowerMgmt_DetectUsbCharge(void);
+
+/**
+ * @brief Enter infinite loop for USB charge-only mode (no game logic).
+ */
+void PowerMgmt_RunChargeLoop(void);
+
 #endif // _POWER_MGMT_H_

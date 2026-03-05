@@ -3,9 +3,9 @@
 #define _PROJECT_CONFIG_H_
 
 /* System/clock configuration */
-#define PLL_CLOCK 48000000
+#define PLL_CLOCK 96000000
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>

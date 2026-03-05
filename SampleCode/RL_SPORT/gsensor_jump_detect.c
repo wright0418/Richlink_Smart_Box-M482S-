@@ -31,6 +31,8 @@ typedef struct
 #include "system_status.h"
 #include "timer.h"
 #include "buzzer.h"
+#include "gsensor.h"
+#include "led.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -467,6 +469,129 @@ uint8_t JumpDetect_IsReady(void)
 {
     /* Only ready when calibration is valid AND fully completed (not during calibration) */
     return (g_calib_data.is_valid && g_calib_state == CALIB_COMPLETED);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Pre-calibration stability FSM (moved from main.c)                        */
+/*---------------------------------------------------------------------------*/
+
+static uint8_t s_precal_started = 0u;
+static uint8_t s_precal_done = 0u;
+static uint32_t s_precal_schedule_at = 0u;
+static uint32_t s_precal_stable_since = 0u;
+static uint32_t s_precal_last_sample_time = 0u;
+static float s_precal_window[GS_CAL_STABLE_WINDOW_SAMPLES];
+static uint8_t s_precal_window_idx = 0u;
+static uint8_t s_precal_window_count = 0u;
+static uint8_t s_precal_stable_now = 0u;
+
+void JumpDetect_InitPreCalib(uint32_t now)
+{
+    s_precal_started = 0u;
+    s_precal_done = 0u;
+    s_precal_schedule_at = now + GS_CAL_START_DELAY_MS;
+    s_precal_stable_since = 0u;
+    s_precal_last_sample_time = 0u;
+    s_precal_window_idx = 0u;
+    s_precal_window_count = 0u;
+    s_precal_stable_now = 0u;
+    for (uint32_t i = 0; i < GS_CAL_STABLE_WINDOW_SAMPLES; i++)
+    {
+        s_precal_window[i] = 0.0f;
+    }
+    SetGreenLedMode(GS_CAL_LED_UNCAL_FREQ_HZ, GS_CAL_LED_DUTY);
+}
+
+static uint8_t JumpDetect_UpdateStable(uint32_t now)
+{
+    if (!is_timeout(s_precal_last_sample_time, GS_CAL_STABLE_SAMPLE_INTERVAL_MS))
+    {
+        return s_precal_stable_now;
+    }
+
+    s_precal_last_sample_time = now;
+
+    int16_t axis[3];
+    GsensorReadAxis(axis);
+    float mag = Gsensor_CalcMagnitude_g_from_raw(axis);
+
+    s_precal_window[s_precal_window_idx] = mag;
+    s_precal_window_idx = (s_precal_window_idx + 1u) % GS_CAL_STABLE_WINDOW_SAMPLES;
+    if (s_precal_window_count < GS_CAL_STABLE_WINDOW_SAMPLES)
+    {
+        s_precal_window_count++;
+    }
+
+    float sum = 0.0f;
+    for (uint32_t i = 0; i < s_precal_window_count; i++)
+    {
+        sum += s_precal_window[i];
+    }
+    float mean = (s_precal_window_count > 0u) ? (sum / (float)s_precal_window_count) : 0.0f;
+
+    float var = 0.0f;
+    for (uint32_t i = 0; i < s_precal_window_count; i++)
+    {
+        float d = s_precal_window[i] - mean;
+        var += d * d;
+    }
+    float stddev = 0.0f;
+    if (s_precal_window_count > 0u)
+    {
+        stddev = sqrtf(var / (float)s_precal_window_count);
+    }
+
+    s_precal_stable_now = (stddev <= GS_CAL_STABLE_STDDEV_THRESHOLD_G &&
+                           fabsf(mean - 1.0f) <= GS_CAL_STABLE_MAG_TOLERANCE_G);
+    return s_precal_stable_now;
+}
+
+void JumpDetect_TryAutoCalibration(uint32_t now)
+{
+    if (s_precal_done || s_precal_started)
+    {
+        return;
+    }
+
+    if (now < s_precal_schedule_at)
+    {
+        return;
+    }
+
+    if (JumpDetect_UpdateStable(now))
+    {
+        if (s_precal_stable_since == 0u)
+        {
+            s_precal_stable_since = now;
+        }
+        if (get_elapsed_ms(s_precal_stable_since) >= GS_CAL_STABLE_REQUIRED_MS)
+        {
+            JumpDetect_StartCalibration();
+            s_precal_started = 1u;
+            s_precal_stable_since = 0u;
+        }
+    }
+    else
+    {
+        s_precal_stable_since = 0u;
+    }
+}
+
+void JumpDetect_UpdatePreCalibState(void)
+{
+    if (s_precal_started && !JumpDetect_IsCalibrating())
+    {
+        s_precal_started = 0u;
+        if (JumpDetect_IsReady())
+        {
+            s_precal_done = 1u;
+        }
+    }
+}
+
+uint8_t JumpDetect_IsPreCalibDone(void)
+{
+    return s_precal_done;
 }
 
 #endif /* USE_GSENSOR_JUMP_DETECT */

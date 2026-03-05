@@ -18,12 +18,11 @@ static uint8_t mouse_mode = 1;
 
 static volatile uint8_t g_u8EP2Ready = 0u;
 
-/* Some boards do not wire VBUS detect; keep USB enabled during test. */
-#define USB_HID_IGNORE_VBUS_DETECT 1
-
 static void UsbHidMouse_ConfigClock(void)
 {
-    uint32_t div = PLL_CLOCK / 48000000UL;
+    /* USB requires a 48 MHz clock. Derive it from current PLL frequency. */
+    uint32_t u32PllFreq = CLK_GetPLLClockFreq();
+    uint32_t div = u32PllFreq / 48000000UL;
     if (div < 1UL)
     {
         div = 1UL;
@@ -33,24 +32,19 @@ static void UsbHidMouse_ConfigClock(void)
         div = 16UL;
     }
 
-    /* Prefer PLL-derived 48 MHz; fall back to HIRC48M if available */
-    if ((PLL_CLOCK % 48000000UL) == 0UL)
-    {
-        CLK->CLKSEL0 |= CLK_CLKSEL0_USBSEL_Msk;
-        CLK->CLKDIV0 = (CLK->CLKDIV0 & ~CLK_CLKDIV0_USBDIV_Msk) | CLK_CLKDIV0_USB(div);
-    }
-    else
-    {
-        CLK->PWRCTL |= CLK_PWRCTL_HIRC48MEN_Msk;
-        CLK->CLKSEL0 &= ~CLK_CLKSEL0_USBSEL_Msk;
-        CLK->CLKDIV0 = (CLK->CLKDIV0 & ~CLK_CLKDIV0_USBDIV_Msk) | CLK_CLKDIV0_USB(1);
-    }
+    /* USB clock source = PLL, divider = actual_PLL / 48 MHz */
+    CLK->CLKSEL0 |= CLK_CLKSEL0_USBSEL_Msk;
+    CLK->CLKDIV0 = (CLK->CLKDIV0 & ~CLK_CLKDIV0_USBDIV_Msk) | CLK_CLKDIV0_USB(div);
 
     /* Enable USBD module clock */
     CLK_EnableModuleClock(USBD_MODULE);
 
     /* Enable USB PHY in device mode */
     SYS->USBPHY = (SYS->USBPHY & ~SYS_USBPHY_USBROLE_Msk) | SYS_USBPHY_USBEN_Msk | SYS_USBPHY_SBO_Msk;
+
+    printf("[USB] PLL=%luHz, USB div=%lu -> USB clk=%luHz\n",
+           (unsigned long)u32PllFreq, (unsigned long)div,
+           (unsigned long)(u32PllFreq / div));
 }
 
 static void UsbHidMouse_ConfigPins(void)
@@ -70,30 +64,27 @@ void UsbHidMouse_TestStart(void)
         return;
     }
 
+    /* Protected register access needed for clock/PHY configuration */
+    SYS_UnlockReg();
+
     UsbHidMouse_ConfigClock();
     UsbHidMouse_ConfigPins();
 
     SYS_ResetModule(USBD_RST);
 
-    /* Force detach/attach to re-enumerate */
-    USBD_SET_SE0();
-    delay_ms(5);
-    USBD_CLR_SE0();
-
+    /* Follow official Nuvoton sequence: Open → Init → Start → NVIC */
     USBD_Open(&gsInfo, HID_ClassRequest, NULL);
     HID_Init();
     USBD_Start();
-    USBD_ENABLE_USB();
-    USBD_ENABLE_PHY();
-#if defined(USBD_ATTR_DPPUEN_Msk)
-    /* Ensure D+ pull-up is enabled */
-    USBD->ATTR |= USBD_ATTR_DPPUEN_Msk;
-#endif
-#if USB_HID_IGNORE_VBUS_DETECT
-    /* Disable VBUS detect interrupt to prevent spurious disconnects */
-    USBD->INTEN &= ~USBD_INT_FLDET;
-#endif
+
     NVIC_EnableIRQ(USBD_IRQn);
+
+    SYS_LockReg();
+
+    printf("[USB] ATTR=0x%03lX INTEN=0x%03lX SE0=0x%lX\n",
+           (unsigned long)(USBD->ATTR),
+           (unsigned long)(USBD->INTEN),
+           (unsigned long)(USBD->SE0));
 
     g_usb_hid_active = 1u;
 }
@@ -134,7 +125,7 @@ void USBD_IRQHandler(void)
     if (u32IntSts & USBD_INTSTS_VBDETIF_Msk)
     {
         USBD_CLR_INT_FLAG(USBD_INTSTS_VBDETIF_Msk);
-#if !USB_HID_IGNORE_VBUS_DETECT
+
         if (USBD_IS_ATTACHED())
         {
             USBD_ENABLE_USB();
@@ -143,7 +134,6 @@ void USBD_IRQHandler(void)
         {
             USBD_DISABLE_USB();
         }
-#endif
     }
 
     if (u32IntSts & USBD_INTSTS_BUSIF_Msk)

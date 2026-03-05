@@ -22,7 +22,7 @@
  * Hall Sensor (PB7): Falling edge triggered, counted as 2 per jump.
  * PB7 debounce is intentionally disabled for fastest response.
  */
-void Init_Buttons_Gsensor(void);
+void Gpio_Init(void);
 
 /**
  * @brief Reset Hall sensor edge counter (called on game stop or disconnect).

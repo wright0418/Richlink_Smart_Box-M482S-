@@ -142,6 +142,29 @@ extern "C"
      */
     uint8_t JumpDetect_IsReady(void);
 
+    /**
+     * @brief Initialize pre-calibration stability FSM
+     * @param now Current tick (ms) from get_ticks_ms()
+     */
+    void JumpDetect_InitPreCalib(uint32_t now);
+
+    /**
+     * @brief Poll pre-calibration: check stability and auto-start calibration
+     * @param now Current tick (ms)
+     */
+    void JumpDetect_TryAutoCalibration(uint32_t now);
+
+    /**
+     * @brief Update pre-calibration state after calibration finishes
+     */
+    void JumpDetect_UpdatePreCalibState(void);
+
+    /**
+     * @brief Check if pre-calibration sequence completed successfully
+     * @return 1 if done, 0 otherwise
+     */
+    uint8_t JumpDetect_IsPreCalibDone(void);
+
 #endif /* USE_GSENSOR_JUMP_DETECT */
 
 #ifdef __cplusplus

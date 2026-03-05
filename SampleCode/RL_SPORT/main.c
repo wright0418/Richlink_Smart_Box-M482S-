@@ -7,10 +7,7 @@
  * @copyright (C) 2023 Richlink  Technology Corp. All rights reserved.
  *****************************************************************************/
 #include <stdint.h>
-#include <stddef.h>
-#include <string.h>
 #include <stdio.h>
-#include <math.h>
 #include "NuMicro.h"
 
 /* Project configuration and common definitions */
@@ -23,11 +20,11 @@
 #include "buzzer.h"
 #include "gpio.h"
 #include "gsensor.h"
-#include "i2c.h"
 #include "board_test_gpio.h"
 #include "adc.h"
 #include "test_mode.h"
 #include "usb_hid_mouse.h"
+#include "power_mgmt.h"
 
 #if USE_GSENSOR_JUMP_DETECT
 #include "gsensor_jump_detect.h"
@@ -35,270 +32,12 @@
 
 static volatile uint8_t g_usb_charge_mode = 0u;
 
-#if USE_GSENSOR_JUMP_DETECT
-static uint8_t g_gs_calib_started = 0u;
-static uint8_t g_gs_calib_done = 0u;
-static uint32_t g_gs_calib_schedule_at = 0u;
-static uint32_t g_gs_calib_stable_since = 0u;
-static uint32_t g_gs_calib_last_sample_time = 0u;
-static float g_gs_calib_window[GS_CAL_STABLE_WINDOW_SAMPLES];
-static uint8_t g_gs_calib_window_idx = 0u;
-static uint8_t g_gs_calib_window_count = 0u;
-static uint8_t g_gs_calib_stable_now = 0u;
-#endif
-
-static uint8_t RL_DetectUsbChargeMode(void)
-{
-  USBDetect_Init();
-  CLK_SysTickDelay(50000); /* 50 ms debounce */
-  return USBDetect_IsHigh();
-}
-
-static void RL_RunUsbChargeLoop(void)
-{
-  while (1)
-  {
-    /* USB charging auto-boot mode: no power lock, no game */
-  }
-}
-
-static uint8_t RL_IsHexChar(char c)
-{
-  return (uint8_t)((c >= '0' && c <= '9') ||
-                   (c >= 'A' && c <= 'F') ||
-                   (c >= 'a' && c <= 'f'));
-}
-
-static uint8_t RL_ExtractMacSuffix4(const char *src, char *out4)
-{
-  if (!src || !out4)
-  {
-    return 0u;
-  }
-
-  char hex_buf[16];
-  uint8_t hex_len = 0u;
-  for (size_t i = 0u; src[i] != '\0'; i++)
-  {
-    if (RL_IsHexChar(src[i]))
-    {
-      if (hex_len < (uint8_t)sizeof(hex_buf))
-      {
-        hex_buf[hex_len++] = src[i];
-      }
-    }
-  }
-
-  if (hex_len < 4u)
-  {
-    out4[0] = '\0';
-    return 0u;
-  }
-
-  out4[0] = hex_buf[hex_len - 4u];
-  out4[1] = hex_buf[hex_len - 3u];
-  out4[2] = hex_buf[hex_len - 2u];
-  out4[3] = hex_buf[hex_len - 1u];
-  out4[4] = '\0';
-  return 1u;
-}
-
-static uint8_t RL_HasValidRopeSuffix(const char *name)
-{
-  if (!name)
-  {
-    return 0u;
-  }
-
-  const char *p = strstr(name, "ROPE_");
-  if (!p)
-  {
-    return 0u;
-  }
-
-  p += 5; /* skip "ROPE_" */
-  for (uint8_t i = 0u; i < 4u; i++)
-  {
-    if (!RL_IsHexChar(p[i]))
-    {
-      return 0u;
-    }
-  }
-  return 1u;
-}
-
-static void RL_BleRenameFlow(uint8_t *device_name, uint8_t *mac)
-{
-  delay_ms(200);
-  BLE_UART_SEND(UART1, BLE_CMD_CCMD);
-  delay_ms(200);
-  CheckBleRecvMsg();
-  BLE_UART_SEND(UART1, BLE_CMD_NAME_QUERY);
-  delay_ms(20);
-  CheckBleRecvMsg();
-
-  DBG_PRINT("[BLE] name raw: '%s'\r\n", Sys_GetDeviceName());
-
-  memcpy(device_name, (const void *)&Sys_GetDeviceName()[12], 4);
-  device_name[4] = '\0';
-  DBG_PRINT("name = %s\r\n", device_name);
-
-  uint8_t has_valid_rope = RL_HasValidRopeSuffix(Sys_GetDeviceName());
-  DBG_PRINT("[BLE] rope suffix valid: %u\r\n", has_valid_rope);
-
-  if (!has_valid_rope)
-  {
-    DBG_PRINT("rename %s\n", device_name);
-    BLE_UART_SEND(UART1, BLE_CMD_ADDR_QUERY);
-    for (uint8_t retry = 0u; retry < 10u; retry++)
-    {
-      delay_ms(20);
-      CheckBleRecvMsg();
-      if (strlen((const char *)Sys_GetMacAddr()) > 0u)
-      {
-        break;
-      }
-    }
-    DBG_PRINT("[BLE] addr raw: '%s'\n", Sys_GetMacAddr());
-
-    char mac_suffix[5];
-    uint8_t has_suffix = RL_ExtractMacSuffix4(Sys_GetMacAddr(), mac_suffix);
-    if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
-    {
-      memcpy(mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4);
-      mac_suffix[4] = '\0';
-      has_suffix = 1u;
-    }
-
-    DBG_PRINT("[BLE] mac suffix: '%s' (valid=%u)\n", mac_suffix, has_suffix);
-
-    if (has_suffix)
-    {
-      memcpy(mac, mac_suffix, 4);
-      mac[4] = '\0';
-      DBG_PRINT("MAC address: %s \n", mac);
-      BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", mac);
-    }
-    else
-    {
-      DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
-    }
-    delay_ms(500);
-    CheckBleRecvMsg();
-    BLE_UART_SEND(UART1, BLE_CMD_REBOOT);
-    delay_ms(500);
-    CheckBleRecvMsg();
-  }
-  BLE_UART_SEND(UART1, BLE_CMD_MODE_DATA);
-  delay_ms(200);
-  DBG_PRINT("rename OK\n");
-}
-
-#if USE_GSENSOR_JUMP_DETECT
-static void RL_InitGsensorCalibState(uint32_t now)
-{
-  g_gs_calib_started = 0u;
-  g_gs_calib_done = 0u;
-  g_gs_calib_schedule_at = now + GS_CAL_START_DELAY_MS;
-  g_gs_calib_stable_since = 0u;
-  g_gs_calib_last_sample_time = 0u;
-  g_gs_calib_window_idx = 0u;
-  g_gs_calib_window_count = 0u;
-  g_gs_calib_stable_now = 0u;
-  for (uint32_t i = 0; i < GS_CAL_STABLE_WINDOW_SAMPLES; i++)
-  {
-    g_gs_calib_window[i] = 0.0f;
-  }
-  SetGreenLedMode(GS_CAL_LED_UNCAL_FREQ_HZ, GS_CAL_LED_DUTY);
-}
-
-static uint8_t RL_UpdateGsensorStable(uint32_t now)
-{
-  if (!is_timeout(g_gs_calib_last_sample_time, GS_CAL_STABLE_SAMPLE_INTERVAL_MS))
-  {
-    return g_gs_calib_stable_now;
-  }
-
-  g_gs_calib_last_sample_time = now;
-
-  int16_t axis[3];
-  GsensorReadAxis(axis);
-  float mag = Gsensor_CalcMagnitude_g_from_raw(axis);
-
-  g_gs_calib_window[g_gs_calib_window_idx] = mag;
-  g_gs_calib_window_idx = (g_gs_calib_window_idx + 1u) % GS_CAL_STABLE_WINDOW_SAMPLES;
-  if (g_gs_calib_window_count < GS_CAL_STABLE_WINDOW_SAMPLES)
-  {
-    g_gs_calib_window_count++;
-  }
-
-  float sum = 0.0f;
-  for (uint32_t i = 0; i < g_gs_calib_window_count; i++)
-  {
-    sum += g_gs_calib_window[i];
-  }
-  float mean = (g_gs_calib_window_count > 0u) ? (sum / (float)g_gs_calib_window_count) : 0.0f;
-
-  float var = 0.0f;
-  for (uint32_t i = 0; i < g_gs_calib_window_count; i++)
-  {
-    float d = g_gs_calib_window[i] - mean;
-    var += d * d;
-  }
-  float stddev = 0.0f;
-  if (g_gs_calib_window_count > 0u)
-  {
-    stddev = sqrtf(var / (float)g_gs_calib_window_count);
-  }
-
-  g_gs_calib_stable_now = (stddev <= GS_CAL_STABLE_STDDEV_THRESHOLD_G &&
-                           fabsf(mean - 1.0f) <= GS_CAL_STABLE_MAG_TOLERANCE_G);
-  return g_gs_calib_stable_now;
-}
-
-static void RL_TryStartGsensorCalibration(uint32_t now)
-{
-  if (g_gs_calib_done || g_gs_calib_started)
-  {
-    return;
-  }
-
-  if (now < g_gs_calib_schedule_at)
-  {
-    return;
-  }
-
-  if (RL_UpdateGsensorStable(now))
-  {
-    if (g_gs_calib_stable_since == 0u)
-    {
-      g_gs_calib_stable_since = now;
-    }
-    if (get_elapsed_ms(g_gs_calib_stable_since) >= GS_CAL_STABLE_REQUIRED_MS)
-    {
-      JumpDetect_StartCalibration();
-      g_gs_calib_started = 1u;
-      g_gs_calib_stable_since = 0u;
-    }
-  }
-  else
-  {
-    g_gs_calib_stable_since = 0u;
-  }
-}
-
-static void RL_UpdateGsensorCalibrationState(void)
-{
-  if (g_gs_calib_started && !JumpDetect_IsCalibrating())
-  {
-    g_gs_calib_started = 0u;
-    if (JumpDetect_IsReady())
-    {
-      g_gs_calib_done = 1u;
-    }
-  }
-}
-#endif
+/* Main-loop state (file-scope for readability) */
+static uint32_t s_last_print_time = 0;
+static uint32_t s_last_batt_check_time = 0;
+static uint8_t s_low_batt = 0;
+static uint8_t s_poweroff_done = 0;
+static uint32_t s_last_usb_update = 0;
 
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
 {
@@ -383,7 +122,7 @@ static void RL_UpdateLedState(uint8_t low_batt)
     return;
   }
 
-  if (g_gs_calib_done)
+  if (JumpDetect_IsPreCalibDone())
   {
     SetGreenLedMode(GS_CAL_LED_CAL_FREQ_HZ, GS_CAL_LED_DUTY);
   }
@@ -494,9 +233,14 @@ void SYS_Init(void)
   CLK_EnableXtalRC(CLK_PWRCTL_HXTEN_Msk);
   CLK_WaitClockReady(CLK_STATUS_HXTSTB_Msk);
 
-  /* Set core clock and HCLK source */
+  /*
+   * Power profile:
+   * - PLL: 96 MHz (project_config.h: PLL_CLOCK)
+   * - CPU/HCLK: 48 MHz (PLL / 2)
+   * - USB clock is configured in usb_hid_mouse.c to 48 MHz from PLL divider
+   */
   CLK_SetCoreClock(PLL_CLOCK);
-  CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_PLL, CLK_CLKDIV0_HCLK(1)); /* PLL @ 192MHz */
+  CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_PLL, CLK_CLKDIV0_HCLK(2)); /* HCLK = PLL / 2 = 48MHz */
 
   /* Configure peripheral clocks common to board: PCLK divider and module clocks */
   Board_ConfigPCLKDiv(); /* sets CLK->PCLKDIV */
@@ -538,7 +282,7 @@ static void RL_InitSystemCore(void)
   SYS_UnlockReg();
   SYS_Init();
 
-  g_usb_charge_mode = RL_DetectUsbChargeMode();
+  g_usb_charge_mode = PowerMgmt_DetectUsbCharge();
   if (!g_usb_charge_mode)
   {
     PowerLock_Init();
@@ -549,7 +293,7 @@ static void RL_InitSystemCore(void)
 static void RL_InitBoardInputs(void)
 {
   /* Button, HALL (optional) and G-sensor interrupt input pins + NVIC */
-  Init_Buttons_Gsensor();
+  Gpio_Init();
 }
 
 static void RL_InitDrivers(void)
@@ -558,7 +302,7 @@ static void RL_InitDrivers(void)
   Timer_Init();
 
   /* Sensors */
-  GsensorInit(100000, FSR_2G);
+  Gsensor_Init(100000, FSR_2G);
   GsensorWakeup();
 
   /* Battery ADC */
@@ -602,52 +346,24 @@ static void RL_InitApplication(void)
  * public APIs instead.
  */
 
-/**
- * @brief Initialize GPIO pins (LED, buttons, G-sensor, Buzzer)
- */
-void InitGpio(void)
-{
-  /* Legacy wrapper: keep symbol for existing code, but route to new init stage. */
-  RL_InitBoardInputs();
-}
-
-/**
- * @brief Initialize LED and Buzzer state
- */
-void InitLedBuzzer(void)
-{
-  SetGreenLedMode(2, 50);
-  BuzzerPlay(1000, 100); // 2KHz ,50ms
-}
-
-void InitSystem(void)
-{
-  RL_InitSystemCore();
-  RL_InitBoardInputs();
-}
-
-void InitPeripheral(void)
-{
-  RL_InitDrivers();
-  RL_InitApplication();
-}
-
 int main()
 {
   int16_t axis[3];
   uint8_t mac[5], device_name[5];
 
-  InitSystem();
+  RL_InitSystemCore();
+  RL_InitBoardInputs();
 
   if (g_usb_charge_mode)
   {
-    RL_RunUsbChargeLoop();
+    PowerMgmt_RunChargeLoop();
   }
 
-  InitPeripheral();
+  RL_InitDrivers();
+  RL_InitApplication();
 
 #if USE_GSENSOR_JUMP_DETECT
-  RL_InitGsensorCalibState(get_ticks_ms());
+  JumpDetect_InitPreCalib(get_ticks_ms());
 #endif
 
   /* Run board GPIO test once at startup */
@@ -657,16 +373,11 @@ int main()
   BLEToRunMode();
 // for make BLE setting NAME + MacAddr
 #if 1
-  RL_BleRenameFlow(device_name, mac);
+  Ble_RenameFlow(device_name, mac);
 #endif
 
   while (1)
   {
-    static uint32_t last_print_time = 0;
-    static uint32_t last_batt_check_time = 0;
-    static uint8_t low_batt = 0;
-    static uint8_t poweroff_done = 0;
-    static uint32_t last_usb_update = 0;
     uint32_t now = get_ticks_ms();
 
     TestMode_PollEnter();
@@ -674,23 +385,23 @@ int main()
 
     if (UsbHidMouse_TestIsActive())
     {
-      if (get_elapsed_ms(last_usb_update) >= 1u)
+      if (get_elapsed_ms(s_last_usb_update) >= 1u)
       {
-        last_usb_update = now;
+        s_last_usb_update = now;
         UsbHidMouse_TestUpdate();
       }
       continue;
     }
 
 #if USE_GSENSOR_JUMP_DETECT
-    RL_TryStartGsensorCalibration(now);
+    JumpDetect_TryAutoCalibration(now);
 #endif
     RL_HandleJumpDetect(now, axis);
 #if USE_GSENSOR_JUMP_DETECT
-    RL_UpdateGsensorCalibrationState();
+    JumpDetect_UpdatePreCalibState();
 #endif
-    RL_HandleGsensorPrint(now, &last_print_time, axis);
-    RL_HandleBatteryCheck(now, &last_batt_check_time, &low_batt);
+    RL_HandleGsensorPrint(now, &s_last_print_time, axis);
+    RL_HandleBatteryCheck(now, &s_last_batt_check_time, &s_low_batt);
     /* Hall sensor IRQ print (main loop, not ISR) */
     if (Sys_GetHallPb7IrqFlag())
     {
@@ -706,8 +417,8 @@ int main()
     }
 
     RL_HandleBleAndGameState();
-    RL_HandleIdlePowerOff(&poweroff_done);
-    RL_UpdateLedState(low_batt);
+    RL_HandleIdlePowerOff(&s_poweroff_done);
+    RL_UpdateLedState(s_low_batt);
   }
 }
 
