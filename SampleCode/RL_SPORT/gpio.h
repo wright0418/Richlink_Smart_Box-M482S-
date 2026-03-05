@@ -18,9 +18,9 @@
  * as inputs, enables appropriate interrupt triggering and debounce for
  * the user key (PB15) and Hall sensor (PB7). Also enables NVIC IRQs
  * for GPB/GPC lines.
- * 
+ *
  * Hall Sensor (PB7): Falling edge triggered, counted as 2 per jump.
- * Debounce (20ms) applied to filter electrical noise.
+ * PB7 debounce is intentionally disabled for fastest response.
  */
 void Init_Buttons_Gsensor(void);
 

@@ -27,6 +27,7 @@
 #include "board_test_gpio.h"
 #include "adc.h"
 #include "test_mode.h"
+#include "usb_hid_mouse.h"
 
 #if USE_GSENSOR_JUMP_DETECT
 #include "gsensor_jump_detect.h"
@@ -665,10 +666,21 @@ int main()
     static uint32_t last_batt_check_time = 0;
     static uint8_t low_batt = 0;
     static uint8_t poweroff_done = 0;
+    static uint32_t last_usb_update = 0;
     uint32_t now = get_ticks_ms();
 
     TestMode_PollEnter();
     TestMode_RunMenuIfActive();
+
+    if (UsbHidMouse_TestIsActive())
+    {
+      if (get_elapsed_ms(last_usb_update) >= 1u)
+      {
+        last_usb_update = now;
+        UsbHidMouse_TestUpdate();
+      }
+      continue;
+    }
 
 #if USE_GSENSOR_JUMP_DETECT
     RL_TryStartGsensorCalibration(now);

@@ -21,10 +21,6 @@ void Init_Buttons_Gsensor(void)
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
 #endif
     GPIO_EnableInt(PB, 15, GPIO_INT_FALLING);
-
-    GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
-    GPIO_ENABLE_DEBOUNCE(PB, BIT7);  /* Enable debounce for Hall sensor */
-    GPIO_ENABLE_DEBOUNCE(PB, BIT15); /* Enable debounce for button */
     NVIC_EnableIRQ(GPB_IRQn);
 
     /* PC GPIO */
@@ -153,13 +149,19 @@ void GPB_IRQHandler(void)
      * Logic: Rope jumping produces 2 falling edges per jump on the Hall sensor.
      * Edge counting:
      *  - Count every falling-edge interrupt on PB7
-     *  - Increment jump counter only after 2 edges received in GAME_START state
+     *  - Increment jump counter immediately in ISR when GAME_START
      *  - Reset counter after each 2-edge pair to prepare for next jump
      *
-     * Safety: Edge counter is static and local to ISR context; auto-clears between
-     * game sessions when GAME_START becomes GAME_STOP. Debounce (20ms via GPIO)
-     * filters electrical noise and contact bounce. If edge arrives while in
-     * GAME_STOP state, it is ignored but flag is set for main loop visibility.
+     * Notes on debounce and filtering:
+     *  - Hardware debounce for PB7 has been disabled in Init_Buttons_Gsensor()
+     *    so this ISR receives raw/fast edges. If contact bounce or noise is
+     *    observed, apply a software debouncing/filtering strategy in the main
+     *    loop or enable hardware debounce via a compile-time option.
+     *  - PB15 (user key) still uses GPIO debounce to filter mechanical bounce.
+     *
+     * Safety: Edge counter is static and local to ISR context; it does not
+     * perform lengthy work. ISR sets a flag so the main loop can log or act on
+     * the event without blocking interrupt latency.
      * ============================================================================ */
     static uint8_t hall_pb7_edge_count = 0u;
 
@@ -168,12 +170,12 @@ void GPB_IRQHandler(void)
         GPIO_CLR_INT_FLAG(PB, BIT7);
         if (Sys_GetGameState() == GAME_START)
         {
-            // hall_pb7_edge_count++;
-            // if (hall_pb7_edge_count >= 2u)
-            // {
-            //     hall_pb7_edge_count = 0u;
-            Sys_IncrementJumpTimes();
-            // }
+            hall_pb7_edge_count++;
+            if (hall_pb7_edge_count >= 2u)
+            {
+                hall_pb7_edge_count = 0u;
+                Sys_IncrementJumpTimes();
+            }
         }
         Sys_SetHallPb7IrqFlag(1); /* Signal main loop for logging */
     }
