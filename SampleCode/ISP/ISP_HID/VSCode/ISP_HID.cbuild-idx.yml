@@ -1,0 +1,16 @@
+build-idx:
+  generated-by: csolution version 2.11.0
+  csolution: ISP_HID.csolution.yml
+  cbuild-run: out/ISP_HID+ARMCLANG.cbuild-run.yml
+  tmpdir: tmp
+  cprojects:
+    - cproject: ISP_HID.cproject.yml
+  cbuilds:
+    - cbuild: out/ISP_HID/ARMCLANG/release/ISP_HID.release+ARMCLANG.cbuild.yml
+      project: ISP_HID
+      configuration: .release+ARMCLANG
+      messages:
+        info:
+          - ISP_HID.cbuild-pack.yml - file is already up-to-date
+          - ISP_HID+ARMCLANG.cbuild-run.yml - file is already up-to-date
+          - ISP_HID.release+ARMCLANG.cbuild.yml - file is already up-to-date

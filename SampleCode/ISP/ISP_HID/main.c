@@ -1,20 +1,20 @@
-/***************************************************************************//**
- * @file     main.c
- * @brief    ISP tool main function
- * @version  0x32
- * @date     14, June, 2017
- *
- * @note
- * Copyright (C) 2017-2018 Nuvoton Technology Corp. All rights reserved.
- ******************************************************************************/
+/***************************************************************************/ /**
+                                                                               * @file     main.c
+                                                                               * @brief    ISP tool main function
+                                                                               * @version  0x32
+                                                                               * @date     14, June, 2017
+                                                                               *
+                                                                               * @note
+                                                                               * Copyright (C) 2017-2018 Nuvoton Technology Corp. All rights reserved.
+                                                                               ******************************************************************************/
 #include <stdio.h>
 #include "targetdev.h"
 #include "hid_transfer.h"
 
-#define PLLCON_SETTING          CLK_PLLCTL_192MHz_HXT
-#define PLL_CLOCK               192000000
-#define HCLK_DIV                        1
-#define USBD_DIV                        4
+#define PLLCON_SETTING CLK_PLLCTL_192MHz_HXT
+#define PLL_CLOCK 192000000
+#define HCLK_DIV 1
+#define USBD_DIV 4
 
 uint32_t CLK_GetPLLClockFreq(void)
 {
@@ -33,12 +33,14 @@ void SYS_Init(void)
     CLK->PWRCTL |= (CLK_PWRCTL_HXTEN_Msk | CLK_PWRCTL_HIRCEN_Msk);
 
     /* Waiting for external XTAL clock ready */
-    while (!(CLK->STATUS & CLK_STATUS_HXTSTB_Msk));
+    while (!(CLK->STATUS & CLK_STATUS_HXTSTB_Msk))
+        ;
 
     /* Set core clock as PLL_CLOCK from PLL */
     CLK->PLLCTL = PLLCON_SETTING;
 
-    while (!(CLK->STATUS & CLK_STATUS_PLLSTB_Msk));
+    while (!(CLK->STATUS & CLK_STATUS_PLLSTB_Msk))
+        ;
 
     CLK->CLKDIV0 &= ~CLK_CLKDIV0_HCLKDIV_Msk;
     CLK->CLKDIV0 |= CLK_CLKDIV0_HCLK(HCLK_DIV);
@@ -48,10 +50,10 @@ void SYS_Init(void)
 
     /* Update System Core Clock */
     /* User can use SystemCoreClockUpdate() to calculate PllClock, SystemCoreClock and CycylesPerUs automatically. */
-    //SystemCoreClockUpdate();
-    PllClock        = PLL_CLOCK;                        // PLL
-    SystemCoreClock = PLL_CLOCK / HCLK_DIV;             // HCLK
-    CyclesPerUs     = SystemCoreClock / 1000000;  // For SYS_SysTickDelay()
+    // SystemCoreClockUpdate();
+    PllClock = PLL_CLOCK;                    // PLL
+    SystemCoreClock = PLL_CLOCK / HCLK_DIV;  // HCLK
+    CyclesPerUs = SystemCoreClock / 1000000; // For SYS_SysTickDelay()
     /* Set both PCLK0 and PCLK1 as HCLK/2 */
     CLK->PCLKDIV = CLK_PCLKDIV_APB0DIV_DIV2 | CLK_PCLKDIV_APB1DIV_DIV2;
     /* Select USBD */
@@ -78,7 +80,19 @@ int32_t main(void)
     SYS_UnlockReg();
     /* Init system and multi-function I/O */
     SYS_Init();
-    FMC->ISPCTL |= FMC_ISPCTL_ISPEN_Msk;    // (1ul << 0)
+
+    PB->MODE &= ~GPIO_MODE_MODE8_Msk;   // input mode
+    PB->PUSEL |= GPIO_PUSEL_PUSEL8_Msk; // pull-up
+
+    PA->MODE |= GPIO_MODE_MODE11_Msk; // PA11 Qsid mode
+    /* Set PA11 high for power lock.
+        Use a volatile register write to ensure the side-effect isn't optimized away. */
+    PA->DOUT |= (1UL << 11);
+
+    PB->MODE |= GPIO_MODE_MODE3_Msk; // output mode
+    PB->DOUT |= (1UL << 3);          // Set DetectPin high
+
+    FMC->ISPCTL |= FMC_ISPCTL_ISPEN_Msk; // (1ul << 0)
     g_apromSize = GetApromSize();
     GetDataFlashInfo(&g_dataFlashAddr, &g_dataFlashSize);
 
@@ -112,20 +126,22 @@ int32_t main(void)
         goto _APROM;
     }
 
-    //CLK_SysTickDelay(300000);
+    // CLK_SysTickDelay(300000);
     SysTick->LOAD = 300000 * CyclesPerUs;
-    SysTick->VAL  = (0x00);
+    SysTick->VAL = (0x00);
     SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
 
     /* Waiting for down-count to zero */
-    while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0);
+    while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0)
+        ;
 
 _APROM:
-    outpw(&SYS->RSTSTS, 3);//clear bit
+    outpw(&SYS->RSTSTS, 3); // clear bit
     outpw(&FMC->ISPCTL, inpw(&FMC->ISPCTL) & 0xFFFFFFFC);
     outpw(&SCB->AIRCR, (V6M_AIRCR_VECTKEY_DATA | V6M_AIRCR_SYSRESETREQ));
 
     /* Trap the CPU */
-    while (1);
+    while (1)
+        ;
 }
 /*** (C) COPYRIGHT 2017 Nuvoton Technology Corp. ***/
