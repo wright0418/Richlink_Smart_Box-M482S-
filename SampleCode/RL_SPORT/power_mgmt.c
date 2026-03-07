@@ -9,10 +9,16 @@
 #include "timer.h" /* For get_ticks if needed */
 
 /* Wake flag masks (from clk_reg.h) for readability */
-#ifndef CLK_PMUSTS_GPBWK_Msk
+#ifndef CLK_PMUSTS_GPAWK_Msk
 #define CLK_PMUSTS_GPAWK_Msk (1u << 8)
+#endif
+#ifndef CLK_PMUSTS_GPBWK_Msk
 #define CLK_PMUSTS_GPBWK_Msk (1u << 9)
+#endif
+#ifndef CLK_PMUSTS_GPCWK_Msk
 #define CLK_PMUSTS_GPCWK_Msk (1u << 10)
+#endif
+#ifndef CLK_PMUSTS_GPDWK_Msk
 #define CLK_PMUSTS_GPDWK_Msk (1u << 11)
 #endif
 

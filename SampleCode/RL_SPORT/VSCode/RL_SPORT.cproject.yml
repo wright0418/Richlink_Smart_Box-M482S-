@@ -13,7 +13,7 @@ project:
           -ffunction-sections,
           -fdata-sections,
           -D__MICROLIB,
-          -o0,
+          -O0,
           -gdwarf-4,
         ]
       ASM: [-D__MICROLIB]

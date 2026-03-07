@@ -81,16 +81,17 @@ int32_t main(void)
     /* Init system and multi-function I/O */
     SYS_Init();
 
-    PB->MODE &= ~GPIO_MODE_MODE8_Msk;   // input mode
-    PB->PUSEL |= GPIO_PUSEL_PUSEL8_Msk; // pull-up
+    /* Configure Detect pin (use GPIO helper to avoid bitfield OR mistakes) */
+    GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);       /* PB.8 input mode */
+    GPIO_SetPullCtl(PB, BIT8, GPIO_PUSEL_PULL_UP); /* PB.8 pull-up */
 
-    PA->MODE |= GPIO_MODE_MODE11_Msk; // PA11 Qsid mode
-    /* Set PA11 high for power lock.
-        Use a volatile register write to ensure the side-effect isn't optimized away. */
+    /* Configure PA.11 as quasi-bidirectional for power lock and set high */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI); /* PA.11 Quasi-bidirectional */
     PA->DOUT |= (1UL << 11);
 
-    PB->MODE |= GPIO_MODE_MODE3_Msk; // output mode
-    PB->DOUT |= (1UL << 3);          // Set DetectPin high
+    /* Ensure the detect pin drive matches the configured DetectPin (PB.8) */
+    GPIO_SetMode(PB, BIT8, GPIO_MODE_OUTPUT); /* PB.8 output mode */
+    PB->DOUT |= (1UL << 8);                   /* Set DetectPin high */
 
     FMC->ISPCTL |= FMC_ISPCTL_ISPEN_Msk; // (1ul << 0)
     g_apromSize = GetApromSize();

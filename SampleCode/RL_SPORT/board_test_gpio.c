@@ -14,14 +14,10 @@
 #include "project_config.h"
 
 /* Simple blocking delay (approx) */
-static void bt_delay(volatile uint32_t d)
+static void bt_delay(uint32_t ms)
 {
-    while (d--)
-    {
-        volatile uint32_t i = 12000;
-        while (i--)
-            __NOP();
-    }
+    /* Use existing timer-based delay for predictable timing across builds */
+    delay_ms(ms);
 }
 
 static void bt_print_result(const char *name, uint8_t pass, const char *hint)
