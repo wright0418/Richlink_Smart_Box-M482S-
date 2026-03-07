@@ -1,7 +1,9 @@
 # RL_SPORT 板上測試指南 (UART0 測試模式)
 
 目的
-- 提供一個透過序列埠 (UART0) 進入的互動式板上測試選單，讓 PC 測試工具可以自動或手動逐項檢查硬體周邊（LED、蜂鳴器、按鍵、HALL、G-sensor、ADC、USB、BLE）。
+- 提供一個透過序列埠 (UART0) 進入的互動式板上測試選單。
+- 需先「進入 test mode」後，才可點選測試項目。
+- 目前僅開放：Buzzer、Key、HALL、G-sensor、ADC、BLE。
 
 通訊設定（PC 端）
 - Baud: 115200
@@ -16,42 +18,31 @@
 - 範例：PC 傳送 `test\r` -> 板子回傳 `=== UART0 Test Mode ===` 與選單清單。
 
 測試選單與對應行為
-- 選單會顯示數字 (0-9) 選項，使用者在提示 `Select>` 後輸入數字並按 Enter。
+- 選單會顯示數字 (0-6) 選項，使用者在提示 `Select>` 後輸入數字並按 Enter。
 - 常見選項（以韌體實作為準）:
-   1) LED PB3
-     - 行為：閃爍 PB3 三次。
-     - 輸出範例：`[Test] LED PB3 blink x3`，不會有機器可解析的結果，屬人工檢查項目。
-
-  2) Buzzer PC7
+   1) Buzzer PC7
      - 行為：播放一次 beep。
      - 輸出範例：`[Test] Buzzer PC7 beep`。
 
-  3) Key PB15
+  2) Key PB15
      - 行為：等待 5 秒內按下 PB15，若偵測到輸出 `Key pressed`，否則回傳 `Key TIMEOUT`。
      - 可由 PC 驅動按鍵控制 (若具備外部按鍵控制治具)。
 
-  4) HALL PB7/PB8
+  3) HALL PB7/PB8
      - 行為：連續讀取 3 秒，偵測 PB7/PB8 變化並輸出變動值。
      - 輸出範例：`[Test] PB7=0 PB8=1`。
 
-  5) G-sensor I2C
+  4) G-sensor I2C
      - 行為：讀取 3 組三軸資料並顯示。
      - 輸出範例：`[Test] XYZ = 12, 34, -56`。
 
-  6) ADC PB1 (battery)
+  5) ADC PB1 (battery)
      - 行為：讀取電池 ADC 平均值並回傳原始值與電壓。
      - 輸出範例：`[Test] raw=1023 V=3.70V`。
 
-  7) Run all tests
-     - 會依序執行 LED / Buzzer / Key / HALL / G-sensor / ADC 等（部分為人工檢查）。
-
-  8) USB FS HID Mouse (auto 5s)
-     - 行為：啟動板上 USB HID Mouse 測試流程自動執行 5 秒。
-     - 輸出範例：`[Test] USB auto test done`。
-
-  9) BLE AT CMD name check
-     - 行為：切換 BLE 模組到 CMD 模式，查詢名稱並判斷回傳是否包含預期字首 (如 `ROPR_` 或 `ROPE_`)。
-     - 成功回傳範例：`[Test] BLE_AT_CMD PASS`。失敗會列出失敗原因。
+  6) BLE AT CMD name query (raw)
+     - 行為：切換 BLE 模組到 CMD 模式並查詢名稱。
+     - 不做 PASS/FAIL 判斷，直接顯示原始名稱回應。
 
   0) Exit
    - 行為：離開測試模式並回到主程式循環。
@@ -61,14 +52,13 @@
 - 步驟範例：
    1) 傳送 `test\r`。
    2) 等待並解析選單輸出（可使用 timeout ，例如 1s）。
-   3) 傳送選項號（例如 `9`）再加上 `\r`。
-   4) 監聽並解析測試回應；視項目不同回應可能是可解析的資料（ADC、G-sensor、HALL）或狀態字串（PASS/FAIL/TIMEOUT/MANUAL CHECK）。
+   3) 傳送選項號（例如 `6`）再加上 `\r`。
+   4) 監聽並解析測試回應；以原始回應文字為準。
 
 回應字串與格式約定
 - 所有板上測試輸出皆使用 `printf()`，會回傳可讀的 ASCII 行（以 `\n` 或 `\r\n` 結尾），常見前綴：`[Test]`、`[BT]`。
 - 自動化解析應採行為驅動（關鍵字 match）：
-   - 成功或主要資訊通常以 `PASS`、`raw=`、`V=`、`XYZ =`、`PB7=` 等關鍵字出現。
-   - 人工檢查項目會標示 `MANUAL CHECK`，需人工確認或配合外部儀器。
+   - 目前不做 PASS/FAIL 判斷，請直接使用原始回應內容（例如 `raw=`、`V=`、`XYZ =`、`PB7=`、`BLE RAW NAME =`）。
 
 實務注意事項與硬體設定
 - 進入測試模式需要在 UART0 接收到 `test` 並送出換行；如果主程式已經大量使用 UART0 做其他工作，請在進入測試前暫停或確保序列埠交互不會被搶佔。
@@ -78,8 +68,8 @@
 範例 PC 測試腳本摘錄（流程摘要）
 1) 開啟 COM 與 115200 8N1
 2) 傳送 `test\r`，等待選單
-3) 傳送 `9\r` 執行 BLE 名稱檢查
-4) 監聽回應 1s：若含 `BLE_AT_CMD PASS` 表示通過，否則記錄錯誤訊息
+3) 傳送 `6\r` 執行 BLE 名稱查詢
+4) 監聽回應 1s：擷取並記錄原始 BLE 回應
 5) 傳送 `0\r` 離開
 
 檔案與實作參考
@@ -88,7 +78,7 @@
 - 電源 / 充電檢測：`SampleCode/RL_SPORT/power_mgmt.c`
 
 建議
-- 若要自動化全部測項，建議在硬體測試夾具上加上可控按鍵與檢測回授點（例如 LED 回讀或 ADC 閾值），以把人工檢查項目改為可自動判斷。
+- 若要自動化測項，建議以關鍵字擷取原始回應並儲存 log，方便後續追蹤。
 
 若需我幫忙：
 - 我可以補一個範例 Python/serial 腳本 (pyserial) 做完整自動測試流程範本，或將 `test_mode` 的輸出標準化為機器易解析的 JSON-like 行，您要哪一種？
@@ -130,34 +120,21 @@ How to run
 
 UART log format
 ---------------
-Board test prints simple English logs:
+Board test prints raw UART logs (no PASS/FAIL judgment):
 
-- `[BT] <ITEM>: PASS`
-- `[BT] <ITEM>: FAIL - <hint>`
-- `[BT] <ITEM>: SKIP`
-- Final summary: `[BT] SUMMARY: PASS=x FAIL=y SKIP=z`
-
-Current PASS/FAIL criteria
---------------------------
-- `LED`: manual check (must blink 3 times)
-- `BUZZER`: manual check (must beep 2 times)
-- `POWER_LOCK`: removed from board test (not tested here)
-- `BATTERY_ADC`: battery voltage must be in 2.0V ~ 5.5V
-- `GSENSOR_I2C`: read and print XYZ values for 3 samples
-- `BLE_AT_NAME`: removed from board test (use Test Mode item `9`)
-- `KEY`: optional test item (default SKIP in quick run)
+- `[Test] ...`
+- `[BT] ...`
+- `BLE RAW NAME = ...`
 
 Operator test steps (recommended)
 ---------------------------------
-1. Run board test and watch UART logs.
-2. Check LED and buzzer physically.
-3. If fail appears, follow hint text directly:
-   - `BATTERY_ADC` fail: check PB1 divider and ADC path
-4. Confirm final summary has `FAIL=0`.
+1. Enter test mode with `test` + Enter.
+2. Select test items from menu (Buzzer/Key/HALL/G-sensor/ADC/BLE).
+3. Record raw UART response directly for analysis.
 
 Test Mode BLE AT CMD
 --------------------
-Use UART test mode item `9) BLE AT CMD name check` for BLE name query/check.
+Use UART test mode item `6) BLE AT CMD name query (raw)` for BLE name query.
 
 Key test notes (PB15)
 ---------------------
