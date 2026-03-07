@@ -43,6 +43,13 @@ static uint8_t s_ble_rename_done = 0u;
 static uint8_t s_charge_mode_initialized = 0u;
 static uint8_t s_hall_edge_residual = 0u;
 
+static void RL_StartupBeep(void)
+{
+  /* One short beep at boot, independent from board test flow. */
+  BuzzerPlay(1200u, 80u);
+  delay_ms(120u);
+}
+
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
 {
 #if USE_GSENSOR_JUMP_DETECT
@@ -358,14 +365,19 @@ int main()
   RL_InitBoardInputs();
 
   RL_InitDrivers();
+  RL_StartupBeep();
   RL_InitApplication();
 
 #if USE_GSENSOR_JUMP_DETECT
   JumpDetect_InitPreCalib(get_ticks_ms());
 #endif
 
-  /* Run board GPIO test once at startup */
+  /* Optional board test at boot (for fast board check stage). */
+#if BOARD_TEST_AUTORUN
   BoardTest_RunAll();
+#else
+  DBG_PRINT("[Main] Board test autorun disabled\n");
+#endif
 
   DBG_PRINT("System Up\n");
   BLEToRunMode();

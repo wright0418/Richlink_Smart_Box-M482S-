@@ -10,6 +10,7 @@
 #include "gsensor.h"
 #include "i2c.h"
 #include "adc.h"
+#include "buzzer.h"
 #include "project_config.h"
 
 /* Simple blocking delay (approx) */
@@ -23,6 +24,18 @@ static void bt_delay(volatile uint32_t d)
     }
 }
 
+static void bt_print_result(const char *name, uint8_t pass, const char *hint)
+{
+    if (pass)
+    {
+        printf("[BT] %s: PASS\n", name);
+    }
+    else
+    {
+        printf("[BT] %s: FAIL - %s\n", name, hint);
+    }
+}
+
 void BoardTest_GPIO_Init(void)
 {
     /* Configure commonly used pins for tests. Assumes SYS_Init() already ran. */
@@ -30,7 +43,7 @@ void BoardTest_GPIO_Init(void)
     GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
 
     /* Key (PB15) */
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
     GPIO_SetPullCtl(PB, BIT15, GPIO_PUSEL_PULL_UP);
     GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
     GPIO_ENABLE_DEBOUNCE(PB, BIT15);
@@ -42,12 +55,12 @@ void BoardTest_GPIO_Init(void)
     /* Buzzer (PC7) */
     GPIO_SetMode(PC, BIT7, GPIO_MODE_OUTPUT);
 
-    printf("[BoardTest] GPIO init done\n");
+    printf("[BT] GPIO init done\n");
 }
 
-static void test_led(void)
+static uint8_t test_led(void)
 {
-    printf("[BoardTest] LED test: blink 3 times\n");
+    printf("[BT] LED: blink 3 times. Check LED on PB3.\n");
     for (int i = 0; i < 3; ++i)
     {
         PB->DOUT |= BIT3; /* LED on */
@@ -55,54 +68,46 @@ static void test_led(void)
         PB->DOUT &= ~BIT3; /* LED off */
         bt_delay(80);
     }
+
+    /* No feedback pin for LED; this is a manual check item. */
+    printf("[BT] LED: MANUAL CHECK. If no blink, LED path is bad.\n");
+    return 1u;
 }
 
-static void test_buzzer(void)
+static uint8_t test_buzzer(void)
 {
-    printf("[BoardTest] Buzzer test: square-wave beeps (1kHz)\n");
+    printf("[BT] Buzzer: beep 2 times. Check sound output.\n");
+    BuzzerPlay(1000u, 120u);
+    CLK_SysTickDelay(180000u);
+    BuzzerPlay(1000u, 120u);
+    CLK_SysTickDelay(180000u);
 
-    /* Generate square wave on PC7 (active high) */
-    const uint32_t freq = 1000;       /* 1 kHz */
-    const uint32_t duration_ms = 150; /* 150 ms per beep */
-    const uint32_t gap_ms = 150;
-
-    for (int i = 0; i < 2; ++i)
-    {
-        if (freq > 0 && duration_ms > 0)
-        {
-            uint32_t half_period_us = (1000000U / (freq * 2U));
-            uint32_t half_cycles = (uint32_t)(((uint64_t)freq * (uint64_t)duration_ms * 2ULL) / 1000ULL);
-
-            for (uint32_t c = 0; c < half_cycles; ++c)
-            {
-                PC->DOUT ^= BIT7;
-                CLK_SysTickDelay(half_period_us);
-            }
-        }
-        PC->DOUT &= ~BIT7; /* ensure buzzer off */
-        CLK_SysTickDelay(gap_ms * 1000U);
-    }
+    /* No feedback pin for buzzer sound pressure; this is a manual check item. */
+    printf("[BT] Buzzer: MANUAL CHECK. If no sound, check PC7/BJT/buzzer.\n");
+    return 1u;
 }
 
-static void test_key_poll(void)
+static uint8_t test_key_poll(void)
 {
-    printf("[BoardTest] Key test: press Key (PB15) within 6s to register\n");
+    printf("[BT] Key: press PB15 in 6 seconds.\n");
     uint32_t timeout = 6000; /* approx ms */
     while (timeout--)
     {
         if ((GPIO_GET_IN_DATA(PB) & BIT15) == 0)
         { /* active low */
-            printf("[BoardTest] Key pressed (PB15)\n");
-            return;
+            printf("[BT] Key event detected on PB15.\n");
+            return 1u;
         }
         bt_delay(1);
     }
-    printf("[BoardTest] Key test: TIMEOUT (no press)\n");
+    printf("[BT] Key timeout.\n");
+    return 0u;
 }
 
-static void test_gsensor_i2c(void)
+static uint8_t test_gsensor_i2c(void)
 {
-    printf("[BoardTest] G-sensor test: init + read via I2C\n");
+    printf("[BT] Gsensor: init and read I2C data.\n");
+    uint8_t non_zero_seen = 0u;
 
     /* Ensure sensor is configured and awake */
     Gsensor_Init(100000, FSR_2G);
@@ -117,57 +122,117 @@ static void test_gsensor_i2c(void)
     {
         int16_t axis[3] = {0};
         GsensorReadAxis(axis);
-        printf("[BoardTest] G-sensor XYZ = %d, %d, %d\n", axis[0], axis[1], axis[2]);
+        if ((axis[0] != 0) || (axis[1] != 0) || (axis[2] != 0))
+        {
+            non_zero_seen = 1u;
+        }
+        printf("[BT] Gsensor sample %d: X=%d Y=%d Z=%d\n", i + 1, axis[0], axis[1], axis[2]);
         CLK_SysTickDelay(20000); /* 20 ms */
     }
+
+    if (!non_zero_seen)
+    {
+        printf("[BT] Gsensor all zeros.\n");
+        return 0u;
+    }
+
+    return 1u;
 }
 
-static void test_power_lock(void)
+static uint8_t test_power_lock(void)
 {
-    printf("[BoardTest] Power Lock test: PA11 set HIGH\n");
+    printf("[BT] PowerLock: set PA11 HIGH, switch to Quasi, then read.\n");
 
     PowerLock_Set(1);
     CLK_SysTickDelay(10000); /* 10 ms */
 
+    /* PA11 readback requires Quasi mode on this board design. */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
+    CLK_SysTickDelay(1000); /* 1 ms settle */
+
     uint32_t pin = (PA->PIN & BIT11) ? 1u : 0u;
-    printf("[BoardTest] PA11 state = %s\n", pin ? "HIGH" : "LOW");
+
+    /* Keep quasi mode for normal power-lock control and readable pin state. */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
+    PowerLock_Set(1);
+
+    printf("[BT] PA11 readback (Quasi) = %s\n", pin ? "HIGH" : "LOW");
+    return (pin == 1u) ? 1u : 0u;
 }
 
-static void test_battery_adc(void)
+static uint8_t test_battery_adc(void)
 {
-    printf("[BoardTest] Battery ADC test: read PB1 (EADC0_CH1)\n");
+    printf("[BT] Battery ADC: read PB1 (EADC0_CH1).\n");
 
     Adc_InitBattery();
     uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
     float vbat = Adc_ConvertRawToBatteryV(raw);
-    printf("[BoardTest] VBAT raw=%u, V=%.2fV (low<=%.2fV)\n",
+    printf("[BT] Battery raw=%u, V=%.2fV\n",
            (unsigned int)raw,
-           vbat,
-           (double)ADC_BATT_LOW_V);
+           vbat);
+
+    /* Basic hardware sanity window to catch open/short quickly. */
+    if (vbat < 2.0f || vbat > 5.5f)
+    {
+        return 0u;
+    }
+
+    return 1u;
 }
 
 void BoardTest_RunAll(void)
 {
-    printf("\n=== RL_SPORT V3 - GPIO Board Test ===\n");
+    uint32_t pass_count = 0u;
+    uint32_t fail_count = 0u;
+    uint32_t skip_count = 0u;
+    uint8_t ok = 0u;
+
+    printf("\n=== RL_SPORT V3 Board Test ===\n");
+    printf("[BT] Start tests...\n");
 
     /* Only print I2C status during board tests to avoid runtime log spam. */
     RL_I2C_SetDebugLog(1);
     BoardTest_GPIO_Init();
 
-    test_led();
+    ok = test_led();
+    bt_print_result("LED", ok, "No blink on PB3");
+    pass_count += ok ? 1u : 0u;
+    fail_count += ok ? 0u : 1u;
     bt_delay(20);
-    test_buzzer();
+
+    ok = test_buzzer();
+    bt_print_result("BUZZER", ok, "No sound. Check PC7/BJT/buzzer");
+    pass_count += ok ? 1u : 0u;
+    fail_count += ok ? 0u : 1u;
     bt_delay(20);
-    /* Skip PB15 key polling test (6s timeout) */
-    /* test_key_poll(); */
+
+    /* Keep key test optional to avoid blocking in quick test flow. */
+    printf("[BT] KEY: SKIP (optional interactive test)\n");
+    skip_count++;
     bt_delay(20);
-    test_power_lock();
+
+    ok = test_power_lock();
+    bt_print_result("POWER_LOCK", ok, "PA11 did not go HIGH");
+    pass_count += ok ? 1u : 0u;
+    fail_count += ok ? 0u : 1u;
     bt_delay(20);
-    test_battery_adc();
+
+    ok = test_battery_adc();
+    bt_print_result("BATTERY_ADC", ok, "Voltage out of range (2.0V~5.5V)");
+    pass_count += ok ? 1u : 0u;
+    fail_count += ok ? 0u : 1u;
     bt_delay(20);
-    test_gsensor_i2c();
+
+    ok = test_gsensor_i2c();
+    bt_print_result("GSENSOR_I2C", ok, "All zero data. Check I2C or sensor");
+    pass_count += ok ? 1u : 0u;
+    fail_count += ok ? 0u : 1u;
 
     RL_I2C_SetDebugLog(0);
 
-    printf("[BoardTest] All tests completed (see PASS/FAIL above).\n");
+    printf("[BT] SUMMARY: PASS=%lu FAIL=%lu SKIP=%lu\n",
+           (unsigned long)pass_count,
+           (unsigned long)fail_count,
+           (unsigned long)skip_count);
+    printf("[BT] End.\n");
 }

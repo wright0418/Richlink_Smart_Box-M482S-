@@ -7,7 +7,7 @@
 void Gpio_Init(void)
 {
     /* PB GPIO */
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
 
 #if !USE_GSENSOR_JUMP_DETECT
     /* HALL sensors used for jump counting: enable PB7 input and interrupt only */
@@ -64,7 +64,7 @@ static void Board_ConfigUartPins(void)
 static void Board_ConfigPowerPins(void)
 {
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk | SYS_GPA_MFPH_PA12MFP_Msk);
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
 }
 
 void Board_ConfigMultiFuncPins(void)
@@ -84,8 +84,8 @@ void Board_ReleaseIOPD(void)
 
 void PowerLock_Init(void)
 {
-    /* Configure PA11 as output and assert lock (high). */
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
+    /* Configure PA11 as quasi mode and assert lock (high). */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
     PA->DOUT |= BIT11;
 }
 
@@ -118,7 +118,7 @@ void InitSpdPins(void)
     /* Configure PB7/PB8/PB15 and PC5 for SPD input state */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT); /* G sensor interrupt */
 }
 
@@ -132,7 +132,7 @@ void Gpio_ConfigDPDWakeup(uint32_t edgeType)
 void Gpio_ConfigSPDWakeup(void)
 {
     /* Configure PB15 as SPD wakeup pin and set debounce as original code */
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
     CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
 }
 

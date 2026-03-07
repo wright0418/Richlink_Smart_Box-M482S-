@@ -1,38 +1,85 @@
-RL_SPORT V3 - GPIO Board Test
-================================
+RL_SPORT V3 - Board Test Guide
+==============================
 
 Overview
 --------
-This is a minimal GPIO hardware test harness for RL_SPORT V3. It exercises:
+This board test is a quick hardware check for RL_SPORT V3.
+
+Current test items:
 
 - LED (PB3)
 - Buzzer (PC7)
-- Key (PB15) — simple polling (active low)
-- HALL inputs (PB7/PB8) — configured as inputs (not actively tested)
+- Power lock (PA11)
+- Battery ADC (PB1 / EADC0_CH1)
+- G-sensor I2C read
+- Key (PB15) is optional interactive test (not in default auto sequence)
+
+Boot behavior
+-------------
+- Firmware always gives one short boot beep.
+- `BoardTest_RunAll()` is optional and controlled by `BOARD_TEST_AUTORUN` in `project_config.h`:
+  - `0`: do not auto-run board test at boot (default)
+  - `1`: run board test once at boot
+
+Pin mode rule (important)
+-------------------------
+- PB15 and PA11 use **Quasi mode** in app flow.
+- Reason: pin state can be read back while still keeping pull-high behavior.
 
 How to run
 ----------
-1. Build the `SampleCode/RL_SPORT` project as usual (AC6/toolchain configured in VSCode csolution).
-2. Ensure `retarget.c` routes `printf` to `UART0` (PB12/PB13). Connect serial to observe output (115200).
-3. Power the board and run the firmware. The test prints progress via UART and blinks LED / beeps buzzer.
+1. Build `SampleCode/RL_SPORT`.
+2. Connect UART0 (PB12/PB13), 115200-8-N-1.
+3. Choose one method:
+   - Set `BOARD_TEST_AUTORUN = 1` and reboot, or
+   - Call `BoardTest_RunAll()` from a debug path/test entry.
 
-Assumptions & Notes
+UART log format
+---------------
+Board test prints simple English logs:
+
+- `[BT] <ITEM>: PASS`
+- `[BT] <ITEM>: FAIL - <hint>`
+- `[BT] <ITEM>: SKIP`
+- Final summary: `[BT] SUMMARY: PASS=x FAIL=y SKIP=z`
+
+Current PASS/FAIL criteria
+--------------------------
+- `LED`: manual check (must blink 3 times)
+- `BUZZER`: manual check (must beep 2 times)
+- `POWER_LOCK`: set PA11 high, read back in Quasi mode (must read HIGH)
+- `BATTERY_ADC`: battery voltage must be in 2.0V ~ 5.5V
+- `GSENSOR_I2C`: multiple samples must not be all zeros
+- `KEY`: optional test item (default SKIP in quick run)
+
+Operator test steps (recommended)
+---------------------------------
+1. Run board test and watch UART logs.
+2. Check LED and buzzer physically.
+3. If fail appears, follow hint text directly:
+   - `POWER_LOCK` fail: check PA11 path and power lock circuit
+   - `BATTERY_ADC` fail: check PB1 divider and ADC path
+   - `GSENSOR_I2C` fail: check I2C wiring/sensor address/pull-ups
+4. Confirm final summary has `FAIL=0`.
+
+Key test notes (PB15)
+---------------------
+If key test reports pressed without pressing:
+
+1. Run test with no touch for full timeout.
+2. Measure PB15 level:
+   - idle should stay HIGH
+   - press should go LOW
+3. If unstable, check key pull-up path and board noise coupling.
+
+Integration example
 -------------------
-- Assumes `SYS_Init()` or equivalent board init already ran before calling `BoardTest_RunAll()`.
-- Key (`PB15`) is assumed active-low with external pull (internal pull-up enabled in test).
-- I2C / ADC tests are not included in this minimal PoC. If needed, provide schematic info for PB1 and PA11 and whether I2C pull-ups are present.
-
-Integration
------------
-Call `BoardTest_RunAll()` from your `main()` (or add it to a test runner). Example:
-
-    int main(void) {
-        SYS_Init();
-        UART_Open(UART0, 115200);
-        BoardTest_RunAll();
-        while (1) { }
-    }
-
-Next steps
-----------
-- Add interrupt-driven key tests, I2C device probe, ADC PB1 measurement, and PA11 power-lock verification once hardware schematic is confirmed.
+```c
+int main(void)
+{
+    SYS_Init();
+    UART_Open(UART0, 115200);
+    BoardTest_RunAll();
+    while (1) { }
+}
+```

@@ -46,7 +46,7 @@ void PowerMgmt_HandleWake(void)
         CLK->PMUSTS |= (1u << 31); /* Set CLRWK bit */
         PowerMgmt_DebugWakeFlags();
         /* Reconfigure PB15 button interrupt (falling edge) */
-        GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+        GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
         GPIO_EnableInt(PB, 15, GPIO_INT_FALLING);
         GPIO_SET_DEBOUNCE_TIME(GPIO_DBCTL_DBCLKSRC_LIRC, GPIO_DBCTL_DBCLKSEL_512);
         GPIO_ENABLE_DEBOUNCE(PB, BIT15);
@@ -72,7 +72,7 @@ void PowerMgmt_ConfigGpioForSPD(void)
     GPIO_SetMode(PB, BIT3, GPIO_MODE_INPUT);  // GREEN LED PB3
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);  // JUMP1
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);  // JUMP2
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT); // KeyA
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI); // KeyA
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT);  // G-sensor INT
     GPIO_SetMode(PC, BIT7, GPIO_MODE_INPUT);  // Buzzer
 }
@@ -148,7 +148,7 @@ void PowerMgmt_EnterSPD(PowerMode mode)
     PowerMgmt_ConfigGpioForSPD();
 
     /* Configure PB15 (KeyA) as SPD wake-up pin - */
-    GPIO_SetMode(PB, BIT15, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
 
     /* Try enabling PB15 (group 1, pin15) wake (falling edge press) */
     CLK_EnableSPDWKPin(1, 15, CLK_SPDWKPIN_FALLING, CLK_SPDWKPIN_DEBOUNCEDIS);
