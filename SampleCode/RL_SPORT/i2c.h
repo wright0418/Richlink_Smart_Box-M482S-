@@ -26,18 +26,28 @@ uint8_t RL_I2C_GetDebugLog(void);
 /**
  * @brief I2C write: 1-byte register address + 1-byte data.
  *
- * This is a thin wrapper around StdDriver I2C_WriteByteOneReg() that prints
- * the return status, I2C STATUS code, and StdDriver global error code when
- * an error/abnormal condition is detected.
+ * This wrapper performs up to I2C_XFER_RETRY_COUNT retries when transfer
+ * fails (including timeout-flag recovery).
+ * @return 0 on success; non-zero on failure after retries.
+ *
+ * Error semantics:
+ * - non-zero return means write failure (NACK/timeout/arbitration issues).
+ * - when debug log is enabled via RL_I2C_SetDebugLog(), abnormal status and
+ *   timeout info are printed for diagnosis.
  */
 uint8_t RL_I2C_WriteByteOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t data);
 
 /**
  * @brief I2C read: 1-byte register address + multi-byte read.
  *
- * This is a thin wrapper around StdDriver I2C_ReadMultiBytesOneReg() that prints
- * the return status, I2C STATUS code, and StdDriver global error code when
- * an error/abnormal condition is detected.
+ * This wrapper performs up to I2C_XFER_RETRY_COUNT retries when read length
+ * is shorter than requested.
+ * @return Number of bytes read. Expected value is u32rLen.
+ *
+ * Error semantics:
+ * - return < u32rLen indicates incomplete read/failure after retries.
+ * - when debug log is enabled via RL_I2C_SetDebugLog(), abnormal status and
+ *   timeout info are printed for diagnosis.
  */
 uint32_t RL_I2C_ReadMultiBytesOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t rdata[], uint32_t u32rLen);
 

@@ -106,8 +106,8 @@ static void Game_CheckMovementAndUpdateIdle(uint8_t ble_connected)
     if (movement_window_count > 0)
         stddev = sqrtf(var / (float)movement_window_count);
 
-    /* Detect movement: either stddev large or magnitude deviates from 1g */
-    if (stddev > MOVEMENT_STDDEV_THRESHOLD_G || fabsf(mean - 1.0f) > MOVEMENT_MAG_TOLERANCE_G)
+    /* Detect movement using shared algorithm helper for unit-test consistency */
+    if (GameAlgo_IsMovement(stddev, mean, MOVEMENT_STDDEV_THRESHOLD_G, MOVEMENT_MAG_TOLERANCE_G))
     {
         /* movement detected -> reset last movement time */
         last_movement_time = now;

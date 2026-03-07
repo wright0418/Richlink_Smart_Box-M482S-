@@ -76,7 +76,11 @@ void PowerMgmt_HandleWake(void);
 uint8_t PowerMgmt_DetectUsbCharge(void);
 
 /**
- * @brief Enter infinite loop for USB charge-only mode (no game logic).
+ * @brief Compatibility wrapper for legacy blocking charge loop.
+ *
+ * New code should prefer non-blocking pair:
+ * - PowerMgmt_ChargeModeInit()
+ * - PowerMgmt_ChargeModeProcess()
  */
 void PowerMgmt_RunChargeLoop(void);
 
@@ -88,6 +92,10 @@ void PowerMgmt_ChargeModeInit(void);
 /**
  * @brief Process one step of charge mode.
  * @return 1 while charge mode should continue, 0 when charge mode should exit.
+ *
+ * Error semantics:
+ * - This API does not return negative/error codes; caller treats 0 as
+ *   "exit charge mode" and may decide fallback behavior.
  */
 uint8_t PowerMgmt_ChargeModeProcess(void);
 

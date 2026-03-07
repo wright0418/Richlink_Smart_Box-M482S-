@@ -52,7 +52,7 @@
   - 以 sliding window 計算 magnitude 的 mean 與 stddev（參數在 `project_config.h`），判定「無動作」
   - 若無動作且超時（聯線/未聯線分別不同 timeout），則設定 `idle_state` -> 觸發 `RL_HandleIdlePowerOff()`
 - 跳繩計數：兩種模式擇一
-  - HALL 模式（`USE_GSENSOR_JUMP_DETECT == 0`）：PB7 中斷每次落下緣計數，兩邊緣一組算一次跳躍（ISR 直接呼叫 `Sys_IncrementJumpTimes()`）
+  - HALL 模式（`USE_GSENSOR_JUMP_DETECT == 0`）：PB7 中斷僅累積 edge 事件；主迴圈以 2 edge = 1 jump 規則換算跳數（ISR 減負）
   - G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `gsensor_jump_detect` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
 
 ## BLE 行為 / AT 流程（`ble.c`）
@@ -77,13 +77,14 @@
 ## 中斷與 ISR 注意事項
 - UART1 IRQ：累積字元直到 newline，設定 `g_u8DataReady` 交由主迴圈解析
 - GPB_IRQHandler：
-  - PB7（HALL）落邊緣計數（ISR 內增量，但僅在 `GAME_START` 時有效）
+  - PB7（HALL）僅做 edge 累積/flag 設定，不在 ISR 直接做 jump 數學運算
   - PB15（KeyA）設定 flag，主迴圈處理實際行為
 - Timer0 ISR（`TMR0_IRQHandler`）以 1ms tick 觸發，更新系統 tick 與 LED callback
 
 ## 電源管理
 - 支援 SPD（Shallow Power-Down）與 DPD（Deep Power-Down）
 - `PowerMgmt_DetectUsbCharge()` 讀取 PA12 偵測 USB 充電；若為充電模式，系統進入 `PowerMgmt_RunChargeLoop()`（充電模式特殊行為）
+- `PowerMgmt_DetectUsbCharge()` 讀取 PA12 偵測 USB 充電；充電模式建議使用 `PowerMgmt_ChargeModeInit()` / `PowerMgmt_ChargeModeProcess()`（非阻塞）
 - 電源鎖（Power Lock）：PA11，高表示鎖定電源（保持開機），低表示允許關機
 - SPD 進入前需將非必要 GPIO 設為輸入以降低漏電（`PowerMgmt_ConfigGpioForSPD`）
 - Wake-up sources：PB15（按鍵, SPD）、PC0（DPD）等，Wake flag 由 `CLK->PMUSTS` 驗證
@@ -100,6 +101,46 @@
 - 充電模式：插拔 USB 檢查 `PowerMgmt_DetectUsbCharge()` 與 `PowerMgmt_ChargeModeProcess()` 的進出行為
 - 跳繩計數：HALL 與 G-sensor 模式下各做 50 次跳繩比對
 - 閒置關機：模擬停止移動並觀察 LED 與最終關機流程
+
+## 單元測試（演算法層）
+- 測試目標：
+  - movement 判定：`GameAlgo_IsMovement`
+  - jump 計數：`GameAlgo_CalcJumpsFromEdges`
+- 位置：`SampleCode/RL_SPORT/tests/test_game_algorithms.c`
+- 執行腳本：`SampleCode/RL_SPORT/tests/run_tests.ps1`
+
+## 流程圖（Mermaid）
+
+### 1) 啟動與主迴圈高階流程
+```mermaid
+flowchart TD
+    A[Reset] --> B[RL_InitSystemCore]
+    B --> C[RL_InitBoardInputs]
+    C --> D[RL_InitDrivers]
+    D --> E[RL_InitApplication]
+    E --> F[BoardTest_RunAll]
+    F --> G{while(1)}
+
+    G --> H{USB charge mode?}
+    H -- Yes --> H1[PowerMgmt_ChargeModeInit / Process]
+    H1 --> G
+    H -- No --> I[TestMode / USB HID test]
+    I --> J[BLE msg + game state]
+    J --> K[G-sensor / battery / key / hall event]
+    K --> L[Idle power-off check]
+    L --> M[LED update]
+    M --> G
+```
+
+### 2) HALL edge -> jump 計數流程（ISR 減負）
+```mermaid
+flowchart LR
+    IRQ[PB7 Falling Edge IRQ] --> ISR[GPB_IRQHandler]
+    ISR --> ACC[Sys_AccumulateHallPb7Edge + set flag]
+    ACC --> LOOP[Main Loop consume pending edges]
+    LOOP --> CALC[GameAlgo_CalcJumpsFromEdges]
+    CALC --> ADD[Sys_AddJumpTimes]
+```
 
 ## 作為下一次專案的範例要點（最佳實務）
 1. 模組化 API：保持 `xxx_Init()`, `xxx_Process()` 與 `xxx_ISR()` 介面清晰（見本專案模組化風格）。

@@ -432,9 +432,7 @@ int main()
 
       if (Sys_GetGameState() == GAME_START)
       {
-        uint16_t accumulated = (uint16_t)s_hall_edge_residual + (uint16_t)edges;
-        uint16_t jumps = accumulated / 2u;
-        s_hall_edge_residual = (uint8_t)(accumulated % 2u);
+        uint16_t jumps = GameAlgo_CalcJumpsFromEdges(s_hall_edge_residual, edges, &s_hall_edge_residual);
         if (jumps > 0u)
         {
           Sys_AddJumpTimes(jumps);

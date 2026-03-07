@@ -12,6 +12,54 @@
 #define _GAME_LOGIC_H_
 
 #include <stdint.h>
+#include <math.h>
+
+/**
+ * @brief Determine whether current statistics indicate movement.
+ * @param stddev_g Standard deviation of acceleration magnitude window (g).
+ * @param mean_mag_g Mean acceleration magnitude of window (g).
+ * @param stddev_threshold_g Movement stddev threshold (g).
+ * @param mag_tolerance_g Allowed absolute deviation from 1g.
+ * @return 1 if movement detected, 0 if considered stationary.
+ *
+ * Decision rule:
+ * - movement when stddev_g > stddev_threshold_g, OR
+ * - movement when |mean_mag_g - 1.0| > mag_tolerance_g.
+ */
+static inline uint8_t GameAlgo_IsMovement(float stddev_g,
+                                          float mean_mag_g,
+                                          float stddev_threshold_g,
+                                          float mag_tolerance_g)
+{
+    return (uint8_t)((stddev_g > stddev_threshold_g) ||
+                     (fabsf(mean_mag_g - 1.0f) > mag_tolerance_g));
+}
+
+/**
+ * @brief Convert Hall falling-edge counts to jump count with residual support.
+ * @param residual_edges_in Residual edges from previous cycle (typically 0 or 1).
+ * @param new_edges Newly captured edges in current cycle.
+ * @param residual_edges_out Output residual edges for next cycle.
+ * @return Number of complete jumps calculated in this cycle.
+ *
+ * Counting rule: 2 falling edges = 1 jump.
+ * Error handling:
+ * - If residual_edges_out is NULL, function returns 0 and performs no update.
+ */
+static inline uint16_t GameAlgo_CalcJumpsFromEdges(uint8_t residual_edges_in,
+                                                   uint8_t new_edges,
+                                                   uint8_t *residual_edges_out)
+{
+    if (!residual_edges_out)
+    {
+        return 0u;
+    }
+
+    uint16_t total_edges = (uint16_t)residual_edges_in + (uint16_t)new_edges;
+    uint16_t jumps = (uint16_t)(total_edges / 2u);
+    *residual_edges_out = (uint8_t)(total_edges % 2u);
+    return jumps;
+}
 
 /**
  * @brief Initialize game logic module.

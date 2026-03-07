@@ -21,15 +21,19 @@
  *
  * Hall Sensor (PB7): Falling edge triggered, counted as 2 per jump.
  * PB7 debounce is intentionally disabled for fastest response.
+ *
+ * ISR policy:
+ * - GPB IRQ only records edge events/flags (lightweight ISR).
+ * - Edge-to-jump conversion is handled in main loop.
  */
 void Gpio_Init(void);
 
 /**
- * @brief Reset Hall sensor edge counter (called on game stop or disconnect).
+ * @brief Reset Hall sensor software edge context.
  *
- * Clears the internal PB7 falling-edge counter used for 2-edge jump
- * detection. Must be called when transitioning from GAME_START or on
- * state reset to ensure clean counting on next game session.
+ * For current implementation this API is reserved for compatibility and
+ * future extension. Main-loop residual edge state is maintained by app
+ * logic, while ISR only accumulates pending edges.
  */
 void GPIO_ResetHallEdgeCount(void);
 
