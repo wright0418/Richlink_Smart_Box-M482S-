@@ -165,20 +165,10 @@ void GPB_IRQHandler(void)
      * perform lengthy work. ISR sets a flag so the main loop can log or act on
      * the event without blocking interrupt latency.
      * ============================================================================ */
-    static uint8_t hall_pb7_edge_count = 0u;
-
     if (GPIO_GET_INT_FLAG(PB, BIT7))
     {
         GPIO_CLR_INT_FLAG(PB, BIT7);
-        if (Sys_GetGameState() == GAME_START)
-        {
-            hall_pb7_edge_count++;
-            if (hall_pb7_edge_count >= 2u)
-            {
-                hall_pb7_edge_count = 0u;
-                Sys_IncrementJumpTimes();
-            }
-        }
+        Sys_AccumulateHallPb7Edge();
         Sys_SetHallPb7IrqFlag(1); /* Signal main loop for logging */
     }
 

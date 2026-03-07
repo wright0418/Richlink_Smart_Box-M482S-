@@ -3,6 +3,7 @@
  * @brief System status module implementation
  */
 #include "system_status.h"
+#include "NuMicro.h"
 #include <string.h>
 
 /* Global system status instance (extern declaration in header) */
@@ -21,7 +22,35 @@ void Sys_Init(void)
     memset((void *)g_sys.device_name, 0, sizeof(g_sys.device_name));
     g_sys.keyA_flag = 0;
     g_sys.hall_pb7_irq_flag = 0;
+    g_sys.hall_pb7_edge_pending = 0;
     g_sys.idle_state = 0;
+}
+
+void Sys_AddJumpTimes(uint16_t delta)
+{
+    __disable_irq();
+    g_sys.jump_times = (uint16_t)(g_sys.jump_times + delta);
+    __enable_irq();
+}
+
+void Sys_AccumulateHallPb7Edge(void)
+{
+    __disable_irq();
+    if (g_sys.hall_pb7_edge_pending < 0xFFu)
+    {
+        g_sys.hall_pb7_edge_pending++;
+    }
+    __enable_irq();
+}
+
+uint8_t Sys_TakeHallPb7PendingEdges(void)
+{
+    uint8_t edges;
+    __disable_irq();
+    edges = g_sys.hall_pb7_edge_pending;
+    g_sys.hall_pb7_edge_pending = 0u;
+    __enable_irq();
+    return edges;
 }
 
 const char *Sys_GetMacAddr(void)

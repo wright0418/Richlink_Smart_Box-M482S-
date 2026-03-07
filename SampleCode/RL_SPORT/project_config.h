@@ -80,6 +80,11 @@
 #define LOW_BATT_LED_FREQ_HZ 4.0f
 #define LOW_BATT_LED_DUTY 0.1f
 
+/* I2C / G-sensor robustness */
+#define I2C_XFER_RETRY_COUNT 3u
+#define GSENSOR_INIT_RETRY_COUNT 3u
+#define GSENSOR_RECOVERY_RETRY_INTERVAL 5u
+
 /* G-Sensor Jump Detection Configuration */
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
 #define USE_GSENSOR_JUMP_DETECT 0

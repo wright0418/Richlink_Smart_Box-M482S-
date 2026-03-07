@@ -38,6 +38,7 @@ typedef struct
     volatile uint8_t device_name[30];
     volatile uint8_t keyA_flag;
     volatile uint8_t hall_pb7_irq_flag;
+    volatile uint8_t hall_pb7_edge_pending;
     volatile uint8_t idle_state; /* 0: moving, 1: idle */
 } SystemStatus;
 
@@ -62,6 +63,7 @@ static inline void Sys_SetGameState(GameState state) { g_sys.game_state = state;
 static inline uint16_t Sys_GetJumpTimes(void) { return g_sys.jump_times; }
 static inline void Sys_SetJumpTimes(uint16_t times) { g_sys.jump_times = times; }
 static inline void Sys_IncrementJumpTimes(void) { g_sys.jump_times++; }
+void Sys_AddJumpTimes(uint16_t delta);
 static inline void Sys_ResetJumpTimes(void) { g_sys.jump_times = 0; }
 
 /* Button/sensor flag accessors */
@@ -69,6 +71,8 @@ static inline uint8_t Sys_GetKeyAFlag(void) { return g_sys.keyA_flag; }
 static inline void Sys_SetKeyAFlag(uint8_t flag) { g_sys.keyA_flag = flag; }
 static inline uint8_t Sys_GetHallPb7IrqFlag(void) { return g_sys.hall_pb7_irq_flag; }
 static inline void Sys_SetHallPb7IrqFlag(uint8_t flag) { g_sys.hall_pb7_irq_flag = flag; }
+void Sys_AccumulateHallPb7Edge(void);
+uint8_t Sys_TakeHallPb7PendingEdges(void);
 static inline uint8_t Sys_GetIdleState(void) { return g_sys.idle_state; }
 static inline void Sys_SetIdleState(uint8_t state) { g_sys.idle_state = state; }
 

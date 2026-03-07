@@ -125,7 +125,20 @@ static void RL_I2C_LogIfAbnormal(I2C_T *i2c,
 
 uint8_t RL_I2C_WriteByteOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t data)
 {
-    uint8_t ret = I2C_WriteByteOneReg(i2c, u8SlaveAddr, u8DataAddr, data);
+    uint8_t ret = 1u;
+    for (uint32_t attempt = 0u; attempt < I2C_XFER_RETRY_COUNT; attempt++)
+    {
+        ret = I2C_WriteByteOneReg(i2c, u8SlaveAddr, u8DataAddr, data);
+        if (ret == 0u)
+        {
+            break;
+        }
+
+        if (I2C_GET_TIMEOUT_FLAG(i2c))
+        {
+            I2C_ClearTimeoutFlag(i2c);
+        }
+    }
 
     /* StdDriver convention: 0 = success, non-zero = fail */
     RL_I2C_LogIfAbnormal(i2c, "WR1", u8SlaveAddr, u8DataAddr, (int32_t)ret, 0u);
@@ -134,7 +147,20 @@ uint8_t RL_I2C_WriteByteOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAd
 
 uint32_t RL_I2C_ReadMultiBytesOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t rdata[], uint32_t u32rLen)
 {
-    uint32_t rx = I2C_ReadMultiBytesOneReg(i2c, u8SlaveAddr, u8DataAddr, rdata, u32rLen);
+    uint32_t rx = 0u;
+    for (uint32_t attempt = 0u; attempt < I2C_XFER_RETRY_COUNT; attempt++)
+    {
+        rx = I2C_ReadMultiBytesOneReg(i2c, u8SlaveAddr, u8DataAddr, rdata, u32rLen);
+        if (rx == u32rLen)
+        {
+            break;
+        }
+
+        if (I2C_GET_TIMEOUT_FLAG(i2c))
+        {
+            I2C_ClearTimeoutFlag(i2c);
+        }
+    }
 
     /* StdDriver convention: returns received length; expect == requested length */
     RL_I2C_LogIfAbnormal(i2c, "RDm", u8SlaveAddr, u8DataAddr, (int32_t)rx, u32rLen);

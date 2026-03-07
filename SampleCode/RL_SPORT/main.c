@@ -41,6 +41,7 @@ static uint32_t s_last_usb_update = 0;
 static uint8_t s_ble_rename_started = 0u;
 static uint8_t s_ble_rename_done = 0u;
 static uint8_t s_charge_mode_initialized = 0u;
+static uint8_t s_hall_edge_residual = 0u;
 
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
 {
@@ -427,9 +428,26 @@ int main()
     /* Hall sensor IRQ print (main loop, not ISR) */
     if (Sys_GetHallPb7IrqFlag())
     {
+      uint8_t edges = Sys_TakeHallPb7PendingEdges();
+
+      if (Sys_GetGameState() == GAME_START)
+      {
+        uint16_t accumulated = (uint16_t)s_hall_edge_residual + (uint16_t)edges;
+        uint16_t jumps = accumulated / 2u;
+        s_hall_edge_residual = (uint8_t)(accumulated % 2u);
+        if (jumps > 0u)
+        {
+          Sys_AddJumpTimes(jumps);
+        }
+      }
+      else
+      {
+        s_hall_edge_residual = 0u;
+      }
+
       uint16_t total = Sys_GetJumpTimes();
       Sys_SetHallPb7IrqFlag(0);
-      DBG_PRINT("[HALL] PB7 IRQ total=%u\n", (unsigned)total);
+      DBG_PRINT("[HALL] PB7 edges=%u total=%u\n", (unsigned)edges, (unsigned)total);
     }
     /* Process button events */
     if (Sys_GetKeyAFlag())
