@@ -33,7 +33,7 @@ typedef struct
     volatile GameState game_state;
     volatile uint8_t keyA_state; // 0: Released , 1: Press
     volatile uint16_t jump_times;
-    volatile uint16_t lest_time_ms;
+    volatile uint16_t left_time_ms;
     volatile uint8_t mac_addr[24];
     volatile uint8_t device_name[30];
     volatile uint8_t keyA_flag;

@@ -1,6 +1,6 @@
 CompileFlags:
 CompilationDatabase: >-
-d:\Nuvoton\M480_SmartBox\SampleCode\RL_SPORT\VSCode\out\RL_SPORT\ARMCLANG\debug
+out/RL_SPORT/ARMCLANG/debug
 Add:
 - '-D_ILP32=1'
 - '-D_USE_STATIC_INLINE=1'

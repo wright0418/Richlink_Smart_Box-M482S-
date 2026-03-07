@@ -30,8 +30,8 @@
 #define HID_RPT_TYPE_FEATURE 0x03
 
 /* Define EP maximum packet size */
-#define EP0_MAX_PKT_SIZE 8
-#define EP1_MAX_PKT_SIZE EP0_MAX_PKT_SIZE
+#define EP0_MAX_PKT_SIZE 64
+#define EP1_MAX_PKT_SIZE 8
 #define EP2_MAX_PKT_SIZE 8
 
 #define SETUP_BUF_BASE 0

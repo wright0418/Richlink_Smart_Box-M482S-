@@ -17,7 +17,7 @@ void Sys_Init(void)
     g_sys.game_state = GAME_STOP;
     g_sys.keyA_state = 0;
     g_sys.jump_times = 0;
-    g_sys.lest_time_ms = 0;
+    g_sys.left_time_ms = 0;
     memset((void *)g_sys.mac_addr, 0, sizeof(g_sys.mac_addr));
     memset((void *)g_sys.device_name, 0, sizeof(g_sys.device_name));
     g_sys.keyA_flag = 0;
