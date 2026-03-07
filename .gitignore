@@ -26,3 +26,46 @@ cmake_install.cmake
 # Ignore IDE/editor specific
 .vscode/
 .idea/
+
+# Ignore VSCode build/temp outputs for sample code
+SampleCode/*/VSCode/out/
+SampleCode/*/VSCode/tmp/
+SampleCode/*/VSCode/tmp/**
+
+# General build outputs and temporary project files
+**/out/
+**/tmp/
+**/build/
+**/.ninja_log
+**/.ninja_deps
+**/build.ninja
+**/compile_commands.json
+
+# Toolchain / linker / binary outputs
+*.axf
+*.axf.map
+*.map
+*.bin
+*.hex
+*.elf
+*.cbuild-run.yml
+
+# CMake artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+SampleCode/ISP/ISP_HID/targetdev.h
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/.clangd
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/HSUSBD_HID_Mouse.cbuild-idx.yml
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/HSUSBD_HID_Mouse.cbuild-pack.yml
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/HSUSBD_HID_Mouse.cbuild-set.yml
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/ac6_linker_script.sct.src
+SampleCode/StdDriver/HSUSBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/regions_M487JIDAE.h
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/.clangd
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.cbuild-idx.yml
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.cbuild-pack.yml
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.cbuild-set.yml
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.csolution.yml
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/ac6_linker_script.sct.src
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/regions_M487JIDAE.h
+SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.csolution.yml

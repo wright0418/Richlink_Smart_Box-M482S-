@@ -31,6 +31,29 @@ These rules help AI coding agents work productively in this CMSIS/Keil-style fir
 ## Board/IO specifics (Smart_Box)
 - `SampleCode/Smart_Box/AGNETS.md` documents intended IO (LEDs PB1/2/3, RS485 DIR PB14, etc.) and mentions M482; csolution targets M487. Confirm actual target/pinout before flashing and align MFP settings.
 
+## Board/IO specifics (RL_SPORT)
+- LED PB3,Green 
+- I2C0 G-Sensor (PB5,PB4) , 中斷 PC5 , Sensor Part number MXC4005XC
+- UART1 (PA8,PA9) for BLE Module buardrate = 115200 , AT CMD
+- Buzzer PC7 , external have BJT driver ,disable buzzer must drive to low
+- button Key PB15 low active
+- dual HALL sensor input PB8 and PB7 , low active
+- Deep power down wakeUp Pin PC0
+- UART0 PB12/PB13 for printf debug 
+
+## Board/IO specifics (RL_SPORT V3)
+- LED PB3,Green 
+- I2C0 G-Sensor (PB5,PB4) , 中斷 PC5 , Sensor Part number MXC4005XC
+- UART0 PB12/PB13 for printf debug 
+- UART1 (PA8,PA9) for BLE Module buardrate = 115200 , AT CMD
+- Buzzer PC7 , external have BJT driver ,disable buzzer must drive to low
+- button Key PB15 Low active
+- dual HALL sensor input PB8 and PB7 , low active
+- Deep power down wakeUp Pin PC0
+- PB1 , ADC for Battery low battery voltage detetc 
+- PA11 , for System power lock , High is lock the power , low is turn off system power
+- support USB FS Device 
+
 ## External tools
 - Requires CMSIS-Toolbox and pyOCD on PATH; CMSIS-DAP probe expected. GDB attaches to 3333 when CMSIS Run is active.
 
@@ -39,3 +62,4 @@ These rules help AI coding agents work productively in this CMSIS/Keil-style fir
 - Mirror relative paths/case when adding files; update `groups:` and `add-path:`.
 - For new peripherals: clock enable → clock source → pin mux (MFP) → driver init.
 - If changing device/memory, update csolution device and the GCC linker script.
+

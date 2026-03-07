@@ -70,9 +70,17 @@ extern "C"
     // 檢查是否正在通訊中
     bool modbus_sensor_manager_is_busy(const modbus_sensor_manager_t *manager);
 
-    // 更新配置（僅在非忙碌狀態下可用）
+    // 更新配置(僅在非忙碌狀態下可用)
     bool modbus_sensor_manager_update_config(modbus_sensor_manager_t *manager,
                                              const modbus_sensor_config_t *new_config);
+
+    // 動態設定 baudrate (會重新初始化 UART)
+    bool modbus_sensor_manager_set_baudrate(modbus_sensor_manager_t *manager,
+                                            uint32_t new_baudrate);
+
+    // 動態設定 slave address
+    bool modbus_sensor_manager_set_slave_address(modbus_sensor_manager_t *manager,
+                                                 uint8_t new_slave_address);
 
 #ifdef __cplusplus
 }

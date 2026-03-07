@@ -283,3 +283,51 @@ static void modbus_sensor_try_start_request(modbus_sensor_manager_t *manager, ui
         manager->state.next_poll_ms = current_time_ms + 100U; // 短延遲後重試
     }
 }
+
+bool modbus_sensor_manager_set_baudrate(modbus_sensor_manager_t *manager, uint32_t new_baudrate)
+{
+    if ((manager == NULL) || (!manager->initialized) || (new_baudrate == 0))
+    {
+        return false;
+    }
+
+    if (modbus_rtu_client_is_busy(&manager->client))
+    {
+        return false; // 忙碌時不允許更改
+    }
+
+    // 使用 UART driver 的 baudrate 設定功能
+    if (!uart_rs485_driver_set_baudrate(new_baudrate))
+    {
+        return false;
+    }
+
+    // 更新 client 的 baudrate 設定
+    manager->client.config.baudrate = new_baudrate;
+
+    // 重置 client 狀態
+    modbus_rtu_client_reset(&manager->client);
+
+    return true;
+}
+
+bool modbus_sensor_manager_set_slave_address(modbus_sensor_manager_t *manager, uint8_t new_slave_address)
+{
+    if ((manager == NULL) || (!manager->initialized) || (new_slave_address == 0))
+    {
+        return false;
+    }
+
+    if (modbus_rtu_client_is_busy(&manager->client))
+    {
+        return false; // 忙碌時不允許更改
+    }
+
+    // 更新配置中的 slave address
+    manager->config.slave_address = new_slave_address;
+
+    // 重置連續失敗計數
+    manager->state.consecutive_failures = 0;
+
+    return true;
+}

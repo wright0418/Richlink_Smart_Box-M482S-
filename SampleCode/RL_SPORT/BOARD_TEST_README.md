@@ -1,0 +1,87 @@
+RL_SPORT V3 - Board Test Guide
+==============================
+
+Overview
+--------
+This board test is a quick hardware check for RL_SPORT V3.
+
+Current test items:
+
+- LED (PB3)
+- Buzzer (PC7)
+- Battery ADC (PB1 / EADC0_CH1)
+- G-sensor I2C XYZ read (3 samples)
+- Key (PB15) is optional interactive test (not in default auto sequence)
+
+Boot behavior
+-------------
+- Firmware always gives one short boot beep.
+- `BoardTest_RunAll()` is optional and controlled by `BOARD_TEST_AUTORUN` in `project_config.h`:
+  - `0`: do not auto-run board test at boot (default)
+  - `1`: run board test once at boot
+
+Pin mode rule (important)
+-------------------------
+- PB15 uses **Quasi mode** in app flow.
+- PA11 (Power Lock) uses **Output mode** only.
+
+How to run
+----------
+1. Build `SampleCode/RL_SPORT`.
+2. Connect UART0 (PB12/PB13), 115200-8-N-1.
+3. Choose one method:
+   - Set `BOARD_TEST_AUTORUN = 1` and reboot, or
+   - Call `BoardTest_RunAll()` from a debug path/test entry.
+
+UART log format
+---------------
+Board test prints simple English logs:
+
+- `[BT] <ITEM>: PASS`
+- `[BT] <ITEM>: FAIL - <hint>`
+- `[BT] <ITEM>: SKIP`
+- Final summary: `[BT] SUMMARY: PASS=x FAIL=y SKIP=z`
+
+Current PASS/FAIL criteria
+--------------------------
+- `LED`: manual check (must blink 3 times)
+- `BUZZER`: manual check (must beep 2 times)
+- `POWER_LOCK`: removed from board test (not tested here)
+- `BATTERY_ADC`: battery voltage must be in 2.0V ~ 5.5V
+- `GSENSOR_I2C`: read and print XYZ values for 3 samples
+- `BLE_AT_NAME`: removed from board test (use Test Mode item `9`)
+- `KEY`: optional test item (default SKIP in quick run)
+
+Operator test steps (recommended)
+---------------------------------
+1. Run board test and watch UART logs.
+2. Check LED and buzzer physically.
+3. If fail appears, follow hint text directly:
+   - `BATTERY_ADC` fail: check PB1 divider and ADC path
+4. Confirm final summary has `FAIL=0`.
+
+Test Mode BLE AT CMD
+--------------------
+Use UART test mode item `9) BLE AT CMD name check` for BLE name query/check.
+
+Key test notes (PB15)
+---------------------
+If key test reports pressed without pressing:
+
+1. Run test with no touch for full timeout.
+2. Measure PB15 level:
+   - idle should stay HIGH
+   - press should go LOW
+3. If unstable, check key pull-up path and board noise coupling.
+
+Integration example
+-------------------
+```c
+int main(void)
+{
+    SYS_Init();
+    UART_Open(UART0, 115200);
+    BoardTest_RunAll();
+    while (1) { }
+}
+```

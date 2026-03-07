@@ -17,6 +17,7 @@
 #include "mesh_handler.h"
 #include "modbus_sensor_manager.h"
 #include "mesh_modbus_agent.h"
+#include "modbus_auto_detect.h"
 #include "hex_utils.h"
 #include <stdio.h>
 #include <string.h>
@@ -91,6 +92,17 @@ static void process_pending_agent_request(void);
  */
 uint32_t get_system_time_ms(void)
 {
+    return g_systick_ms;
+}
+
+/**
+ * @brief Get system time in milliseconds (callback wrapper)
+ * @param context Unused context pointer
+ * @return System time in milliseconds since startup
+ */
+static uint32_t get_system_time_ms_cb(void *context)
+{
+    (void)context;
     return g_systick_ms;
 }
 
@@ -395,9 +407,47 @@ int main(void)
     // Configure SysTick for 1ms interrupt
     SysTick_Config(SystemCoreClock / 1000);
 
-    // Initialize Modbus Sensor Manager
+    // === Auto-detect Modbus RTU device ===
+    modbus_detect_config_t detect_config;
+    modbus_auto_detect_get_default_config(&detect_config);
+
+    modbus_detect_result_t detect_result;
+    bool scan_success = modbus_auto_detect_scan(
+        &detect_result,
+        &detect_config,
+        get_system_time_ms_cb,
+        NULL,
+        NULL);
+
+    // Determine parameters to use
+    uint8_t slave_address;
+    uint32_t baudrate;
+
+    if (scan_success && detect_result.device_found)
+    {
+        // Device found - use detected parameters
+        slave_address = detect_result.slave_address;
+        baudrate = detect_result.baudrate;
+        // No LED flash (device found successfully)
+    }
+    else if (scan_success)
+    {
+        // Scan completed but no device found - use defaults
+        slave_address = MODBUS_SENSOR_SLAVE_ADDRESS;
+        baudrate = 9600;
+        led_flash_red(3); // Flash red LED 3 times
+    }
+    else
+    {
+        // Scan failed - use defaults
+        slave_address = MODBUS_SENSOR_SLAVE_ADDRESS;
+        baudrate = 9600;
+        led_flash_red(5); // Flash red LED 5 times
+    }
+
+    // Initialize Modbus Sensor Manager with detected/default parameters
     modbus_sensor_config_t sensor_config = {
-        .slave_address = MODBUS_SENSOR_SLAVE_ADDRESS,
+        .slave_address = slave_address,
         .start_address = MODBUS_SENSOR_START_ADDRESS,
         .register_quantity = MODBUS_SENSOR_REGISTER_QUANTITY,
         .poll_interval_ms = MODBUS_SENSOR_POLL_INTERVAL_MS,
@@ -409,6 +459,12 @@ int main(void)
                                     modbus_sensor_error_callback))
     {
         led_red_on();
+    }
+
+    // Update baudrate after initialization
+    if (baudrate != 9600)
+    {
+        modbus_sensor_manager_set_baudrate(&s_modbus_sensor_manager, baudrate);
     }
 
     // Initialize Mesh Modbus Agent

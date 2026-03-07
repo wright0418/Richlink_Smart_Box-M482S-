@@ -3,7 +3,6 @@ solution:
   created-for: CMSIS-Toolbox@2.4.0
   select-compiler:
     - compiler: AC6@>=5.19.0
-    - compiler: GCC@>=10.3.1
   build-types:
     - type: debug
       optimize: debug
@@ -16,18 +15,12 @@ solution:
       target-set:
         - set:
           images:
-            - project-context: USBD_HID_Mouse.debug
+            - project-context: RL_SPORT.debug
           debugger:
-            name: Nu-Link@pyOCD
+            name: CMSIS-DAP@pyOCD
             port: 3333
             protocol: swd
             clock: 10000000
-    - type: GNUC
-      compiler: GCC
-      device: Nuvoton::M487JIDAE
-      target-set:
-        - set:
-          images:
-            - project-context: USBD_HID_Mouse.debug
+    # GNUC target removed; only ARMCLANG (AC6) is supported for this solution
   projects:
-    - project: USBD_HID_Mouse.cproject.yml
+    - project: RL_SPORT.cproject.yml
