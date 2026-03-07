@@ -217,15 +217,34 @@ int BLE_UART_SEND(void *uart, const char *format, ...)
   uint8_t buf[BUF_SIZE];
   va_list arg;
   int done;
+  int write_len;
+
+  if (uart == NULL || format == NULL)
+  {
+    return -1;
+  }
 
   va_start(arg, format);
   done = vsnprintf((char *)buf, BUF_SIZE, format, arg);
   va_end(arg);
 
+  if (done < 0)
+  {
+    return done;
+  }
+
+  /* vsnprintf returns the length that would have been written (excluding '\0').
+     Clamp to local buffer capacity to avoid reading past buf on UART_Write(). */
+  write_len = done;
+  if (write_len >= (int)BUF_SIZE)
+  {
+    write_len = (int)BUF_SIZE - 1;
+  }
+
   /* uart is an opaque pointer in the public API; cast back to UART_T* for SDK calls */
   UART_T *u = (UART_T *)uart;
-  UART_Write(u, buf, done);
-  return done;
+  UART_Write(u, buf, write_len);
+  return write_len;
 }
 
 void CheckBleRecvMsg(void)

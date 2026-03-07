@@ -721,6 +721,54 @@ static void handle_status_verbose(void)
     repl_send("+OK,STATUS_VERBOSE_G,AX=%d,AY=%d,AZ=%d\r\n", axis[0], axis[1], axis[2]);
 }
 
+static uint8_t handle_safe_or_common_cmd(const char *cmd)
+{
+    if (strncmp(cmd, "LED_", 4) == 0)
+    {
+        handle_led_cmd(cmd);
+        return 1u;
+    }
+
+    if (strncmp(cmd, "BUZZER_", 7) == 0)
+    {
+        handle_buzzer_cmd(cmd);
+        return 1u;
+    }
+
+    if (strcmp(cmd, "SENSOR_READ") == 0)
+    {
+        handle_sensor_read();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "ADC_READ") == 0)
+    {
+        handle_adc_read();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "HALL_READ") == 0)
+    {
+        handle_hall_read();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "KEY_READ") == 0)
+    {
+        handle_key_read();
+        return 1u;
+    }
+
+    /* Allow DataFlash info/read queries outside REPL; write/erase require REPL */
+    if (strncmp(cmd, "DFLASH_INFO", 11) == 0 || strncmp(cmd, "DFLASH_READ", 11) == 0)
+    {
+        handle_dflash_cmd(cmd);
+        return 1u;
+    }
+
+    return 0u;
+}
+
 uint8_t BleAtRepl_HandleMessage(const char *msg)
 {
     char msg_local[RXBUFSIZE];
@@ -794,46 +842,8 @@ uint8_t BleAtRepl_HandleMessage(const char *msg)
     }
 
     /* --- Commands we allow outside REPL (safe/read-only or explicitly permitted) --- */
-    if (strncmp(cmd, "LED_", 4) == 0)
+    if (handle_safe_or_common_cmd(cmd))
     {
-        handle_led_cmd(cmd);
-        return 1u;
-    }
-
-    if (strncmp(cmd, "BUZZER_", 7) == 0)
-    {
-        handle_buzzer_cmd(cmd);
-        return 1u;
-    }
-
-    if (strcmp(cmd, "SENSOR_READ") == 0)
-    {
-        handle_sensor_read();
-        return 1u;
-    }
-
-    if (strcmp(cmd, "ADC_READ") == 0)
-    {
-        handle_adc_read();
-        return 1u;
-    }
-
-    if (strcmp(cmd, "HALL_READ") == 0)
-    {
-        handle_hall_read();
-        return 1u;
-    }
-
-    if (strcmp(cmd, "KEY_READ") == 0)
-    {
-        handle_key_read();
-        return 1u;
-    }
-
-    /* Allow DataFlash info/read queries outside REPL; write/erase require REPL */
-    if (strncmp(cmd, "DFLASH_INFO", 11) == 0 || strncmp(cmd, "DFLASH_READ", 11) == 0)
-    {
-        handle_dflash_cmd(cmd);
         return 1u;
     }
 
@@ -863,45 +873,14 @@ uint8_t BleAtRepl_HandleMessage(const char *msg)
         return 1u;
     }
 
-    if (strncmp(cmd, "LED_", 4) == 0)
+    if (handle_safe_or_common_cmd(cmd))
     {
-        handle_led_cmd(cmd);
-        return 1u;
-    }
-
-    if (strncmp(cmd, "BUZZER_", 7) == 0)
-    {
-        handle_buzzer_cmd(cmd);
-        return 1u;
-    }
-
-    if (strcmp(cmd, "SENSOR_READ") == 0)
-    {
-        handle_sensor_read();
         return 1u;
     }
 
     if (strncmp(cmd, "SENSOR_STREAM", 13) == 0)
     {
         handle_sensor_stream(cmd);
-        return 1u;
-    }
-
-    if (strcmp(cmd, "ADC_READ") == 0)
-    {
-        handle_adc_read();
-        return 1u;
-    }
-
-    if (strcmp(cmd, "HALL_READ") == 0)
-    {
-        handle_hall_read();
-        return 1u;
-    }
-
-    if (strcmp(cmd, "KEY_READ") == 0)
-    {
-        handle_key_read();
         return 1u;
     }
 

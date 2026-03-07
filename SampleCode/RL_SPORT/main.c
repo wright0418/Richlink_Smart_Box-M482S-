@@ -317,19 +317,6 @@ static void RL_InitBoardInputs(void)
 {
   /* Button, HALL (optional) and G-sensor interrupt input pins + NVIC */
   Gpio_Init();
-  /* If BLE REPL test mode is active, let the REPL module control the LED
-     and avoid reapplying the main blink patterns which would override
-     REPL-driven SetGreenLed()/SetGreenLedMode() calls. */
-  if (Sys_GetReplMode())
-  {
-    DBG_PRINT("[Main] RL_UpdateLedState: REPL active -> skip main LED update\n");
-    return;
-  }
-  if (Sys_GetLedOverride())
-  {
-    DBG_PRINT("[Main] RL_UpdateLedState: LED override active -> skip main LED update\n");
-    return;
-  }
 }
 
 static void RL_InitDrivers(void)
@@ -390,6 +377,19 @@ int main()
   RL_InitSystemCore();
   RL_InitBoardInputs();
 
+  /* If USB charge detected at boot, enter charge-mode loop before
+     initializing drivers or starting the game. In charge mode we keep
+     the power-lock low .
+     This prevents the game from starting while on USB power. */
+  if (g_usb_charge_mode)
+  {
+    DBG_PRINT("[Main] USB charge detected at boot, entering charge mode\n");
+    /* Set power lock low so board will not stay powered when USB removed */
+    PowerMgmt_ChargeModeInit();
+    /* This will block here until USB is removed and charge loop exits */
+    PowerMgmt_RunChargeLoop();
+  }
+
   RL_InitDrivers();
   RL_StartupBeep();
   RL_InitApplication();
@@ -413,27 +413,6 @@ int main()
   while (1)
   {
     uint32_t now = get_ticks_ms();
-
-    if (g_usb_charge_mode)
-    {
-      if (!s_charge_mode_initialized)
-      {
-        GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
-        PB->DOUT |= BIT3;
-        PowerMgmt_ChargeModeInit();
-        s_charge_mode_initialized = 1u;
-      }
-
-      if (!PowerMgmt_ChargeModeProcess())
-      {
-        DBG_PRINT("[Main] USB removed, exit charge mode\n");
-        g_usb_charge_mode = 0u;
-        s_charge_mode_initialized = 0u;
-        PB->DOUT &= ~BIT3;
-        PowerLock_Init();
-      }
-      continue;
-    }
 
     TestMode_PollEnter();
     TestMode_RunMenuIfActive();
