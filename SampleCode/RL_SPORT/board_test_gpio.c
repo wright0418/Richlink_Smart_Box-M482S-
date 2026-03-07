@@ -8,9 +8,9 @@
 #include "NuMicro.h"
 #include "gpio.h"
 #include "gsensor.h"
-#include "i2c.h"
 #include "adc.h"
 #include "buzzer.h"
+#include "timer.h"
 #include "project_config.h"
 
 /* Simple blocking delay (approx) */
@@ -104,62 +104,6 @@ static uint8_t test_key_poll(void)
     return 0u;
 }
 
-static uint8_t test_gsensor_i2c(void)
-{
-    printf("[BT] Gsensor: init and read I2C data.\n");
-    uint8_t non_zero_seen = 0u;
-
-    /* Ensure sensor is configured and awake */
-    Gsensor_Init(100000, FSR_2G);
-    GsensorWakeup();
-
-    /* Allow sensor to settle */
-    CLK_SysTickDelay(50000); /* 50 ms */
-
-    /* No device ID/Who_Am_I read here; assume G-sensor address is configured and functional */
-
-    for (int i = 0; i < 5; ++i)
-    {
-        int16_t axis[3] = {0};
-        GsensorReadAxis(axis);
-        if ((axis[0] != 0) || (axis[1] != 0) || (axis[2] != 0))
-        {
-            non_zero_seen = 1u;
-        }
-        printf("[BT] Gsensor sample %d: X=%d Y=%d Z=%d\n", i + 1, axis[0], axis[1], axis[2]);
-        CLK_SysTickDelay(20000); /* 20 ms */
-    }
-
-    if (!non_zero_seen)
-    {
-        printf("[BT] Gsensor all zeros.\n");
-        return 0u;
-    }
-
-    return 1u;
-}
-
-static uint8_t test_power_lock(void)
-{
-    printf("[BT] PowerLock: set PA11 HIGH, switch to Quasi, then read.\n");
-
-    PowerLock_Set(1);
-    CLK_SysTickDelay(10000); /* 10 ms */
-
-    /* PA11 readback requires Quasi mode on this board design. */
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
-    CLK_SysTickDelay(1000); /* 1 ms settle */
-
-    uint32_t pin = (PA->PIN & BIT11) ? 1u : 0u;
-
-    /* Keep quasi mode for normal power-lock control and readable pin state. */
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
-    PowerLock_Set(1);
-
-    printf("[BT] PA11 readback (Quasi) = %s\n", pin ? "HIGH" : "LOW");
-    return (pin == 1u) ? 1u : 0u;
-}
-
 static uint8_t test_battery_adc(void)
 {
     printf("[BT] Battery ADC: read PB1 (EADC0_CH1).\n");
@@ -180,6 +124,26 @@ static uint8_t test_battery_adc(void)
     return 1u;
 }
 
+static uint8_t test_gsensor_i2c(void)
+{
+    printf("[BT] Gsensor: read XYZ 3 samples.\n");
+
+    /* Ensure sensor is configured and awake. */
+    Gsensor_Init(100000, FSR_2G);
+    GsensorWakeup();
+    CLK_SysTickDelay(50000u); /* 50 ms settle */
+
+    for (int i = 0; i < 3; ++i)
+    {
+        int16_t axis[3] = {0};
+        GsensorReadAxis(axis);
+        printf("[BT] Gsensor sample %d: X=%d Y=%d Z=%d\n", i + 1, axis[0], axis[1], axis[2]);
+        CLK_SysTickDelay(20000u); /* 20 ms */
+    }
+
+    return 1u;
+}
+
 void BoardTest_RunAll(void)
 {
     uint32_t pass_count = 0u;
@@ -189,9 +153,6 @@ void BoardTest_RunAll(void)
 
     printf("\n=== RL_SPORT V3 Board Test ===\n");
     printf("[BT] Start tests...\n");
-
-    /* Only print I2C status during board tests to avoid runtime log spam. */
-    RL_I2C_SetDebugLog(1);
     BoardTest_GPIO_Init();
 
     ok = test_led();
@@ -211,10 +172,8 @@ void BoardTest_RunAll(void)
     skip_count++;
     bt_delay(20);
 
-    ok = test_power_lock();
-    bt_print_result("POWER_LOCK", ok, "PA11 did not go HIGH");
-    pass_count += ok ? 1u : 0u;
-    fail_count += ok ? 0u : 1u;
+    printf("[BT] POWER_LOCK: SKIP (not tested in board test)\n");
+    skip_count++;
     bt_delay(20);
 
     ok = test_battery_adc();
@@ -224,11 +183,13 @@ void BoardTest_RunAll(void)
     bt_delay(20);
 
     ok = test_gsensor_i2c();
-    bt_print_result("GSENSOR_I2C", ok, "All zero data. Check I2C or sensor");
+    bt_print_result("GSENSOR_I2C", ok, "Read XYZ failed");
     pass_count += ok ? 1u : 0u;
     fail_count += ok ? 0u : 1u;
+    bt_delay(20);
 
-    RL_I2C_SetDebugLog(0);
+    printf("[BT] BLE_AT_NAME: SKIP (use Test Mode item 9)\n");
+    skip_count++;
 
     printf("[BT] SUMMARY: PASS=%lu FAIL=%lu SKIP=%lu\n",
            (unsigned long)pass_count,

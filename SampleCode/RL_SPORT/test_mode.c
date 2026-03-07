@@ -10,6 +10,8 @@
 #include "adc.h"
 #include "gpio.h"
 #include "usb_hid_mouse.h"
+#include "ble.h"
+#include "system_status.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;
 
@@ -171,6 +173,101 @@ static void Test_USB(void)
     printf("[Test] USB auto test done\n");
 }
 
+static uint8_t Test_BLE_WaitMode(uint8_t target_mode, uint32_t timeout_ms)
+{
+    uint32_t start = get_ticks_ms();
+    while (!is_timeout(start, timeout_ms))
+    {
+        CheckBleRecvMsg();
+        if (Sys_GetBleMode() == target_mode)
+        {
+            return 1u;
+        }
+        delay_ms(5u);
+    }
+    return 0u;
+}
+
+static uint8_t Test_BLE_SwitchToCmdMode(void)
+{
+    Sys_SetBleMode(0u);
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_DLPS_OFF);
+    delay_ms(60u);
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADVERT_ON);
+    delay_ms(30u);
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_MODE_DATA);
+    (void)Test_BLE_WaitMode(1u, 500u);
+
+    /* Single attempt only: if CMD mode cannot be entered once, fail. */
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_CCMD);
+    return Test_BLE_WaitMode(0u, 700u);
+}
+
+static uint8_t Test_BLE_SwitchToDataMode(void)
+{
+    Sys_SetBleMode(0u);
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_MODE_DATA);
+    return Test_BLE_WaitMode(1u, 400u);
+}
+
+static void Test_BLE_AT_CMD(void)
+{
+    const uint32_t timeout_ms = 1000u;
+    uint32_t start = get_ticks_ms();
+    uint8_t got_name_resp = 0u;
+    uint8_t pass = 0u;
+
+    printf("[Test] BLE AT CMD: query name, expect ROPR_\n");
+
+    if (!Test_BLE_SwitchToCmdMode())
+    {
+        printf("[Test] BLE_AT_CMD FAIL: cannot enter CMD mode after retries\n");
+        return;
+    }
+
+    Sys_SetDeviceName("", 0u);
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_NAME_QUERY);
+
+    while (!is_timeout(start, timeout_ms))
+    {
+        CheckBleRecvMsg();
+
+        const char *name = Sys_GetDeviceName();
+        if (name && name[0] != '\0')
+        {
+            got_name_resp = 1u;
+            printf("[Test] BLE NAME = %s\n", name);
+
+            /* Single read result: one response is enough to decide pass/fail. */
+            if ((strstr(name, "ROPR_") != NULL) || (strstr(name, "ROPE_") != NULL))
+            {
+                pass = 1u;
+            }
+            break;
+        }
+
+        delay_ms(5u);
+    }
+
+    if (pass)
+    {
+        printf("[Test] BLE_AT_CMD PASS\n");
+    }
+    else if (!got_name_resp)
+    {
+        printf("[Test] BLE_AT_CMD FAIL: no name response\n");
+    }
+    else
+    {
+        printf("[Test] BLE_AT_CMD FAIL: name format invalid\n");
+    }
+
+    if (!Test_BLE_SwitchToDataMode())
+    {
+        printf("[Test] WARN: failed to return DATA mode\n");
+    }
+}
+
 static void RunAllTests(void)
 {
     Test_LED();
@@ -193,6 +290,7 @@ static void UART0_TestMenuLoop(void)
     printf("6) ADC PB1\n");
     printf("7) Run all tests\n");
     printf("8) USB FS HID Mouse (auto 5s)\n");
+    printf("9) BLE AT CMD name check\n");
     printf("0) Exit\n");
 
     while (g_uart_test_mode)
@@ -225,6 +323,9 @@ static void UART0_TestMenuLoop(void)
             break;
         case '8':
             Test_USB();
+            break;
+        case '9':
+            Test_BLE_AT_CMD();
             break;
         case '0':
             g_uart_test_mode = 0u;

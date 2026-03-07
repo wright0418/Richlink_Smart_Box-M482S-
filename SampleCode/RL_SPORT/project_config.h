@@ -83,7 +83,7 @@
 /* Board test control
 	0: Do not run BoardTest_RunAll() at boot (default for normal firmware)
 	1: Run BoardTest_RunAll() once at boot */
-#define BOARD_TEST_AUTORUN 0
+#define BOARD_TEST_AUTORUN 1
 
 /* I2C / G-sensor robustness */
 #define I2C_XFER_RETRY_COUNT 3u

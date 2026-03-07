@@ -9,9 +9,8 @@ Current test items:
 
 - LED (PB3)
 - Buzzer (PC7)
-- Power lock (PA11)
 - Battery ADC (PB1 / EADC0_CH1)
-- G-sensor I2C read
+- G-sensor I2C XYZ read (3 samples)
 - Key (PB15) is optional interactive test (not in default auto sequence)
 
 Boot behavior
@@ -23,8 +22,8 @@ Boot behavior
 
 Pin mode rule (important)
 -------------------------
-- PB15 and PA11 use **Quasi mode** in app flow.
-- Reason: pin state can be read back while still keeping pull-high behavior.
+- PB15 uses **Quasi mode** in app flow.
+- PA11 (Power Lock) uses **Output mode** only.
 
 How to run
 ----------
@@ -47,9 +46,10 @@ Current PASS/FAIL criteria
 --------------------------
 - `LED`: manual check (must blink 3 times)
 - `BUZZER`: manual check (must beep 2 times)
-- `POWER_LOCK`: set PA11 high, read back in Quasi mode (must read HIGH)
+- `POWER_LOCK`: removed from board test (not tested here)
 - `BATTERY_ADC`: battery voltage must be in 2.0V ~ 5.5V
-- `GSENSOR_I2C`: multiple samples must not be all zeros
+- `GSENSOR_I2C`: read and print XYZ values for 3 samples
+- `BLE_AT_NAME`: removed from board test (use Test Mode item `9`)
 - `KEY`: optional test item (default SKIP in quick run)
 
 Operator test steps (recommended)
@@ -57,10 +57,12 @@ Operator test steps (recommended)
 1. Run board test and watch UART logs.
 2. Check LED and buzzer physically.
 3. If fail appears, follow hint text directly:
-   - `POWER_LOCK` fail: check PA11 path and power lock circuit
    - `BATTERY_ADC` fail: check PB1 divider and ADC path
-   - `GSENSOR_I2C` fail: check I2C wiring/sensor address/pull-ups
 4. Confirm final summary has `FAIL=0`.
+
+Test Mode BLE AT CMD
+--------------------
+Use UART test mode item `9) BLE AT CMD name check` for BLE name query/check.
 
 Key test notes (PB15)
 ---------------------

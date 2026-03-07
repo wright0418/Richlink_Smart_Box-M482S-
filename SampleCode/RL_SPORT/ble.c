@@ -78,7 +78,9 @@ static const struct
     {BLE_CMD_SET_END, "set end"},
     {BLE_CMD_DISC_MSG, "disc"},
     {BLE_CMD_MAC_ADDR, "MAC_ADDR"},
-    {BLE_CMD_DEVICE_NAME, "DEVICE_NAME"}};
+    {BLE_CMD_MAC_ADDR, "ADDR"},
+    {BLE_CMD_DEVICE_NAME, "DEVICE_NAME"},
+    {BLE_CMD_DEVICE_NAME, "NAME"}};
 
 static size_t BLE_TrimLineLen(const char *src, size_t len)
 {
@@ -381,6 +383,7 @@ typedef struct
   uint8_t active;
   uint8_t done;
   uint8_t need_rename;
+  uint8_t ccmd_retry;
   uint32_t state_enter_ms;
   BleRenameState state;
   char mac_suffix[5];
@@ -453,6 +456,24 @@ static uint8_t Ble_HasValidRopeSuffix(const char *name)
   return 1u;
 }
 
+static uint8_t Ble_IsNameQueryEcho(const char *s)
+{
+  if (!s)
+  {
+    return 0u;
+  }
+  return (uint8_t)(strstr(s, "AT+NAME=?") != NULL);
+}
+
+static uint8_t Ble_IsAddrQueryEcho(const char *s)
+{
+  if (!s)
+  {
+    return 0u;
+  }
+  return (uint8_t)(strstr(s, "AT+ADDR=?") != NULL);
+}
+
 void Ble_RenameFlow(uint8_t *device_name, uint8_t *mac)
 {
   /* Backward-compatible wrapper: run non-blocking flow with bounded wait. */
@@ -483,10 +504,13 @@ void Ble_RenameFlowStart(void)
   s_rename.active = 1u;
   s_rename.done = 0u;
   s_rename.need_rename = 0u;
+  s_rename.ccmd_retry = 0u;
   s_rename.state = BLE_RENAME_SEND_CCMD;
   s_rename.state_enter_ms = get_ticks_ms();
   s_rename.mac_suffix[0] = '\0';
 
+  /* Force WAIT_CCMD to rely on fresh BLE reply instead of stale mode value. */
+  g_sys.ble_mode = 1u;
   g_sys.mac_addr[0] = '\0';
   g_sys.device_name[0] = '\0';
 }
@@ -514,10 +538,25 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_WAIT_CCMD:
-    if ((Sys_GetBleMode() == 0) || is_timeout(s_rename.state_enter_ms, 200u))
+    if (Sys_GetBleMode() == 0)
     {
       s_rename.state = BLE_RENAME_SEND_NAME_QUERY;
       s_rename.state_enter_ms = now;
+    }
+    else if (is_timeout(s_rename.state_enter_ms, 400u))
+    {
+      if (s_rename.ccmd_retry == 0u)
+      {
+        s_rename.ccmd_retry = 1u;
+        s_rename.state = BLE_RENAME_SEND_CCMD;
+        s_rename.state_enter_ms = now;
+      }
+      else
+      {
+        /* Continue to query flow even without explicit mode ACK. */
+        s_rename.state = BLE_RENAME_SEND_NAME_QUERY;
+        s_rename.state_enter_ms = now;
+      }
     }
     break;
 
@@ -529,8 +568,14 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_WAIT_NAME:
-    if (strlen((const char *)Sys_GetDeviceName()) > 0u || is_timeout(s_rename.state_enter_ms, 300u))
+    if (strlen((const char *)Sys_GetDeviceName()) > 0u)
     {
+      if (Ble_IsNameQueryEcho(Sys_GetDeviceName()))
+      {
+        g_sys.device_name[0] = '\0';
+        break;
+      }
+
       uint8_t has_valid_rope = Ble_HasValidRopeSuffix(Sys_GetDeviceName());
       s_rename.need_rename = (uint8_t)(!has_valid_rope);
       if (s_rename.need_rename)
@@ -543,6 +588,13 @@ void Ble_RenameFlowProcess(void)
       }
       s_rename.state_enter_ms = now;
     }
+    else if (is_timeout(s_rename.state_enter_ms, 300u))
+    {
+      /* No valid name response in time -> continue with rename path. */
+      s_rename.need_rename = 1u;
+      s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
+      s_rename.state_enter_ms = now;
+    }
     break;
 
   case BLE_RENAME_SEND_ADDR_QUERY:
@@ -553,8 +605,14 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_WAIT_ADDR:
-    if (strlen((const char *)Sys_GetMacAddr()) > 0u || is_timeout(s_rename.state_enter_ms, 400u))
+    if (strlen((const char *)Sys_GetMacAddr()) > 0u)
     {
+      if (Ble_IsAddrQueryEcho(Sys_GetMacAddr()))
+      {
+        g_sys.mac_addr[0] = '\0';
+        break;
+      }
+
       uint8_t has_suffix = Ble_ExtractMacSuffix4(Sys_GetMacAddr(), s_rename.mac_suffix);
       if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
       {
@@ -566,12 +624,18 @@ void Ble_RenameFlowProcess(void)
       if (has_suffix)
       {
         s_rename.state = BLE_RENAME_SEND_SET_NAME;
+        s_rename.state_enter_ms = now;
       }
       else
       {
-        DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
-        s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+        /* Response arrived but not parseable yet, keep waiting until timeout. */
+        g_sys.mac_addr[0] = '\0';
       }
+    }
+    else if (is_timeout(s_rename.state_enter_ms, 400u))
+    {
+      DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
+      s_rename.state = BLE_RENAME_SEND_MODE_DATA;
       s_rename.state_enter_ms = now;
     }
     break;

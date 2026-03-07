@@ -64,7 +64,7 @@ static void Board_ConfigUartPins(void)
 static void Board_ConfigPowerPins(void)
 {
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk | SYS_GPA_MFPH_PA12MFP_Msk);
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
 }
 
 void Board_ConfigMultiFuncPins(void)
@@ -84,8 +84,8 @@ void Board_ReleaseIOPD(void)
 
 void PowerLock_Init(void)
 {
-    /* Configure PA11 as quasi mode and assert lock (high). */
-    GPIO_SetMode(PA, BIT11, GPIO_MODE_QUASI);
+    /* Configure PA11 as output mode and assert lock (high). */
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
     PA->DOUT |= BIT11;
 }
 
