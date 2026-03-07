@@ -76,15 +76,15 @@ AT+MDTS 0 01501234ABCD????
 ```python
 #!/usr/bin/env python3
 def modbus_crc16(data):
-    crc = 0xFFFF
-    for byte in data:
-        crc ^= byte
-        for _ in range(8):
-            if crc & 0x0001:
-                crc = (crc >> 1) ^ 0xA001
-            else:
-                crc >>= 1
-    return crc
+		crc = 0xFFFF
+		for byte in data:
+				crc ^= byte
+				for _ in range(8):
+						if crc & 0x0001:
+								crc = (crc >> 1) ^ 0xA001
+						else:
+								crc >>= 1
+		return crc
 
 # 使用範例
 request = bytes.fromhex("0101000000010")
@@ -198,23 +198,23 @@ Read Device ID (0x2B):
 #### 問題：Timeout 無回應
 - **原因**：從站未回應或地址錯誤
 - **解決**：
-  1. 檢查從站地址
-  2. 確認波特率匹配
-  3. 檢查 RS485 硬體連線
+	1. 檢查從站地址
+	2. 確認波特率匹配
+	3. 檢查 RS485 硬體連線
 
 #### 問題：Raw 模式回應長度錯誤
 - **原因**：回應格式不含 byte_count 欄位
 - **解決**：
-  1. 查閱設備手冊確認回應格式
-  2. 可能需要修改 client 的長度偵測邏輯
-  3. 或在已知功能碼列表中新增專用 API
+	1. 查閱設備手冊確認回應格式
+	2. 可能需要修改 client 的長度偵測邏輯
+	3. 或在已知功能碼列表中新增專用 API
 
 ## 進階測試案例
 
 ### 連續多功能碼測試
 ```bash
 # 1. Read Holding (0x03)
-AT+MDTS 0 010300000002C40B
+AT+MDTS 0 0103000000010C0D
 
 # 2. Write Single (0x06)
 AT+MDTS 0 010600010003DA0A
@@ -233,8 +233,8 @@ AT+MDTS 0 012B0E010000????
 ```bash
 # 快速連續發送（測試緩衝與互斥）
 for i in {1..10}; do
-  AT+MDTS 0 0103000000010C0D
-  sleep 0.5
+	AT+MDTS 0 0103000000010C0D
+	sleep 0.5
 done
 ```
 
@@ -262,7 +262,41 @@ AT+MDTS 0 82760100001
 | 0x41-0x7F (自訂) | Raw 透傳 | 完整透傳 | 依廠商定義 |
 | Exception | 自動處理 | CRC 驗證 | 5 bytes 固定 |
 
-## 參考資料
-- Modbus Application Protocol V1.1b3
-- `MODBUS_RTU_AGENT_EXTENDED.md` - 完整功能說明
-- `modbus_rtu/README.md` - Client API 文件
+## 除錯建議
+
+### 1. 啟用詳細日誌
+- 查看 LED 指示：
+- 黃燈閃 1 次：收到新 Mesh request
+- 黃燈閃 3 次：成功發送 MODBUS request
+- 黃燈閃 2 次 + 紅燈：MODBUS 錯誤/timeout
+- 紅燈持續：Agent 初始化失敗
+
+### 2. 檢查 UART 波形
+- 使用邏輯分析儀監控 RS485：
+- 確認 TX 封包正確
+- 檢查 RX 回應格式
+- 驗證 CRC 正確性
+
+### 3. 模擬從站回應
+- 使用 Modbus Slave Simulator：
+- 配置虛擬從站 (address=1)
+- 啟用所有功能碼
+- 觀察實際回應格式
+
+## 進階測試案例
+
+下面列出與本專案相關的進階測試與建議：
+
+- 混合 RL / Bypass 長時間壓力測試（連續發送、不同功能碼混合），驗證 buffer 與互斥邏輯。
+- 使用 Modbus Slave Simulator 驗證 Raw 模式在各種非標準回應下的長度偵測邏輯。
+- 測試 RL GET/SET（本地處理）以確認 GET/SET 不會觸發 Modbus 路徑。
+
+參考文件：
+
+- `docs/SampleCode/Smart_Box/MODBUS_RTU_AGENT_EXTENDED.md`（功能擴充與設計細節）
+- `docs/IMPLEMENTATION_NOTES.md`（專案整體實作說明與注意事項）
+
+----
+
+此文件已完成。如需加入更具體的測試腳本或自動化測試步驟，我可以幫你新增 `tests/` 下的範例腳本（例如 Python 或 shell），或生成一份簡短的測試清單供 CI 使用。
+
