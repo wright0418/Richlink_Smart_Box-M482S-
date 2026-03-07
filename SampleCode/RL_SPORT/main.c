@@ -356,6 +356,9 @@ int main()
 
   if (g_usb_charge_mode)
   {
+    // charge mode LED on and run charge loop (blocking until power cut)
+    GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
+    PB->DOUT |= BIT3;
     PowerMgmt_RunChargeLoop();
   }
 

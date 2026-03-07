@@ -171,6 +171,10 @@ uint8_t PowerMgmt_DetectUsbCharge(void)
 
 void PowerMgmt_RunChargeLoop(void)
 {
+    /* 在 LDROM 已經將  Power lock 設定為 High 為了可以進入 APROM 正常run code
+        為了USB 充電被移除之後可以自動關機，需要將 power lock 關閉，讓 PA11 變為 low */
+
+    PA->DOUT &= ~BIT11; // Clear power lock to allow charging
     while (1)
     {
         /* USB charging auto-boot mode: no power lock, no game */

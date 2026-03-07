@@ -69,11 +69,11 @@
 #define MOVEMENT_MAG_TOLERANCE_G 0.4f	  /* magnitude deviation from 1g considered stable (relaxed for sensor calibration) */
 
 /* Battery ADC configuration (PB1 -> EADC0_CH1)
-	Assumptions: Vref=3.0V, divider=1/2 (ADC=BAT/2) */
-#define ADC_VREF_V 3.0f
+	Assumptions: Vref=4.0V, divider=1/2 (ADC=BAT/2) */
+#define ADC_VREF_V 3.3f
 #define ADC_FULL_SCALE 4095.0f
 #define ADC_DIVIDER_RATIO 0.5f
-#define ADC_BATT_LOW_V 3.6f
+#define ADC_BATT_LOW_V 3.0f
 #define ADC_BATT_AVG_SAMPLES 4u
 #define ADC_CONV_TIMEOUT 10000u
 #define LOW_BATT_CHECK_INTERVAL_MS 1000u

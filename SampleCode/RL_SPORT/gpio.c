@@ -64,6 +64,7 @@ static void Board_ConfigUartPins(void)
 static void Board_ConfigPowerPins(void)
 {
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk | SYS_GPA_MFPH_PA12MFP_Msk);
+    GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
 }
 
 void Board_ConfigMultiFuncPins(void)
@@ -104,6 +105,7 @@ void USBDetect_Init(void)
 {
     /* Configure PA12 as input for USB charge detect */
     GPIO_SetMode(PA, BIT12, GPIO_MODE_INPUT);
+    GPIO_SetPullCtl(PA, BIT12, GPIO_PUSEL_PULL_DOWN);
 }
 
 uint8_t USBDetect_IsHigh(void)
