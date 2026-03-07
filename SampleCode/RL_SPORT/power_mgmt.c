@@ -169,13 +169,44 @@ uint8_t PowerMgmt_DetectUsbCharge(void)
     return USBDetect_IsHigh();
 }
 
-void PowerMgmt_RunChargeLoop(void)
+void PowerMgmt_ChargeModeInit(void)
 {
     /* 在 LDROM 已經將  Power lock 設定為 High 為了可以進入 APROM 正常run code
-        為了USB 充電被移除之後可以自動關機，需要將 power lock 關閉，讓 PA11 變為 low */
+       為了USB 充電被移除之後可以自動關機，需要將 power lock 關閉，讓 PA11 變為 low */
+    PA->DOUT &= ~BIT11;
+}
 
-    PA->DOUT &= ~BIT11; // Clear power lock to allow charging
-    while (1)
+uint8_t PowerMgmt_ChargeModeProcess(void)
+{
+    static uint32_t s_usb_low_start = 0u;
+
+    if (USBDetect_IsHigh())
+    {
+        s_usb_low_start = 0u;
+        __WFI();
+        return 1u;
+    }
+
+    if (s_usb_low_start == 0u)
+    {
+        s_usb_low_start = get_ticks_ms();
+        return 1u;
+    }
+
+    /* USB low stable for 100ms => exit charge mode */
+    if (!is_timeout(s_usb_low_start, 100u))
+    {
+        return 1u;
+    }
+
+    s_usb_low_start = 0u;
+    return 0u;
+}
+
+void PowerMgmt_RunChargeLoop(void)
+{
+    PowerMgmt_ChargeModeInit();
+    while (PowerMgmt_ChargeModeProcess())
     {
         /* USB charging auto-boot mode: no power lock, no game */
     }

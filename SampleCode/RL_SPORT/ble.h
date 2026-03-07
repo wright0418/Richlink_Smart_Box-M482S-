@@ -135,6 +135,27 @@ void BLESetName(const char *name);
  */
 void Ble_RenameFlow(uint8_t *device_name, uint8_t *mac);
 
+/**
+ * @brief Start non-blocking BLE rename flow.
+ *
+ * The flow runs as a small state machine and must be progressed by
+ * periodically calling Ble_RenameFlowProcess() from main loop.
+ */
+void Ble_RenameFlowStart(void);
+
+/**
+ * @brief Progress non-blocking BLE rename flow state machine.
+ *
+ * Call this periodically from main loop after BLE transport is initialized.
+ */
+void Ble_RenameFlowProcess(void);
+
+/**
+ * @brief Query whether non-blocking BLE rename flow has completed.
+ * @return 1 if completed (success or skipped), 0 otherwise.
+ */
+uint8_t Ble_RenameFlowIsDone(void);
+
 /* Mode/connection helpers */
 /** Switch BLE link to disconnected state (soft disconnect). */
 void BLEDisconnect(void);

@@ -80,4 +80,15 @@ uint8_t PowerMgmt_DetectUsbCharge(void);
  */
 void PowerMgmt_RunChargeLoop(void);
 
+/**
+ * @brief Initialize charge mode behavior (release power lock, prepare pins).
+ */
+void PowerMgmt_ChargeModeInit(void);
+
+/**
+ * @brief Process one step of charge mode.
+ * @return 1 while charge mode should continue, 0 when charge mode should exit.
+ */
+uint8_t PowerMgmt_ChargeModeProcess(void);
+
 #endif // _POWER_MGMT_H_

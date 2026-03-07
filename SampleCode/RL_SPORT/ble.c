@@ -44,6 +44,9 @@ void *memcpy(void *dest, const void *src, size_t n);
 volatile uint8_t g_u8RecData[RXBUFSIZE] = {0};
 volatile uint32_t g_u32RecLen = 0;
 volatile uint8_t g_u8DataReady = 0;
+static volatile uint8_t s_uart_line_buf[RXBUFSIZE] = {0};
+static volatile uint32_t s_uart_line_len = 0;
+static volatile uint8_t s_uart_line_overflow = 0;
 
 /* BLE command enum and table (moved from main.c) */
 typedef enum
@@ -131,16 +134,38 @@ void UART1_IRQHandler(void)
 
       if (u8InChar == '\n')
       {
-        g_u8RecData[g_u32RecLen] = '\0';
-        g_u8DataReady = 1;
+        if (!g_u8DataReady)
+        {
+          uint32_t copy_len = s_uart_line_len;
+          if (copy_len >= RXBUFSIZE)
+          {
+            copy_len = RXBUFSIZE - 1u;
+          }
+
+          for (uint32_t i = 0; i < copy_len; i++)
+          {
+            g_u8RecData[i] = s_uart_line_buf[i];
+          }
+          g_u8RecData[copy_len] = '\0';
+          g_u32RecLen = copy_len;
+          g_u8DataReady = 1;
+        }
+
+        s_uart_line_len = 0;
+        s_uart_line_overflow = 0;
         break;
       }
 
-      g_u8RecData[g_u32RecLen] = u8InChar;
-      g_u32RecLen++;
-      if (g_u32RecLen >= RXBUFSIZE)
+      if (!s_uart_line_overflow)
       {
-        g_u32RecLen = 0;
+        if (s_uart_line_len < (RXBUFSIZE - 1u))
+        {
+          s_uart_line_buf[s_uart_line_len++] = u8InChar;
+        }
+        else
+        {
+          s_uart_line_overflow = 1u;
+        }
       }
     }
   }
@@ -151,14 +176,37 @@ void UART1_IRQHandler(void)
   }
 }
 
-void receiveData(volatile uint8_t **recData)
+static uint8_t BLE_TakeMessageSnapshot(char *dst, size_t dst_size)
 {
+  if (!dst || dst_size == 0u)
+  {
+    return 0u;
+  }
+
+  uint8_t has_data = 0u;
+
+  __disable_irq();
   if (g_u8DataReady)
   {
-    *recData = g_u8RecData;
+    size_t copy_len = (size_t)g_u32RecLen;
+    if (copy_len >= dst_size)
+    {
+      copy_len = dst_size - 1u;
+    }
+
+    for (size_t i = 0u; i < copy_len; i++)
+    {
+      dst[i] = (char)g_u8RecData[i];
+    }
+    dst[copy_len] = '\0';
+
     g_u8DataReady = 0;
     g_u32RecLen = 0;
+    has_data = 1u;
   }
+  __enable_irq();
+
+  return has_data;
 }
 
 int BLE_UART_SEND(void *uart, const char *format, ...)
@@ -179,17 +227,16 @@ int BLE_UART_SEND(void *uart, const char *format, ...)
 
 void CheckBleRecvMsg(void)
 {
-  volatile uint8_t *pRecData, i;
-  volatile uint8_t **ppRecData = &pRecData;
-  if (g_u8DataReady)
-  {
-    receiveData(ppRecData);
+  char msg[RXBUFSIZE];
+  uint8_t i;
 
+  if (BLE_TakeMessageSnapshot(msg, sizeof(msg)))
+  {
 #if DEBUG
-    printf("[DEBUG] Received: %s\n", pRecData);
+    printf("[DEBUG] Received: %s\n", msg);
 #endif
 
-    BleCmdType cmdType = BLEParseCommand((const char *)pRecData);
+    BleCmdType cmdType = BLEParseCommand((const char *)msg);
     switch (cmdType)
     {
     case BLE_CMD_CONNECTED:
@@ -234,21 +281,21 @@ void CheckBleRecvMsg(void)
       break;
     case BLE_CMD_MAC_ADDR:
     {
-      size_t len = strlen((const char *)pRecData);
-      len = BLE_TrimLineLen((const char *)pRecData, len);
+      size_t len = strlen((const char *)msg);
+      len = BLE_TrimLineLen((const char *)msg, len);
       if (len > 0u)
       {
-        BLE_CopyClamp(g_sys.mac_addr, sizeof(g_sys.mac_addr), (const char *)pRecData, len);
+        BLE_CopyClamp(g_sys.mac_addr, sizeof(g_sys.mac_addr), (const char *)msg, len);
       }
     }
     break;
     case BLE_CMD_DEVICE_NAME:
     {
-      size_t len = strlen((const char *)pRecData);
-      len = BLE_TrimLineLen((const char *)pRecData, len);
+      size_t len = strlen((const char *)msg);
+      len = BLE_TrimLineLen((const char *)msg, len);
       if (len > 0u)
       {
-        BLE_CopyClamp(g_sys.device_name, sizeof(g_sys.device_name), (const char *)pRecData, len);
+        BLE_CopyClamp(g_sys.device_name, sizeof(g_sys.device_name), (const char *)msg, len);
       }
     }
     break;
@@ -311,6 +358,35 @@ void BleSetup(void)
 }
 
 /* ---- BLE rename flow helpers (moved from main.c) ---- */
+
+typedef enum
+{
+  BLE_RENAME_IDLE = 0,
+  BLE_RENAME_SEND_CCMD,
+  BLE_RENAME_WAIT_CCMD,
+  BLE_RENAME_SEND_NAME_QUERY,
+  BLE_RENAME_WAIT_NAME,
+  BLE_RENAME_SEND_ADDR_QUERY,
+  BLE_RENAME_WAIT_ADDR,
+  BLE_RENAME_SEND_SET_NAME,
+  BLE_RENAME_WAIT_SET_NAME,
+  BLE_RENAME_SEND_REBOOT,
+  BLE_RENAME_WAIT_REBOOT,
+  BLE_RENAME_SEND_MODE_DATA,
+  BLE_RENAME_DONE
+} BleRenameState;
+
+typedef struct
+{
+  uint8_t active;
+  uint8_t done;
+  uint8_t need_rename;
+  uint32_t state_enter_ms;
+  BleRenameState state;
+  char mac_suffix[5];
+} BleRenameFlowCtx;
+
+static BleRenameFlowCtx s_rename = {0};
 
 static uint8_t Ble_IsHexChar(char c)
 {
@@ -379,69 +455,168 @@ static uint8_t Ble_HasValidRopeSuffix(const char *name)
 
 void Ble_RenameFlow(uint8_t *device_name, uint8_t *mac)
 {
-  delay_ms(200);
-  BLE_UART_SEND(UART1, BLE_CMD_CCMD);
-  delay_ms(200);
-  CheckBleRecvMsg();
-  BLE_UART_SEND(UART1, BLE_CMD_NAME_QUERY);
-  delay_ms(20);
-  CheckBleRecvMsg();
-
-  DBG_PRINT("[BLE] name raw: '%s'\r\n", Sys_GetDeviceName());
-
-  memcpy(device_name, (const void *)&Sys_GetDeviceName()[12], 4);
-  device_name[4] = '\0';
-  DBG_PRINT("name = %s\r\n", device_name);
-
-  uint8_t has_valid_rope = Ble_HasValidRopeSuffix(Sys_GetDeviceName());
-  DBG_PRINT("[BLE] rope suffix valid: %u\r\n", has_valid_rope);
-
-  if (!has_valid_rope)
+  /* Backward-compatible wrapper: run non-blocking flow with bounded wait. */
+  uint32_t start = get_ticks_ms();
+  Ble_RenameFlowStart();
+  while (!Ble_RenameFlowIsDone() && !is_timeout(start, 2000u))
   {
-    DBG_PRINT("rename %s\n", device_name);
-    BLE_UART_SEND(UART1, BLE_CMD_ADDR_QUERY);
-    for (uint8_t retry = 0u; retry < 10u; retry++)
-    {
-      delay_ms(20);
-      CheckBleRecvMsg();
-      if (strlen((const char *)Sys_GetMacAddr()) > 0u)
-      {
-        break;
-      }
-    }
-    DBG_PRINT("[BLE] addr raw: '%s'\n", Sys_GetMacAddr());
-
-    char mac_suffix[5];
-    uint8_t has_suffix = Ble_ExtractMacSuffix4(Sys_GetMacAddr(), mac_suffix);
-    if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
-    {
-      memcpy(mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4);
-      mac_suffix[4] = '\0';
-      has_suffix = 1u;
-    }
-
-    DBG_PRINT("[BLE] mac suffix: '%s' (valid=%u)\n", mac_suffix, has_suffix);
-
-    if (has_suffix)
-    {
-      memcpy(mac, mac_suffix, 4);
-      mac[4] = '\0';
-      DBG_PRINT("MAC address: %s \n", mac);
-      BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", mac);
-    }
-    else
-    {
-      DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
-    }
-    delay_ms(500);
     CheckBleRecvMsg();
-    BLE_UART_SEND(UART1, BLE_CMD_REBOOT);
-    delay_ms(500);
-    CheckBleRecvMsg();
+    Ble_RenameFlowProcess();
+    delay_ms(5u);
   }
-  BLE_UART_SEND(UART1, BLE_CMD_MODE_DATA);
-  delay_ms(200);
-  DBG_PRINT("rename OK\n");
+
+  if (device_name)
+  {
+    memcpy(device_name, (const void *)s_rename.mac_suffix, 4u);
+    device_name[4] = '\0';
+  }
+  if (mac)
+  {
+    memcpy(mac, (const void *)s_rename.mac_suffix, 4u);
+    mac[4] = '\0';
+  }
+}
+
+void Ble_RenameFlowStart(void)
+{
+  memset((void *)&s_rename, 0, sizeof(s_rename));
+  s_rename.active = 1u;
+  s_rename.done = 0u;
+  s_rename.need_rename = 0u;
+  s_rename.state = BLE_RENAME_SEND_CCMD;
+  s_rename.state_enter_ms = get_ticks_ms();
+  s_rename.mac_suffix[0] = '\0';
+
+  g_sys.mac_addr[0] = '\0';
+  g_sys.device_name[0] = '\0';
+}
+
+uint8_t Ble_RenameFlowIsDone(void)
+{
+  return s_rename.done;
+}
+
+void Ble_RenameFlowProcess(void)
+{
+  if (!s_rename.active || s_rename.done)
+  {
+    return;
+  }
+
+  uint32_t now = get_ticks_ms();
+
+  switch (s_rename.state)
+  {
+  case BLE_RENAME_SEND_CCMD:
+    BLE_UART_SEND(UART1, BLE_CMD_CCMD);
+    s_rename.state = BLE_RENAME_WAIT_CCMD;
+    s_rename.state_enter_ms = now;
+    break;
+
+  case BLE_RENAME_WAIT_CCMD:
+    if ((Sys_GetBleMode() == 0) || is_timeout(s_rename.state_enter_ms, 200u))
+    {
+      s_rename.state = BLE_RENAME_SEND_NAME_QUERY;
+      s_rename.state_enter_ms = now;
+    }
+    break;
+
+  case BLE_RENAME_SEND_NAME_QUERY:
+    g_sys.device_name[0] = '\0';
+    BLE_UART_SEND(UART1, BLE_CMD_NAME_QUERY);
+    s_rename.state = BLE_RENAME_WAIT_NAME;
+    s_rename.state_enter_ms = now;
+    break;
+
+  case BLE_RENAME_WAIT_NAME:
+    if (strlen((const char *)Sys_GetDeviceName()) > 0u || is_timeout(s_rename.state_enter_ms, 300u))
+    {
+      uint8_t has_valid_rope = Ble_HasValidRopeSuffix(Sys_GetDeviceName());
+      s_rename.need_rename = (uint8_t)(!has_valid_rope);
+      if (s_rename.need_rename)
+      {
+        s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
+      }
+      else
+      {
+        s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+      }
+      s_rename.state_enter_ms = now;
+    }
+    break;
+
+  case BLE_RENAME_SEND_ADDR_QUERY:
+    g_sys.mac_addr[0] = '\0';
+    BLE_UART_SEND(UART1, BLE_CMD_ADDR_QUERY);
+    s_rename.state = BLE_RENAME_WAIT_ADDR;
+    s_rename.state_enter_ms = now;
+    break;
+
+  case BLE_RENAME_WAIT_ADDR:
+    if (strlen((const char *)Sys_GetMacAddr()) > 0u || is_timeout(s_rename.state_enter_ms, 400u))
+    {
+      uint8_t has_suffix = Ble_ExtractMacSuffix4(Sys_GetMacAddr(), s_rename.mac_suffix);
+      if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
+      {
+        memcpy(s_rename.mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4u);
+        s_rename.mac_suffix[4] = '\0';
+        has_suffix = 1u;
+      }
+
+      if (has_suffix)
+      {
+        s_rename.state = BLE_RENAME_SEND_SET_NAME;
+      }
+      else
+      {
+        DBG_PRINT("[BLE] WARN: MAC suffix not found, skip rename\n");
+        s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+      }
+      s_rename.state_enter_ms = now;
+    }
+    break;
+
+  case BLE_RENAME_SEND_SET_NAME:
+    BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", s_rename.mac_suffix);
+    s_rename.state = BLE_RENAME_WAIT_SET_NAME;
+    s_rename.state_enter_ms = now;
+    break;
+
+  case BLE_RENAME_WAIT_SET_NAME:
+    if (is_timeout(s_rename.state_enter_ms, 200u))
+    {
+      s_rename.state = BLE_RENAME_SEND_REBOOT;
+      s_rename.state_enter_ms = now;
+    }
+    break;
+
+  case BLE_RENAME_SEND_REBOOT:
+    BLE_UART_SEND(UART1, BLE_CMD_REBOOT);
+    s_rename.state = BLE_RENAME_WAIT_REBOOT;
+    s_rename.state_enter_ms = now;
+    break;
+
+  case BLE_RENAME_WAIT_REBOOT:
+    if (is_timeout(s_rename.state_enter_ms, 500u))
+    {
+      s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+      s_rename.state_enter_ms = now;
+    }
+    break;
+
+  case BLE_RENAME_SEND_MODE_DATA:
+    BLE_UART_SEND(UART1, BLE_CMD_MODE_DATA);
+    s_rename.state = BLE_RENAME_DONE;
+    s_rename.state_enter_ms = now;
+    DBG_PRINT("rename flow done\n");
+    break;
+
+  case BLE_RENAME_DONE:
+  default:
+    s_rename.done = 1u;
+    s_rename.active = 0u;
+    break;
+  }
 }
 
 void Ble_Init(uint32_t baud)

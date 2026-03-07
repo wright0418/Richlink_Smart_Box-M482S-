@@ -38,6 +38,9 @@ static uint32_t s_last_batt_check_time = 0;
 static uint8_t s_low_batt = 0;
 static uint8_t s_poweroff_done = 0;
 static uint32_t s_last_usb_update = 0;
+static uint8_t s_ble_rename_started = 0u;
+static uint8_t s_ble_rename_done = 0u;
+static uint8_t s_charge_mode_initialized = 0u;
 
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
 {
@@ -349,18 +352,9 @@ static void RL_InitApplication(void)
 int main()
 {
   int16_t axis[3];
-  uint8_t mac[5], device_name[5];
 
   RL_InitSystemCore();
   RL_InitBoardInputs();
-
-  if (g_usb_charge_mode)
-  {
-    // charge mode LED on and run charge loop (blocking until power cut)
-    GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
-    PB->DOUT |= BIT3;
-    PowerMgmt_RunChargeLoop();
-  }
 
   RL_InitDrivers();
   RL_InitApplication();
@@ -374,14 +368,33 @@ int main()
 
   DBG_PRINT("System Up\n");
   BLEToRunMode();
-// for make BLE setting NAME + MacAddr
-#if 1
-  Ble_RenameFlow(device_name, mac);
-#endif
+  Ble_RenameFlowStart();
+  s_ble_rename_started = 1u;
 
   while (1)
   {
     uint32_t now = get_ticks_ms();
+
+    if (g_usb_charge_mode)
+    {
+      if (!s_charge_mode_initialized)
+      {
+        GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
+        PB->DOUT |= BIT3;
+        PowerMgmt_ChargeModeInit();
+        s_charge_mode_initialized = 1u;
+      }
+
+      if (!PowerMgmt_ChargeModeProcess())
+      {
+        DBG_PRINT("[Main] USB removed, exit charge mode\n");
+        g_usb_charge_mode = 0u;
+        s_charge_mode_initialized = 0u;
+        PB->DOUT &= ~BIT3;
+        PowerLock_Init();
+      }
+      continue;
+    }
 
     TestMode_PollEnter();
     TestMode_RunMenuIfActive();
@@ -394,6 +407,12 @@ int main()
         UsbHidMouse_TestUpdate();
       }
       continue;
+    }
+
+    if (s_ble_rename_started && !s_ble_rename_done)
+    {
+      Ble_RenameFlowProcess();
+      s_ble_rename_done = Ble_RenameFlowIsDone();
     }
 
 #if USE_GSENSOR_JUMP_DETECT

@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
