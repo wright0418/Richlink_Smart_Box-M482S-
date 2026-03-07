@@ -258,7 +258,7 @@ void SaveCalibrationToFlash(const CalibrationData *data)
     FMC_Erase(CALIB_DATA_ADDR);
     FMC_Write(CALIB_DATA_ADDR, *(uint32_t*)&data->baseline_magnitude);
     FMC_Write(CALIB_DATA_ADDR + 4, *(uint32_t*)&data->dynamic_threshold);
-    /* ... 其他欄位 */
+    /* 其他欄位（例如校正向量、標準差等）依序寫入 */
     
     FMC_DISABLE_AP_UPDATE();
     FMC_Close();
@@ -285,7 +285,11 @@ if (strstr(buffer, "calib start") != NULL)
 /* In timer.c */
 #if USE_GSENSOR_JUMP_DETECT
     uint8_t interval = (Sys_GetGameState() == GAME_START) ? 20 : 100;  /* 50Hz or 10Hz */
-    if (g_gsensor_sample_counter >= interval) { /* ... */ }
+    if (g_gsensor_sample_counter >= interval) {
+      /* 處理已達採樣間隔：讀取 sensor 資料、執行 FIR、峰值偵測並更新計數 */
+      g_gsensor_sample_counter = 0;
+      /* 具體實作在 jump_detect.c 的 JumpDetect_ProcessSample() 中 */
+    }
 #endif
 ```
 
