@@ -94,6 +94,9 @@
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
 #define USE_GSENSOR_JUMP_DETECT 0
 
+/* BLE AT REPL test mode (isolated from game BLE protocol) */
+#define USE_BLE_AT_REPL 1
+
 /* Delayed stationary calibration configuration */
 #define GS_CAL_START_DELAY_MS 3000u
 #define GS_CAL_STABLE_REQUIRED_MS 800u

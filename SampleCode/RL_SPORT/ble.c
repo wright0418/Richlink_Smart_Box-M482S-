@@ -34,6 +34,7 @@ void *memcpy(void *dest, const void *src, size_t n);
 #endif
 
 #include "ble.h"
+#include "ble_at_repl.h"
 #include "system_status.h"
 #include "buzzer.h"
 #include "led.h"
@@ -237,6 +238,24 @@ void CheckBleRecvMsg(void)
 #if DEBUG
     printf("[DEBUG] Received: %s\n", msg);
 #endif
+
+    /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
+       which may appear anywhere in the received line (echoes, concatenated
+       fragments). Treat all occurrences as noise and strip them out so the
+       AT payload is parsed cleanly. */
+    {
+      char *p = NULL;
+      while ((p = strstr(msg, BLE_CMD_CCMD)) != NULL)
+      {
+        size_t tail_len = strlen(p + strlen(BLE_CMD_CCMD));
+        memmove(p, p + strlen(BLE_CMD_CCMD), tail_len + 1); /* include null */
+      }
+    }
+
+    if (BleAtRepl_HandleMessage((const char *)msg))
+    {
+      return;
+    }
 
     BleCmdType cmdType = BLEParseCommand((const char *)msg);
     switch (cmdType)
