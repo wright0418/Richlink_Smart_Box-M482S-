@@ -39,7 +39,9 @@ typedef struct
     volatile uint8_t keyA_flag;
     volatile uint8_t hall_pb7_irq_flag;
     volatile uint8_t hall_pb7_edge_pending;
-    volatile uint8_t idle_state; /* 0: moving, 1: idle */
+    volatile uint8_t idle_state;        /* 0: moving, 1: idle */
+    volatile uint8_t repl_mode;         /* 0: normal game mode, 1: BLE REPL test mode */
+    volatile uint8_t repl_led_override; /* 0: main LED allowed, 1: REPL/override controls LED */
 } SystemStatus;
 
 /* Global instance (defined in system_status.c) */
@@ -88,6 +90,12 @@ void Sys_AccumulateHallPb7Edge(void);
 uint8_t Sys_TakeHallPb7PendingEdges(void);
 static inline uint8_t Sys_GetIdleState(void) { return g_sys.idle_state; }
 static inline void Sys_SetIdleState(uint8_t state) { g_sys.idle_state = state; }
+static inline uint8_t Sys_GetReplMode(void) { return g_sys.repl_mode; }
+static inline void Sys_SetReplMode(uint8_t mode) { g_sys.repl_mode = mode; }
+
+/* LED override accessors: when set, main LED update should skip reapplying blink */
+static inline uint8_t Sys_GetLedOverride(void) { return g_sys.repl_led_override; }
+static inline void Sys_SetLedOverride(uint8_t v) { g_sys.repl_led_override = v; }
 
 /* MAC address and device name accessors */
 const char *Sys_GetMacAddr(void);

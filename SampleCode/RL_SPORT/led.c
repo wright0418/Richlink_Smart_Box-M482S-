@@ -88,6 +88,9 @@ volatile uint32_t g_u32PeriodCounter = 0;
 volatile uint32_t g_u32OnTimeCounter = 0;
 volatile float g_LedFreqHz = 1;
 volatile float g_LedDuty = 0.5f;
+/* When non-negative, LED state is forced by callers (e.g., REPL) and
+    the blink engine must not override the pin. -1 means no force. */
+static volatile int8_t g_forceLedState = -1;
 
 /* Internal precomputed tick targets (milliseconds) to avoid float ops in ISR */
 /* Internal precomputed tick targets (in units of LED_TIMER_TICK_MS). */
@@ -106,12 +109,21 @@ static void SetGreenLedRaw(uint8_t state)
 
 void SetGreenLed(uint8_t state)
 {
+    DBG_PRINT("[LED] SetGreenLed state=%u (force)\n", (unsigned)state);
+    /* force the LED state and prevent blink engine from changing it */
+    g_forceLedState = (int8_t)state;
     SetGreenLedRaw(state);
 }
 
 // Update LED state: toggle according to period and duty
 static void Led_Update(void)
 {
+    /* If forced state is set, respect it and don't run blink logic */
+    if (g_forceLedState >= 0)
+    {
+        SetGreenLedRaw((uint8_t)g_forceLedState);
+        return;
+    }
     /* Use precomputed tick targets (set by SetGreenLedMode) to avoid
        floating-point work inside ISR context. g_u32OnTicks and
        g_u32PeriodTicksTarget are expressed in units of LED_TIMER_TICK_MS. */
@@ -152,6 +164,12 @@ void SetGreenLedMode(float freq, float duty)
        Precompute integer ticks (ms) to avoid float in ISR. */
     if (freq <= 0.0f)
     {
+        /* Only log when changing to off to avoid noisy logs when repeatedly
+           called with same parameters. */
+        if (g_u32PeriodTicksTarget != 0 || g_u32OnTicks != 0)
+        {
+            DBG_PRINT("[LED] SetGreenLedMode: freq<=0, turning LED off\n");
+        }
         /* turn LED off */
         g_LedFreqHz = 0;
         g_LedDuty = 0;
@@ -168,6 +186,8 @@ void SetGreenLedMode(float freq, float duty)
 
     /* normalize duty */
     float d = duty;
+    /* enabling blinking should release forced state */
+    g_forceLedState = -1;
     if (d > 1.0f)
     {
         /* Reflect new state on the LED pin immediately so callers see the
@@ -192,6 +212,9 @@ void SetGreenLedMode(float freq, float duty)
     {
         return;
     }
+
+    /* Log only when mode actually changes to reduce noise. */
+    DBG_PRINT("[LED] SetGreenLedMode apply freq=%.2f duty=%.2f\n", freq, d);
 
     /* compute integer period and on ticks (ms). Use rounding. */
     float period_ms_f = 1000.0f / freq;

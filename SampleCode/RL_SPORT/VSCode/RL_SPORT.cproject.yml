@@ -60,6 +60,7 @@ project:
         - file: ../../../Library/StdDriver/src/eadc.c
         - file: ../../../Library/StdDriver/src/timer.c
         - file: ../../../Library/StdDriver/src/usbd.c
+        - file: ../../../Library/StdDriver/src/fmc.c
         - file: ../../../Library/CMSIS/Lib/ARM/arm_cortexM4lf_math.lib
           for-compiler: AC6
     - group: User
@@ -69,6 +70,7 @@ project:
         - file: ../system_status.c
         - file: ../game_logic.c
         - file: ../ble.c
+        - file: ../ble_at_repl.c
         - file: ../led.c
         - file: ../buzzer.c
         - file: ../gpio.c

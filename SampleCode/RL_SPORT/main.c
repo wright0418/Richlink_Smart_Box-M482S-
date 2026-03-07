@@ -25,6 +25,7 @@
 #include "test_mode.h"
 #include "usb_hid_mouse.h"
 #include "power_mgmt.h"
+#include "ble_at_repl.h"
 
 #if USE_GSENSOR_JUMP_DETECT
 #include "gsensor_jump_detect.h"
@@ -109,6 +110,12 @@ static void RL_HandleBatteryCheck(uint32_t now, uint32_t *last_batt_check_time, 
 
 static void RL_UpdateLedState(uint8_t low_batt)
 {
+  /* In REPL mode or when LED is under REPL override, skip entirely */
+  if (Sys_GetReplMode() || Sys_GetLedOverride())
+  {
+    return;
+  }
+
   if (low_batt)
   {
     SetGreenLedMode(LOW_BATT_LED_FREQ_HZ, LOW_BATT_LED_DUTY);
@@ -150,6 +157,11 @@ static void RL_HandleBleAndGameState(void)
 {
   /* Process BLE messages */
   CheckBleRecvMsg();
+
+  if (BleAtRepl_IsActive())
+  {
+    return;
+  }
 
   /* Main state machine using new game_logic module */
   switch (Sys_GetBleState())
@@ -305,6 +317,19 @@ static void RL_InitBoardInputs(void)
 {
   /* Button, HALL (optional) and G-sensor interrupt input pins + NVIC */
   Gpio_Init();
+  /* If BLE REPL test mode is active, let the REPL module control the LED
+     and avoid reapplying the main blink patterns which would override
+     REPL-driven SetGreenLed()/SetGreenLedMode() calls. */
+  if (Sys_GetReplMode())
+  {
+    DBG_PRINT("[Main] RL_UpdateLedState: REPL active -> skip main LED update\n");
+    return;
+  }
+  if (Sys_GetLedOverride())
+  {
+    DBG_PRINT("[Main] RL_UpdateLedState: LED override active -> skip main LED update\n");
+    return;
+  }
 }
 
 static void RL_InitDrivers(void)
@@ -334,6 +359,7 @@ static void RL_InitDrivers(void)
 static void RL_InitApplication(void)
 {
   Sys_Init();
+  BleAtRepl_Init();
   Game_Init();
 
 #if USE_GSENSOR_JUMP_DETECT
@@ -426,6 +452,15 @@ int main()
     {
       Ble_RenameFlowProcess();
       s_ble_rename_done = Ble_RenameFlowIsDone();
+    }
+
+    BleAtRepl_RunIfActive();
+
+    /* ---- REPL mode: only run BLE message processing, skip game/idle/LED ---- */
+    if (Sys_GetReplMode() || Sys_GetLedOverride())
+    {
+      CheckBleRecvMsg();
+      continue;
     }
 
 #if USE_GSENSOR_JUMP_DETECT

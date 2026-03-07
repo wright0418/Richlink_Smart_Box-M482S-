@@ -24,6 +24,8 @@ void Sys_Init(void)
     g_sys.hall_pb7_irq_flag = 0;
     g_sys.hall_pb7_edge_pending = 0;
     g_sys.idle_state = 0;
+    g_sys.repl_mode = 0;
+    g_sys.repl_led_override = 0;
 }
 
 void Sys_AddJumpTimes(uint16_t delta)
