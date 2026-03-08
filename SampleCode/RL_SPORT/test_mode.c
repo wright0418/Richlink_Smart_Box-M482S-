@@ -15,13 +15,6 @@
 
 static volatile uint8_t g_uart_test_mode = 0u;
 
-/*
- * Keep legacy/extended test code in source, but hide from current UART menu.
- * 0: hide advanced items (LED / USB / RunAll / etc.)
- * 1: show advanced items
- */
-#define TESTMODE_ENABLE_ADVANCED_ITEMS 0u
-
 static int UART0_ReadCharNonBlocking(char *out)
 {
     if (UART_IS_RX_READY(UART0))
@@ -83,7 +76,6 @@ void TestMode_PollEnter(void)
     }
 }
 
-#if TESTMODE_ENABLE_ADVANCED_ITEMS
 static void Test_LED(void)
 {
     printf("[Test] LED PB3 blink x3\n");
@@ -95,11 +87,9 @@ static void Test_LED(void)
         delay_ms(100);
     }
 }
-#endif
 
 static void Test_Buzzer(void)
 {
-    printf("\n==================== [RAW] BUZZER ====================\n");
     printf("[Test] Buzzer PC7 beep\n");
     BuzzerPlay(1000, 200);
     delay_ms(250);
@@ -107,7 +97,6 @@ static void Test_Buzzer(void)
 
 static void Test_Key(void)
 {
-    printf("\n===================== [RAW] KEY ======================\n");
     printf("[Test] Key PB15: press within 5s\n");
     uint32_t start = get_ticks_ms();
     while (!is_timeout(start, 5000))
@@ -123,7 +112,6 @@ static void Test_Key(void)
 
 static void Test_Hall(void)
 {
-    printf("\n==================== [RAW] HALL ======================\n");
     printf("[Test] HALL PB7/PB8: read for 3s\n");
     uint32_t start = get_ticks_ms();
     uint32_t last_pb7 = (PB->PIN & BIT7) ? 1u : 0u;
@@ -144,7 +132,6 @@ static void Test_Hall(void)
 
 static void Test_Gsensor(void)
 {
-    printf("\n=================== [RAW] GSENSOR ====================\n");
     printf("[Test] G-sensor I2C read (3 samples)\n");
     for (int i = 0; i < 3; ++i)
     {
@@ -157,7 +144,6 @@ static void Test_Gsensor(void)
 
 static void Test_ADC(void)
 {
-    printf("\n===================== [RAW] ADC ======================\n");
     printf("[Test] ADC PB1 (battery)\n");
     uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
     float vbat = Adc_ConvertRawToBatteryV(raw);
@@ -167,7 +153,6 @@ static void Test_ADC(void)
            (double)ADC_BATT_LOW_V);
 }
 
-#if TESTMODE_ENABLE_ADVANCED_ITEMS
 static void Test_USB(void)
 {
     printf("[Test] USB FS HID Mouse auto test: 5s\n");
@@ -187,7 +172,6 @@ static void Test_USB(void)
     UsbHidMouse_TestStop();
     printf("[Test] USB auto test done\n");
 }
-#endif
 
 static uint8_t Test_BLE_WaitMode(uint8_t target_mode, uint32_t timeout_ms)
 {
@@ -231,13 +215,13 @@ static void Test_BLE_AT_CMD(void)
     const uint32_t timeout_ms = 1000u;
     uint32_t start = get_ticks_ms();
     uint8_t got_name_resp = 0u;
+    uint8_t pass = 0u;
 
-    printf("\n===================== [RAW] BLE ======================\n");
-    printf("[Test] BLE AT CMD: query device name (raw response)\n");
+    printf("[Test] BLE AT CMD: query name, expect ROPR_\n");
 
     if (!Test_BLE_SwitchToCmdMode())
     {
-        printf("[Test] BLE RAW: cannot enter CMD mode\n");
+        printf("[Test] BLE_AT_CMD FAIL: cannot enter CMD mode after retries\n");
         return;
     }
 
@@ -252,16 +236,30 @@ static void Test_BLE_AT_CMD(void)
         if (name && name[0] != '\0')
         {
             got_name_resp = 1u;
-            printf("[Test] BLE RAW NAME = %s\n", name);
+            printf("[Test] BLE NAME = %s\n", name);
+
+            /* Single read result: one response is enough to decide pass/fail. */
+            if ((strstr(name, "ROPR_") != NULL) || (strstr(name, "ROPE_") != NULL))
+            {
+                pass = 1u;
+            }
             break;
         }
 
         delay_ms(5u);
     }
 
-    if (!got_name_resp)
+    if (pass)
     {
-        printf("[Test] BLE RAW: no name response within %lums\n", (unsigned long)timeout_ms);
+        printf("[Test] BLE_AT_CMD PASS\n");
+    }
+    else if (!got_name_resp)
+    {
+        printf("[Test] BLE_AT_CMD FAIL: no name response\n");
+    }
+    else
+    {
+        printf("[Test] BLE_AT_CMD FAIL: name format invalid\n");
     }
 
     if (!Test_BLE_SwitchToDataMode())
@@ -270,7 +268,6 @@ static void Test_BLE_AT_CMD(void)
     }
 }
 
-#if TESTMODE_ENABLE_ADVANCED_ITEMS
 static void RunAllTests(void)
 {
     Test_LED();
@@ -280,18 +277,20 @@ static void RunAllTests(void)
     Test_Gsensor();
     Test_ADC();
 }
-#endif
 
 static void UART0_TestMenuLoop(void)
 {
     char line[8];
     printf("\n=== UART0 Test Mode ===\n");
-    printf("1) Buzzer PC7\n");
-    printf("2) Key PB15\n");
-    printf("3) HALL PB7/PB8\n");
-    printf("4) G-sensor I2C\n");
-    printf("5) ADC PB1\n");
-    printf("6) BLE AT CMD name query (raw)\n");
+    printf("1) LED PB3\n");
+    printf("2) Buzzer PC7\n");
+    printf("3) Key PB15\n");
+    printf("4) HALL PB7/PB8\n");
+    printf("5) G-sensor I2C\n");
+    printf("6) ADC PB1\n");
+    printf("7) Run all tests\n");
+    printf("8) USB FS HID Mouse (auto 5s)\n");
+    printf("9) BLE AT CMD name check\n");
     printf("0) Exit\n");
 
     while (g_uart_test_mode)
@@ -302,31 +301,32 @@ static void UART0_TestMenuLoop(void)
         switch (line[0])
         {
         case '1':
-            Test_Buzzer();
+            Test_LED();
             break;
         case '2':
-            Test_Key();
+            Test_Buzzer();
             break;
         case '3':
-            Test_Hall();
+            Test_Key();
             break;
         case '4':
-            Test_Gsensor();
+            Test_Hall();
             break;
         case '5':
-            Test_ADC();
+            Test_Gsensor();
             break;
         case '6':
-            Test_BLE_AT_CMD();
+            Test_ADC();
             break;
-#if TESTMODE_ENABLE_ADVANCED_ITEMS
         case '7':
             RunAllTests();
             break;
         case '8':
             Test_USB();
             break;
-#endif
+        case '9':
+            Test_BLE_AT_CMD();
+            break;
         case '0':
             g_uart_test_mode = 0u;
             printf("Exit test mode\n");
