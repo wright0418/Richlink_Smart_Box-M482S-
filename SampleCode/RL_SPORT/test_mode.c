@@ -556,8 +556,35 @@ static uint8_t AT_Hall(const char *param)
             uint32_t pb8 = (PB->PIN & BIT8) ? 1u : 0u;
             if (pb7 != init_pb7)
             {
-                printf("+TEST:HALL,PASS,EDGE=PB7,T=%lu\r\n", (unsigned long)get_elapsed_ms(start));
-                return 1u;
+                /* Require PB7 to toggle at least twice to count as a valid pass
+                   (two or more interrupts). Count transitions relative to the
+                   initial state. */
+                uint32_t pb7_count = 0u;
+                uint32_t last_pb7 = init_pb7;
+
+                /* We already observed one change; consume it and continue
+                   until we see a second transition or timeout. */
+                last_pb7 = pb7;
+                pb7_count = 1u;
+
+                while (!is_timeout(start, timeout))
+                {
+                    uint32_t pb7_now = (PB->PIN & BIT7) ? 1u : 0u;
+                    if (pb7_now != last_pb7)
+                    {
+                        pb7_count++;
+                        last_pb7 = pb7_now;
+                        if (pb7_count >= 2u)
+                        {
+                            printf("+TEST:HALL,PASS,EDGE=PB7,T=%lu\r\n", (unsigned long)get_elapsed_ms(start));
+                            return 1u;
+                        }
+                    }
+                    delay_ms(5);
+                }
+                /* timeout reached while waiting for second PB7 edge */
+                printf("+TEST:HALL,FAIL,TIMEOUT\r\n");
+                return 0u;
             }
             if (pb8 != init_pb8)
             {
