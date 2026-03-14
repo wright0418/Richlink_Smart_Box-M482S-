@@ -92,55 +92,29 @@ static void ReadGsensorTemp(int16_t *temp)
   *temp = (int16_t)temp_reg;
 }
 
-/* MXC400 Controll address 0x0D
+/* MXC400 Control register 0x0D
   bit6:5 full-scale-range  0x00:2G 0x01:4G 0x10:8G
   bit4 : Clksel always 0
-  bit1:0 : normal 0x00 , 0x01: power down
- */
+  bit1:0 : normal 0x00 , 0x01: power down */
+
+/* FSR enum -> control-register FSR bits lookup */
+static const uint8_t s_fsr_reg_bits[] = {0x00, 0x20, 0x40}; /* FSR_2G, FSR_4G, FSR_8G */
+
+static uint8_t fsr_to_ctrl_reg(Gsensor_FSR fsr, uint8_t pd_bit)
+{
+  uint8_t bits = (fsr <= FSR_8G) ? s_fsr_reg_bits[fsr] : 0x00;
+  return bits | pd_bit;
+}
+
 void MXC400_to_PD(Gsensor_FSR fsr)
 {
-  uint8_t reg_value = 0x01; // Power down
-  switch (fsr)
-  {
-  case FSR_2G:
-    reg_value |= 0x00 << 5;
-    break;
-  case FSR_4G:
-    reg_value |= 0x01 << 5;
-    break;
-  case FSR_8G:
-    reg_value |= 0x02 << 5;
-    break;
-  default:
-    reg_value |= 0x00 << 5;
-    break;
-  }
-  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, fsr_to_ctrl_reg(fsr, 0x01));
   (void)wr;
 }
 
-/* MXC400 set full-scale range 2G/4G/8G  address 0x0D
- */
-
 void MXC400_to_wakeup(Gsensor_FSR fsr)
 {
-  uint8_t reg_value = 0x00; // Wakeup
-  switch (fsr)
-  {
-  case FSR_2G:
-    reg_value |= 0x00 << 5;
-    break;
-  case FSR_4G:
-    reg_value |= 0x01 << 5;
-    break;
-  case FSR_8G:
-    reg_value |= 0x02 << 5;
-    break;
-  default:
-    reg_value |= 0x00 << 5;
-    break;
-  }
-  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, reg_value);
+  uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, fsr_to_ctrl_reg(fsr, 0x00));
   (void)wr;
 }
 
@@ -161,29 +135,17 @@ void GsensorReadAxis(int16_t *axis)
   ReadGsensorAxis(axis);
 }
 
-/* Helper: convert raw axis counts to magnitude in g using current FSR */
+/* Counts-per-g lookup indexed by Gsensor_FSR.
+   Empirically verified on MXC4005XC hardware: flat board Z=2047 at 1g indicates
+   2048 counts/g for FSR_2G (not the theoretical 1024 counts/g derived from range). */
+static const float s_fsr_cpg[] = {2048.0f, 1024.0f, 512.0f}; /* FSR_2G, FSR_4G, FSR_8G */
+
 float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
 {
-  float counts_per_g;
-  switch (g_current_fsr)
-  {
-  case FSR_2G:
-    counts_per_g = 1024.0f; /* 1024 counts per g at 2G full-scale */
-    break;
-  case FSR_4G:
-    counts_per_g = 512.0f; /* approximate */
-    break;
-  case FSR_8G:
-    counts_per_g = 256.0f; /* approximate */
-    break;
-  default:
-    counts_per_g = 1024.0f;
-    break;
-  }
-
-  float xg = ((float)axis[0]) / counts_per_g;
-  float yg = ((float)axis[1]) / counts_per_g;
-  float zg = ((float)axis[2]) / counts_per_g;
+  float cpg = (g_current_fsr <= FSR_8G) ? s_fsr_cpg[g_current_fsr] : 2048.0f;
+  float xg = (float)axis[0] / cpg;
+  float yg = (float)axis[1] / cpg;
+  float zg = (float)axis[2] / cpg;
 
   return sqrtf(xg * xg + yg * yg + zg * zg);
 }

@@ -326,7 +326,6 @@ static void RL_InitDrivers(void)
 
   /* Sensors */
   Gsensor_Init(100000, FSR_2G);
-  GsensorWakeup();
 
   /* Battery ADC */
   Adc_InitBattery();

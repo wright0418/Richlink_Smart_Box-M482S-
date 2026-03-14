@@ -62,11 +62,15 @@ const char *Sys_GetMacAddr(void)
 
 void Sys_SetMacAddr(const char *addr, uint32_t len)
 {
-    if (addr && len > 0 && len < sizeof(g_sys.mac_addr))
+    if (!addr || len >= sizeof(g_sys.mac_addr))
+        return;
+    if (len == 0u)
     {
-        memcpy((void *)g_sys.mac_addr, addr, len);
-        g_sys.mac_addr[len] = '\0';
+        g_sys.mac_addr[0] = '\0';
+        return;
     }
+    memcpy((void *)g_sys.mac_addr, addr, len);
+    g_sys.mac_addr[len] = '\0';
 }
 
 const char *Sys_GetDeviceName(void)
@@ -76,9 +80,13 @@ const char *Sys_GetDeviceName(void)
 
 void Sys_SetDeviceName(const char *name, uint32_t len)
 {
-    if (name && len > 0 && len < sizeof(g_sys.device_name))
+    if (!name || len >= sizeof(g_sys.device_name))
+        return;
+    if (len == 0u)
     {
-        memcpy((void *)g_sys.device_name, name, len);
-        g_sys.device_name[len] = '\0';
+        g_sys.device_name[0] = '\0';
+        return;
     }
+    memcpy((void *)g_sys.device_name, name, len);
+    g_sys.device_name[len] = '\0';
 }

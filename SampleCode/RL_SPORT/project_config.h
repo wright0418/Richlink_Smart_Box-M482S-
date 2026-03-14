@@ -51,6 +51,12 @@
 #define STATIC_INLINE INLINE
 #endif
 
+/* Firmware version and board identification */
+#define FW_VERSION "1.1.0"
+#define BOARD_NAME "RL_SPORT_V3"
+#define FW_BUILD_DATE __DATE__
+#define FW_BUILD_TIME __TIME__
+
 /* General project flags */
 
 /* Movement-based idle detection configuration
@@ -66,7 +72,7 @@
 #define MOVEMENT_SAMPLE_INTERVAL_MS 500	  /* sample every 500 ms */
 #define MOVEMENT_WINDOW_SAMPLES 8		  /* sliding window size */
 #define MOVEMENT_STDDEV_THRESHOLD_G 0.02f /* stddev threshold in g to consider 'no movement' */
-#define MOVEMENT_MAG_TOLERANCE_G 0.4f	  /* magnitude deviation from 1g considered stable (relaxed for sensor calibration) */
+#define MOVEMENT_MAG_TOLERANCE_G 0.7f	  /* magnitude deviation from 1g; at cpg=2048 a tilted board may read as low as ~0.3g, so range [0.3, 1.7] is needed */
 
 /* Battery ADC configuration (PB1 -> EADC0_CH1)
 	Assumptions: Vref=4.0V, divider=1/2 (ADC=BAT/2) */

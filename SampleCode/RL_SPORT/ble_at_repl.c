@@ -30,10 +30,7 @@
 #define REPL_STREAM_MIN_INTERVAL_MS 50u
 #define REPL_STREAM_MAX_INTERVAL_MS 2000u
 
-/* ---------- Firmware version (compile-time) ---------- */
-#define FW_VERSION_MAJOR 1
-#define FW_VERSION_MINOR 0
-#define FW_VERSION_PATCH 0
+/* Firmware version from project_config.h: FW_VERSION, FW_BUILD_DATE, FW_BUILD_TIME */
 
 /* ---------- Data Flash layout ---------- */
 /* The last page (4 KB) of APROM is reserved as Data Flash for user parameters.
@@ -468,9 +465,8 @@ static void handle_ping(void)
 /* ===================== VERSION ===================== */
 static void handle_version(void)
 {
-    repl_send("+OK,VERSION,%d.%d.%d,%s,%s\r\n",
-              FW_VERSION_MAJOR, FW_VERSION_MINOR, FW_VERSION_PATCH,
-              __DATE__, __TIME__);
+    repl_send("+OK,VERSION,%s,%s,%s\r\n",
+              FW_VERSION, FW_BUILD_DATE, FW_BUILD_TIME);
 }
 
 /* =================== Data Flash =================== */

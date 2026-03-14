@@ -145,10 +145,7 @@ void UART1_IRQHandler(void)
             copy_len = RXBUFSIZE - 1u;
           }
 
-          for (uint32_t i = 0; i < copy_len; i++)
-          {
-            g_u8RecData[i] = s_uart_line_buf[i];
-          }
+          memcpy((void *)g_u8RecData, (const void *)s_uart_line_buf, copy_len);
           g_u8RecData[copy_len] = '\0';
           g_u32RecLen = copy_len;
           g_u8DataReady = 1;
@@ -254,10 +251,6 @@ void CheckBleRecvMsg(void)
 
   if (BLE_TakeMessageSnapshot(msg, sizeof(msg)))
   {
-#if DEBUG
-    printf("[DEBUG] Received: %s\n", msg);
-#endif
-
     /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
        which may appear anywhere in the received line (echoes, concatenated
        fragments). Treat all occurrences as noise and strip them out so the
