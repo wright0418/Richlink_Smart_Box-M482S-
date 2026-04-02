@@ -69,3 +69,6 @@ SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.csolution.yml
 SampleCode/StdDriver/USBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/ac6_linker_script.sct.src
 SampleCode/StdDriver/USBD_HID_Mouse/VSCode/RTE/Device/M487JIDAE/regions_M487JIDAE.h
 SampleCode/StdDriver/USBD_HID_Mouse/VSCode/USBD_HID_Mouse.csolution.yml
+release_Code/SportV3_FW_TESTTool.zip
+release_Code/SPORTV3_ICP_TEST.pptx
+release_Code/SportV3_UART_Test_Tool.exe

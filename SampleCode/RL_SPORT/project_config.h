@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
@@ -52,7 +52,7 @@
 #endif
 
 /* Firmware version and board identification */
-#define FW_VERSION "1.1.0"
+#define FW_VERSION "1.2.1"
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
@@ -69,17 +69,26 @@
 #define NO_MOVEMENT_TIMEOUT_DISCONNECTED_MS (30 * 1000) /* 30 seconds when BLE disconnected */
 
 /* Movement sampling and detection parameters */
-#define MOVEMENT_SAMPLE_INTERVAL_MS 500	  /* sample every 500 ms */
-#define MOVEMENT_WINDOW_SAMPLES 8		  /* sliding window size */
-#define MOVEMENT_STDDEV_THRESHOLD_G 0.02f /* stddev threshold in g to consider 'no movement' */
-#define MOVEMENT_MAG_TOLERANCE_G 0.7f	  /* magnitude deviation from 1g; at cpg=2048 a tilted board may read as low as ~0.3g, so range [0.3, 1.7] is needed */
+#define MOVEMENT_SAMPLE_INTERVAL_MS 500 /* sample every 500 ms */
+#define MOVEMENT_WINDOW_SAMPLES 8		/* sliding window size */
+/* stddev is the primary (and only effective) motion indicator;
+   empirical stationary noise reaches ~0.027g, so 0.03f gives safe margin. */
+#define MOVEMENT_STDDEV_THRESHOLD_G 0.03f /* stddev threshold in g */
+/* Magnitude condition is unreliable (axis sensitivity varies by orientation/FSR).
+   Set to 1.0f to effectively disable it: |mean-1g| cannot physically exceed 1.0. */
+#define MOVEMENT_MAG_TOLERANCE_G 1.00f /* disabled: magnitude check not used for idle detection */
+
+/* Set to 1 to print movement detection values every sample (for threshold tuning) */
+#define MOVEMENT_DEBUG 0
 
 /* Battery ADC configuration (PB1 -> EADC0_CH1)
-	Assumptions: Vref=4.0V, divider=1/2 (ADC=BAT/2) */
+	Hardware: VBAT(max 4.0V) -> 1/2 divider -> ADC pin (max 2.0V)
+	MCU VREF = 3.3V (12-bit). ADC uses ~61% of its range (2.0V/3.3V).
+	Resolution: ~1.6mV/count at VBAT node. Adequate for battery monitoring. */
 #define ADC_VREF_V 3.3f
 #define ADC_FULL_SCALE 4095.0f
 #define ADC_DIVIDER_RATIO 0.5f
-#define ADC_BATT_LOW_V 3.0f
+#define ADC_BATT_LOW_V 3.2f
 #define ADC_BATT_AVG_SAMPLES 4u
 #define ADC_CONV_TIMEOUT 10000u
 #define LOW_BATT_CHECK_INTERVAL_MS 1000u

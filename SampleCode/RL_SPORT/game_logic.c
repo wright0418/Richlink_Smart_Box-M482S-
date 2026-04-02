@@ -107,7 +107,18 @@ static void Game_CheckMovementAndUpdateIdle(uint8_t ble_connected)
         stddev = sqrtf(var / (float)movement_window_count);
 
     /* Detect movement using shared algorithm helper for unit-test consistency */
-    if (GameAlgo_IsMovement(stddev, mean, MOVEMENT_STDDEV_THRESHOLD_G, MOVEMENT_MAG_TOLERANCE_G))
+    uint8_t is_moving = GameAlgo_IsMovement(stddev, mean, MOVEMENT_STDDEV_THRESHOLD_G, MOVEMENT_MAG_TOLERANCE_G);
+
+#if MOVEMENT_DEBUG
+    DBG_PRINT("[MOV] raw=%d,%d,%d mag=%.3f mean=%.3f std=%.4f | %s | idle=%d elapsed=%lums\n",
+              axis[0], axis[1], axis[2],
+              (double)mag, (double)mean, (double)stddev,
+              is_moving ? "MOVING" : "STILL",
+              Sys_GetIdleState(),
+              (unsigned long)(now - last_movement_time));
+#endif
+
+    if (is_moving)
     {
         /* movement detected -> reset last movement time */
         last_movement_time = now;

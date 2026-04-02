@@ -1,6 +1,7 @@
 build-idx:
   generated-by: csolution version 2.11.0
   csolution: RL_SPORT.csolution.yml
+  cbuild-run: out/RL_SPORT+ARMCLANG.cbuild-run.yml
   tmpdir: tmp
   cprojects:
     - cproject: RL_SPORT.cproject.yml
@@ -11,12 +12,5 @@ build-idx:
       messages:
         info:
           - RL_SPORT.cbuild-pack.yml - file is already up-to-date
+          - RL_SPORT+ARMCLANG.cbuild-run.yml - file is already up-to-date
           - RL_SPORT.debug+ARMCLANG.cbuild.yml - file is already up-to-date
-    - cbuild: out/RL_SPORT/ARMCLANG/release/RL_SPORT.release+ARMCLANG.cbuild.yml
-      project: RL_SPORT
-      configuration: .release+ARMCLANG
-      messages:
-        info:
-          - RL_SPORT.cbuild-pack.yml - file is already up-to-date
-          - RL_SPORT.release+ARMCLANG.cbuild.yml - file is already up-to-date
-  rebuild: true

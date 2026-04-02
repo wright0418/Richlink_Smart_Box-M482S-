@@ -100,25 +100,23 @@ static void RL_HandleBatteryCheck(uint32_t now, uint32_t *last_batt_check_time, 
     uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
     float vbat = Adc_ConvertRawToBatteryV(raw);
     uint8_t is_low = (vbat <= ADC_BATT_LOW_V);
-    if (is_low && !(*low_batt))
-    {
-      DBG_PRINT("[Main] Low battery: %.2fV\n", vbat);
-    }
+    DBG_PRINT("[BATT] raw=%u vbat=%.3fV %s\n", raw, (double)vbat, is_low ? "LOW" : "OK");
     *low_batt = is_low;
   }
 }
 
 static void RL_UpdateLedState(uint8_t low_batt)
 {
-  /* In REPL mode or when LED is under REPL override, skip entirely */
-  if (Sys_GetReplMode() || Sys_GetLedOverride())
-  {
-    return;
-  }
-
+  /* Low battery LED takes priority over all other LED states */
   if (low_batt)
   {
     SetGreenLedMode(LOW_BATT_LED_FREQ_HZ, LOW_BATT_LED_DUTY);
+    return;
+  }
+
+  /* In REPL mode or when LED is under REPL override, skip entirely */
+  if (Sys_GetReplMode() || Sys_GetLedOverride())
+  {
     return;
   }
 
@@ -434,6 +432,12 @@ int main()
 
     BleAtRepl_RunIfActive();
 
+    /* Battery check runs unconditionally (including REPL mode) */
+    RL_HandleBatteryCheck(now, &s_last_batt_check_time, &s_low_batt);
+
+    /* Low battery LED must show even in REPL mode */
+    RL_UpdateLedState(s_low_batt);
+
     /* ---- REPL mode: only run BLE message processing, skip game/idle/LED ---- */
     if (Sys_GetReplMode() || Sys_GetLedOverride())
     {
@@ -449,7 +453,6 @@ int main()
     JumpDetect_UpdatePreCalibState();
 #endif
     RL_HandleGsensorPrint(now, &s_last_print_time, axis);
-    RL_HandleBatteryCheck(now, &s_last_batt_check_time, &s_low_batt);
     /* Hall sensor IRQ print (main loop, not ISR) */
     if (Sys_GetHallPb7IrqFlag())
     {
@@ -481,6 +484,7 @@ int main()
 
     RL_HandleBleAndGameState();
     RL_HandleIdlePowerOff(&s_poweroff_done);
+    /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
     RL_UpdateLedState(s_low_batt);
   }
 }

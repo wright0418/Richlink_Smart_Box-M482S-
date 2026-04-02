@@ -136,13 +136,13 @@ void GsensorReadAxis(int16_t *axis)
 }
 
 /* Counts-per-g lookup indexed by Gsensor_FSR.
-   Empirically verified on MXC4005XC hardware: flat board Z=2047 at 1g indicates
-   2048 counts/g for FSR_2G (not the theoretical 1024 counts/g derived from range). */
-static const float s_fsr_cpg[] = {2048.0f, 1024.0f, 512.0f}; /* FSR_2G, FSR_4G, FSR_8G */
+   MXC4005XC: 12-bit two's complement (-2048..+2047), so ±Ng maps to ±2048 counts.
+   FSR_2G: 2048/2 = 1024 counts/g, FSR_4G: 512, FSR_8G: 256. */
+static const float s_fsr_cpg[] = {1024.0f, 512.0f, 256.0f}; /* FSR_2G, FSR_4G, FSR_8G */
 
 float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
 {
-  float cpg = (g_current_fsr <= FSR_8G) ? s_fsr_cpg[g_current_fsr] : 2048.0f;
+  float cpg = (g_current_fsr <= FSR_8G) ? s_fsr_cpg[g_current_fsr] : 1024.0f;
   float xg = (float)axis[0] / cpg;
   float yg = (float)axis[1] / cpg;
   float zg = (float)axis[2] / cpg;
