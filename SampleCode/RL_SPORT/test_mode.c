@@ -185,13 +185,13 @@ static void Test_Gsensor(void)
 
 static void Test_ADC(void)
 {
-    printf("[Test] ADC PB1 (battery)\n");
-    uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    printf("[Test] raw=%u V=%.2fV (low<=%.2fV)\n",
-           (unsigned int)raw,
-           vbat,
-           (double)ADC_BATT_LOW_V);
+    printf("[Test] VDDA (band-gap)\n");
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
+    printf("[Test] vdda=%.3fV (low<%.2fV) %s\n",
+           (double)vdda,
+           (double)ADC_VDDA_LOW_V,
+           Adc_IsVddaLow() ? "LOW" : "OK");
 }
 
 static void Test_USB(void)
@@ -688,14 +688,13 @@ static uint8_t AT_Gsensor(const char *param)
 static uint8_t AT_Adc(const char *param)
 {
     (void)param;
-    uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    uint32_t mv = (uint32_t)(vbat * 1000.0f);
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
+    uint32_t vdda_mv = (uint32_t)(vdda * 1000.0f);
 
-    if (vbat >= 2.0f && vbat <= 5.5f)
+    if (vdda >= 2.0f && vdda <= 4.0f)
     {
-        printf("+TEST:ADC,PASS,RAW=%u,MV=%lu\r\n",
-               (unsigned int)raw, (unsigned long)mv);
+        printf("+TEST:ADC,PASS,VDDA_MV=%lu\r\n", (unsigned long)vdda_mv);
         return 1u;
     }
     printf("+TEST:ADC,FAIL,OUT_OF_RANGE\r\n");

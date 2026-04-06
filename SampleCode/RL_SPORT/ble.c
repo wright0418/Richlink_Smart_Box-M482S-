@@ -282,6 +282,8 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_DISCONNECTED:
       g_sys.ble_state = BLE_DISCONNECTED;
       g_sys.game_state = GAME_STOP;
+      /* BLE disconnected: restart idle countdown (rule 4 - 30s) */
+      Game_ResetMovementTimer();
       break;
     case BLE_CMD_CMD_MODE:
       g_sys.ble_mode = 0;
@@ -302,6 +304,8 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_SET_END:
       g_sys.game_state = GAME_STOP;
       g_sys.jump_times = 0;
+      /* Game ended: restart idle countdown (rule 2) */
+      Game_ResetMovementTimer();
       for (i = 0; i < 5; i++)
       {
         BuzzerPlay(1000, 200);
@@ -311,6 +315,7 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_DISC_MSG:
       g_sys.game_state = GAME_STOP;
       g_sys.jump_times = 0;
+      Game_ResetMovementTimer();
       break;
     case BLE_CMD_MAC_ADDR:
     {

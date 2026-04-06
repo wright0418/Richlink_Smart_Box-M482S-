@@ -46,13 +46,6 @@ static void Board_ConfigI2C0Pins(void)
                     (SYS_GPB_MFPL_PB4MFP_I2C0_SDA | SYS_GPB_MFPL_PB5MFP_I2C0_SCL);
 }
 
-static void Board_ConfigBatteryAdcPin(void)
-{
-    SYS->GPB_MFPL = (SYS->GPB_MFPL & ~SYS_GPB_MFPL_PB1MFP_Msk) | SYS_GPB_MFPL_PB1MFP_EADC0_CH1;
-    PB->MODE &= ~GPIO_MODE_MODE1_Msk;
-    GPIO_DISABLE_DIGITAL_PATH(PB, BIT1);
-}
-
 static void Board_ConfigUartPins(void)
 {
     SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
@@ -69,9 +62,8 @@ static void Board_ConfigPowerPins(void)
 
 void Board_ConfigMultiFuncPins(void)
 {
-    /* Configure I2C, UART, ADC, and power-related GPIO MFPs */
+    /* Configure I2C, UART, and power-related GPIO MFPs */
     Board_ConfigI2C0Pins();
-    Board_ConfigBatteryAdcPin();
     Board_ConfigUartPins();
     Board_ConfigPowerPins();
 }
