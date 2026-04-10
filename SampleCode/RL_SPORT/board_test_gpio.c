@@ -102,17 +102,15 @@ static uint8_t test_key_poll(void)
 
 static uint8_t test_battery_adc(void)
 {
-    printf("[BT] Battery ADC: read PB1 (EADC0_CH1).\n");
+    printf("[BT] VDDA (band-gap check).\n");
 
-    Adc_InitBattery();
-    uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    printf("[BT] Battery raw=%u, V=%.2fV\n",
-           (unsigned int)raw,
-           vbat);
+    Adc_Init();
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
+    printf("[BT] VDDA=%.3fV\n", (double)vdda);
 
-    /* Basic hardware sanity window to catch open/short quickly. */
-    if (vbat < 2.0f || vbat > 5.5f)
+    /* Basic hardware sanity window to catch power rail issues quickly. */
+    if (vdda < 2.0f || vdda > 4.0f)
     {
         return 0u;
     }

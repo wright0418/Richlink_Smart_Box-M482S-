@@ -30,10 +30,7 @@
 #define REPL_STREAM_MIN_INTERVAL_MS 50u
 #define REPL_STREAM_MAX_INTERVAL_MS 2000u
 
-/* ---------- Firmware version (compile-time) ---------- */
-#define FW_VERSION_MAJOR 1
-#define FW_VERSION_MINOR 0
-#define FW_VERSION_PATCH 0
+/* Firmware version from project_config.h: FW_VERSION, FW_BUILD_DATE, FW_BUILD_TIME */
 
 /* ---------- Data Flash layout ---------- */
 /* The last page (4 KB) of APROM is reserved as Data Flash for user parameters.
@@ -441,9 +438,9 @@ static void handle_sensor_stream(const char *args)
 
 static void handle_adc_read(void)
 {
-    uint16_t raw = Adc_ReadBatteryRawAvg(4u);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    repl_send("+OK,ADC_READ,%u,%.3f\r\n", (unsigned)raw, vbat);
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
+    repl_send("+OK,ADC_READ,VDDA_MV=%u\r\n", (unsigned)(uint32_t)(vdda * 1000.0f));
 }
 
 static void handle_hall_read(void)
@@ -468,9 +465,8 @@ static void handle_ping(void)
 /* ===================== VERSION ===================== */
 static void handle_version(void)
 {
-    repl_send("+OK,VERSION,%d.%d.%d,%s,%s\r\n",
-              FW_VERSION_MAJOR, FW_VERSION_MINOR, FW_VERSION_PATCH,
-              __DATE__, __TIME__);
+    repl_send("+OK,VERSION,%s,%s,%s\r\n",
+              FW_VERSION, FW_BUILD_DATE, FW_BUILD_TIME);
 }
 
 /* =================== Data Flash =================== */
@@ -699,15 +695,15 @@ static void handle_status(void)
 static void handle_status_verbose(void)
 {
     int16_t axis[3] = {0};
-    uint16_t raw = Adc_ReadBatteryRawAvg(4u);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
     uint8_t pb7_low = ((PB->PIN & BIT7) == 0u) ? 1u : 0u;
     uint8_t pb8_low = ((PB->PIN & BIT8) == 0u) ? 1u : 0u;
     uint8_t key_pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
 
     GsensorReadAxis(axis);
 
-    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEY=%u,PB7=%u,PB8=%u,ADC=%u,VBAT=%.3f\r\n",
+    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEY=%u,PB7=%u,PB8=%u,VDDA=%.3f\r\n",
               (unsigned)Sys_GetBleState(),
               (unsigned)Sys_GetGameState(),
               (unsigned)Sys_GetReplMode(),
@@ -716,8 +712,7 @@ static void handle_status_verbose(void)
               (unsigned)key_pressed,
               (unsigned)pb7_low,
               (unsigned)pb8_low,
-              (unsigned)raw,
-              vbat);
+              vdda);
     repl_send("+OK,STATUS_VERBOSE_G,AX=%d,AY=%d,AZ=%d\r\n", axis[0], axis[1], axis[2]);
 }
 
@@ -915,9 +910,9 @@ void BleAtRepl_RunIfActive(void)
         {
         case REPL_STREAM_SRC_ADC:
         {
-            uint16_t raw = Adc_ReadBatteryRawAvg(4u);
-            float vbat = Adc_ConvertRawToBatteryV(raw);
-            repl_send("+DATA,ADC,%u,%.3f\r\n", (unsigned)raw, vbat);
+            Adc_UpdateVdda();
+            float vdda = Adc_GetVdda();
+            repl_send("+DATA,ADC,VDDA_MV=%u\r\n", (unsigned)(uint32_t)(vdda * 1000.0f));
         }
         break;
         case REPL_STREAM_SRC_HALL:

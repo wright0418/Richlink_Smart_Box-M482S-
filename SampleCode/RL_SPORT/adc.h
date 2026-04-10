@@ -1,6 +1,6 @@
 /**
  * @file adc.h
- * @brief Battery ADC helper (PB1 -> EADC0_CH1)
+ * @brief VDDA measurement via internal band-gap for low-voltage detection.
  */
 #ifndef _ADC_H_
 #define _ADC_H_
@@ -8,35 +8,26 @@
 #include <stdint.h>
 
 /**
- * @brief Initialize EADC for battery measurement.
+ * @brief Initialize EADC for band-gap VDDA measurement.
  */
-void Adc_InitBattery(void);
+void Adc_Init(void);
 
 /**
- * @brief Read a single raw ADC sample.
- * @return 12-bit ADC raw value.
+ * @brief Measure actual AVDD using internal band-gap (sample module 16) and
+ *        cache the result. Call periodically to track AVDD.
  */
-uint16_t Adc_ReadBatteryRaw(void);
+void Adc_UpdateVdda(void);
 
 /**
- * @brief Read averaged raw ADC value.
- * @param samples Number of samples to average.
- * @return Averaged 12-bit ADC raw value.
+ * @brief Return the last measured AVDD (V).
+ * @return AVDD in volts.
  */
-uint16_t Adc_ReadBatteryRawAvg(uint8_t samples);
+float Adc_GetVdda(void);
 
 /**
- * @brief Convert raw ADC value to battery voltage (V).
- * @param raw 12-bit ADC raw value.
- * @return Battery voltage in volts.
+ * @brief Check if AVDD is below the low-voltage threshold.
+ * @return 1 if AVDD < ADC_VDDA_LOW_V, 0 otherwise.
  */
-float Adc_ConvertRawToBatteryV(uint16_t raw);
-
-/**
- * @brief Determine if battery voltage is below threshold.
- * @param raw 12-bit ADC raw value.
- * @return 1 if low, 0 otherwise.
- */
-uint8_t Adc_IsBatteryLow(uint16_t raw);
+uint8_t Adc_IsVddaLow(void);
 
 #endif // _ADC_H_

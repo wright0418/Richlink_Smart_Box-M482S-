@@ -145,10 +145,7 @@ void UART1_IRQHandler(void)
             copy_len = RXBUFSIZE - 1u;
           }
 
-          for (uint32_t i = 0; i < copy_len; i++)
-          {
-            g_u8RecData[i] = s_uart_line_buf[i];
-          }
+          memcpy((void *)g_u8RecData, (const void *)s_uart_line_buf, copy_len);
           g_u8RecData[copy_len] = '\0';
           g_u32RecLen = copy_len;
           g_u8DataReady = 1;
@@ -254,9 +251,23 @@ void CheckBleRecvMsg(void)
 
   if (BLE_TakeMessageSnapshot(msg, sizeof(msg)))
   {
-#if DEBUG
-    printf("[DEBUG] Received: %s\n", msg);
-#endif
+    /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
+       which may appear anywhere in the received line (echoes, concatenated
+       fragments). Treat all occurrences as noise and strip them out so the
+       AT payload is parsed cleanly. */
+    {
+      char *p = NULL;
+      while ((p = strstr(msg, BLE_CMD_CCMD)) != NULL)
+      {
+        size_t tail_len = strlen(p + strlen(BLE_CMD_CCMD));
+        memmove(p, p + strlen(BLE_CMD_CCMD), tail_len + 1); /* include null */
+      }
+    }
+
+    if (BleAtRepl_HandleMessage((const char *)msg))
+    {
+      return;
+    }
 
     /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
        which may appear anywhere in the received line (echoes, concatenated
@@ -289,6 +300,8 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_DISCONNECTED:
       g_sys.ble_state = BLE_DISCONNECTED;
       g_sys.game_state = GAME_STOP;
+      /* BLE disconnected: restart idle countdown (rule 4 - 30s) */
+      Game_ResetMovementTimer();
       break;
     case BLE_CMD_CMD_MODE:
       g_sys.ble_mode = 0;
@@ -309,6 +322,8 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_SET_END:
       g_sys.game_state = GAME_STOP;
       g_sys.jump_times = 0;
+      /* Game ended: restart idle countdown (rule 2) */
+      Game_ResetMovementTimer();
       for (i = 0; i < 5; i++)
       {
         BuzzerPlay(1000, 200);
@@ -318,6 +333,7 @@ void CheckBleRecvMsg(void)
     case BLE_CMD_DISC_MSG:
       g_sys.game_state = GAME_STOP;
       g_sys.jump_times = 0;
+      Game_ResetMovementTimer();
       break;
     case BLE_CMD_MAC_ADDR:
     {

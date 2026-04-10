@@ -30,6 +30,9 @@
 #if USE_GSENSOR_JUMP_DETECT
 #include "gsensor_jump_detect.h"
 #endif
+#if USE_HALL_ANTICHEAT
+#include "hall_anticheat.h"
+#endif
 
 static volatile uint8_t g_usb_charge_mode = 0u;
 
@@ -43,6 +46,10 @@ static uint8_t s_ble_rename_started = 0u;
 static uint8_t s_ble_rename_done = 0u;
 static uint8_t s_charge_mode_initialized = 0u;
 static uint8_t s_hall_edge_residual = 0u;
+#if USE_HALL_ANTICHEAT
+static uint16_t s_hall_raw_total = 0u;
+static uint8_t s_prev_game_running = 0u;
+#endif
 
 static void RL_StartupBeep(void)
 {
@@ -73,6 +80,17 @@ static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
       JumpDetect_Process(axis);
     }
   }
+#elif USE_HALL_ANTICHEAT
+  /* Anti-cheat: poll G-sensor at 50Hz for parallel jump estimation */
+  {
+    static uint32_t last_ac_time = 0;
+    if (get_elapsed_ms(last_ac_time) >= 20) /* 50Hz */
+    {
+      last_ac_time = now;
+      GsensorReadAxis(axis);
+      HallAntiCheat_Process(axis);
+    }
+  }
 #else
   (void)now;
   (void)axis;
@@ -97,28 +115,26 @@ static void RL_HandleBatteryCheck(uint32_t now, uint32_t *last_batt_check_time, 
   if (get_elapsed_ms(*last_batt_check_time) >= LOW_BATT_CHECK_INTERVAL_MS)
   {
     *last_batt_check_time = now;
-    uint16_t raw = Adc_ReadBatteryRawAvg(ADC_BATT_AVG_SAMPLES);
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    uint8_t is_low = (vbat <= ADC_BATT_LOW_V);
-    if (is_low && !(*low_batt))
-    {
-      DBG_PRINT("[Main] Low battery: %.2fV\n", vbat);
-    }
+    Adc_UpdateVdda();
+    float vdda = Adc_GetVdda();
+    uint8_t is_low = Adc_IsVddaLow();
+    DBG_PRINT("[BATT] vdda=%.3fV %s\n", (double)vdda, is_low ? "LOW" : "OK");
     *low_batt = is_low;
   }
 }
 
 static void RL_UpdateLedState(uint8_t low_batt)
 {
-  /* In REPL mode or when LED is under REPL override, skip entirely */
-  if (Sys_GetReplMode() || Sys_GetLedOverride())
-  {
-    return;
-  }
-
+  /* Low battery LED takes priority over all other LED states */
   if (low_batt)
   {
     SetGreenLedMode(LOW_BATT_LED_FREQ_HZ, LOW_BATT_LED_DUTY);
+    return;
+  }
+
+  /* In REPL mode or when LED is under REPL override, skip entirely */
+  if (Sys_GetReplMode() || Sys_GetLedOverride())
+  {
     return;
   }
 
@@ -326,10 +342,9 @@ static void RL_InitDrivers(void)
 
   /* Sensors */
   Gsensor_Init(100000, FSR_2G);
-  GsensorWakeup();
 
   /* Battery ADC */
-  Adc_InitBattery();
+  Adc_Init();
 
   /* Debug/printf UART (retarget uses UART0) */
   UART_Open(UART0, 115200);
@@ -353,6 +368,9 @@ static void RL_InitApplication(void)
   JumpDetect_Init();
   DBG_PRINT("[Main] G-Sensor jump detection mode enabled\n");
   DBG_PRINT("[Main] Auto calibration will start when stable\n");
+#elif USE_HALL_ANTICHEAT
+  HallAntiCheat_Init();
+  DBG_PRINT("[Main] HALL + anti-cheat (G-sensor validation) enabled\n");
 #else
   DBG_PRINT("[Main] HALL Sensor jump detection mode enabled\n");
 #endif
@@ -435,6 +453,12 @@ int main()
 
     BleAtRepl_RunIfActive();
 
+    /* Battery check runs unconditionally (including REPL mode) */
+    RL_HandleBatteryCheck(now, &s_last_batt_check_time, &s_low_batt);
+
+    /* Low battery LED must show even in REPL mode */
+    RL_UpdateLedState(s_low_batt);
+
     /* ---- REPL mode: only run BLE message processing, skip game/idle/LED ---- */
     if (Sys_GetReplMode() || Sys_GetLedOverride())
     {
@@ -450,7 +474,19 @@ int main()
     JumpDetect_UpdatePreCalibState();
 #endif
     RL_HandleGsensorPrint(now, &s_last_print_time, axis);
-    RL_HandleBatteryCheck(now, &s_last_batt_check_time, &s_low_batt);
+#if USE_HALL_ANTICHEAT
+    /* Detect game-start transition and reset anti-cheat state */
+    {
+      uint8_t game_running = (Sys_GetGameState() == GAME_START) ? 1u : 0u;
+      if (game_running && !s_prev_game_running)
+      {
+        s_hall_raw_total = 0u;
+        HallAntiCheat_Reset();
+        DBG_PRINT("[AntiCheat] Game started - counters reset\n");
+      }
+      s_prev_game_running = game_running;
+    }
+#endif
     /* Hall sensor IRQ print (main loop, not ISR) */
     if (Sys_GetHallPb7IrqFlag())
     {
@@ -461,12 +497,25 @@ int main()
         uint16_t jumps = GameAlgo_CalcJumpsFromEdges(s_hall_edge_residual, edges, &s_hall_edge_residual);
         if (jumps > 0u)
         {
+#if USE_HALL_ANTICHEAT
+          s_hall_raw_total += jumps;
+          uint16_t validated = HallAntiCheat_ValidateHallTotal(s_hall_raw_total);
+          uint16_t current = Sys_GetJumpTimes();
+          if (validated > current)
+          {
+            Sys_AddJumpTimes(validated - current);
+          }
+#else
           Sys_AddJumpTimes(jumps);
+#endif
         }
       }
       else
       {
         s_hall_edge_residual = 0u;
+#if USE_HALL_ANTICHEAT
+        s_hall_raw_total = 0u;
+#endif
       }
 
       uint16_t total = Sys_GetJumpTimes();
@@ -482,6 +531,7 @@ int main()
 
     RL_HandleBleAndGameState();
     RL_HandleIdlePowerOff(&s_poweroff_done);
+    /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
     RL_UpdateLedState(s_low_batt);
   }
 }

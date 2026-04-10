@@ -2,54 +2,50 @@
 #include "adc.h"
 #include "project_config.h"
 
-void Adc_InitBattery(void)
-{
-    /* Configure EADC in single-end mode and sample module 0 on channel 1 (PB1) */
-    EADC_Open(EADC, EADC_CTL_DIFFEN_SINGLE_END);
-    EADC_ConfigSampleModule(EADC, 0, EADC_SOFTWARE_TRIGGER, 1);
-    EADC_CLR_INT_FLAG(EADC, EADC_STATUS2_ADIF0_Msk);
-}
+/* Measured AVDD (V), updated by Adc_UpdateVdda(). Initialised to nominal 3.3V. */
+static float s_vdda = 3.3f;
 
-uint16_t Adc_ReadBatteryRaw(void)
+void Adc_UpdateVdda(void)
 {
     uint32_t timeout = ADC_CONV_TIMEOUT;
+    int32_t raw_bg = 0;
 
-    EADC_START_CONV(EADC, BIT0);
+    /* Band-gap source needs extra settling time; use maximum extend window */
+    EADC_SetExtendSampleTime(EADC, 16, 0x3F);
+    EADC_START_CONV(EADC, BIT16);
+
     while (timeout--)
     {
-        if (EADC_GET_DATA_VALID_FLAG(EADC, BIT0))
+        if (EADC_GET_DATA_VALID_FLAG(EADC, BIT16))
         {
-            return (uint16_t)EADC_GET_CONV_DATA(EADC, 0);
+            raw_bg = EADC_GET_CONV_DATA(EADC, 16);
+            break;
         }
     }
 
-    return 0;
-}
-
-uint16_t Adc_ReadBatteryRawAvg(uint8_t samples)
-{
-    if (samples == 0)
+    if (raw_bg > 0)
     {
-        samples = 1;
+        /* AVDD_actual = VBG_nominal * 4095 / raw_bg */
+        s_vdda = (ADC_VBG_NOMINAL * ADC_FULL_SCALE) / (float)raw_bg;
     }
-
-    uint32_t sum = 0;
-    for (uint8_t i = 0; i < samples; ++i)
-    {
-        sum += Adc_ReadBatteryRaw();
-    }
-
-    return (uint16_t)(sum / samples);
+    /* else: keep previous cached value */
 }
 
-float Adc_ConvertRawToBatteryV(uint16_t raw)
+float Adc_GetVdda(void)
 {
-    float v_adc = ((float)raw / ADC_FULL_SCALE) * ADC_VREF_V;
-    return v_adc / ADC_DIVIDER_RATIO;
+    return s_vdda;
 }
 
-uint8_t Adc_IsBatteryLow(uint16_t raw)
+uint8_t Adc_IsVddaLow(void)
 {
-    float vbat = Adc_ConvertRawToBatteryV(raw);
-    return (vbat <= ADC_BATT_LOW_V) ? 1u : 0u;
+    return (s_vdda < ADC_VDDA_LOW_V) ? 1u : 0u;
+}
+
+void Adc_Init(void)
+{
+    /* Only need EADC open for band-gap (sample module 16, fixed channel) */
+    EADC_Open(EADC, EADC_CTL_DIFFEN_SINGLE_END);
+
+    /* Prime the AVDD cache with an initial measurement */
+    Adc_UpdateVdda();
 }
