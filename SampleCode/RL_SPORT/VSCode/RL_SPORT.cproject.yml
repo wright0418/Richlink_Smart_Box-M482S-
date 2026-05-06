@@ -16,7 +16,7 @@ project:
           -O0,
           -gdwarf-4,
         ]
-      ASM: [-D__MICROLIB]
+      ASM: [ -D__MICROLIB ]
       Link:
         [
           --library_type=microlib,
@@ -34,7 +34,7 @@ project:
 
   setups:
     - output:
-        type: ["elf", "bin"]
+        type: [ "elf", "bin" ]
     - define:
         - ARM_MATH_CM4
         - __FPU_PRESENT
@@ -70,6 +70,7 @@ project:
         - file: ../system_status.c
         - file: ../game_logic.c
         - file: ../ble.c
+        - file: ../ble_parser.c
         - file: ../ble_at_repl.c
         - file: ../led.c
         - file: ../buzzer.c

@@ -1,11 +1,12 @@
 /**
- * @file pwm_timer.h
- * @brief Lightweight PWM and timer helper API
+ * @file legacy/pwm_timer.h
+ * @brief DEPRECATED placeholder PWM and timer helper (moved to legacy/)
  *
- * This header exposes a small set of helpers to start/stop PWM outputs
- * and to use the common millisecond tick source shared with the LED
- * module. Implementations are platform-specific; the API focuses on
- * portability and clear parameter ranges.
+ * DEPRECATED: This module is a placeholder and has been moved to
+ * `SampleCode/RL_SPORT/legacy/pwm_timer.h` on 2026-05-06 for clarity.
+ * It is retained for historical reference. Do NOT include in new code;
+ * prefer using the board's driver APIs (e.g., StdDriver BPWM/EPWM) or
+ * the LED/buzzer modules which currently own timer hardware.
  */
 
 #ifndef _PWM_TIMER_H_
@@ -16,8 +17,8 @@
 /**
  * @brief Initialize timers and PWM resources used by modules.
  *
- * Safe to call multiple times; must be called before starting PWM on any
- * channel.
+ * DEPRECATED: placeholder. Safe to call multiple times; must be called
+ * before starting PWM on any channel in the original design.
  */
 void PWM_Timer_Init(void);
 
@@ -26,12 +27,16 @@ void PWM_Timer_Init(void);
  * @param channel Logical PWM channel (mapped to hardware in implementation).
  * @param freq_hz Frequency in Hz. Use 0 to stop PWM on the channel.
  * @param duty_percent Duty cycle 0..100 (0 = off, 100 = full on).
+ *
+ * DEPRECATED: placeholder API.
  */
 void PWM_Start(uint8_t channel, uint32_t freq_hz, uint8_t duty_percent);
 
 /**
  * @brief Stop PWM on the specified channel.
  * @param channel PWM channel to stop.
+ *
+ * DEPRECATED: placeholder API.
  */
 void PWM_Stop(uint8_t channel);
 

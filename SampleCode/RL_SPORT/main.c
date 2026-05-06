@@ -220,7 +220,8 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 
 /*
  * Module implementation notes:
- * - BLE (BLEParseCommand, UART IRQ/RX handling, BLE transport) implemented in ble.c, declared in ble.h
+ * - BLE transport/UART IRQ are implemented in ble.c; pure text parsing helpers
+ *   (e.g. BleParser_ParseCommand) are split into ble_parser.c/.h for unit tests.
  * - System status and global `g_sys` live in system_status.c and are initialized by Sys_Init()
  * - GPIO interrupts, buttons and board-level pin config are in gpio.c
  * - LED, Buzzer, Timer and G-sensor drivers live in led.c, buzzer.c, timer.c and gsensor.c

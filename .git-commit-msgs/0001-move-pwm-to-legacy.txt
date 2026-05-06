@@ -1,0 +1,3 @@
+chore(rl_sport): move pwm_timer to legacy and mark DEPRECATED
+
+Move `pwm_timer.c` and `pwm_timer.h` into `SampleCode/RL_SPORT/legacy/` and annotate the header as DEPRECATED. Update `docs/SampleCode/RL_SPORT/REFACTORING_VALIDATION_PLAN.md` to record the change. This keeps unused placeholder code out of the main build and reduces confusion.

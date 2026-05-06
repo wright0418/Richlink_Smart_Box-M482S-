@@ -251,12 +251,23 @@ static uint8_t Test_BLE_SwitchToDataMode(void)
     return Test_BLE_WaitMode(1u, 400u);
 }
 
+static uint8_t Test_BLE_CopyDeviceNameSnapshot(char *dst, uint32_t dst_size)
+{
+    return (uint8_t)(Sys_CopyDeviceName(dst, dst_size) > 0u);
+}
+
+static uint8_t Test_BLE_CopyMacAddrSnapshot(char *dst, uint32_t dst_size)
+{
+    return (uint8_t)(Sys_CopyMacAddr(dst, dst_size) > 0u);
+}
+
 static void Test_BLE_AT_CMD(void)
 {
     const uint32_t timeout_ms = 2000u;
     uint32_t start = get_ticks_ms();
     uint8_t got_name_resp = 0u;
     uint8_t pass = 0u;
+    char device_name[SYS_DEVICE_NAME_BUF_SIZE];
 
     printf("[Test] BLE AT CMD: query name, expect ROPR_\n");
 
@@ -266,21 +277,20 @@ static void Test_BLE_AT_CMD(void)
         return;
     }
 
-    Sys_SetDeviceName("", 0u);
+    Sys_ClearDeviceName();
     BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_NAME_QUERY);
 
     while (!is_timeout(start, timeout_ms))
     {
         CheckBleRecvMsg();
 
-        const char *name = Sys_GetDeviceName();
-        if (name && name[0] != '\0')
+        if (Test_BLE_CopyDeviceNameSnapshot(device_name, (uint32_t)sizeof(device_name)))
         {
             got_name_resp = 1u;
-            printf("[Test] BLE NAME = %s\n", name);
+            printf("[Test] BLE NAME = %s\n", device_name);
 
             /* Single read result: one response is enough to decide pass/fail. */
-            if ((strstr(name, "ROPR_") != NULL) || (strstr(name, "ROPE_") != NULL))
+            if ((strstr(device_name, "ROPR_") != NULL) || (strstr(device_name, "ROPE_") != NULL))
             {
                 pass = 1u;
             }
@@ -736,6 +746,8 @@ static uint8_t AT_I2c(const char *param)
 /* ------------------------------------------------------------------ */
 static uint8_t AT_BleName(void)
 {
+    char device_name[SYS_DEVICE_NAME_BUF_SIZE];
+
     if (!Test_BLE_SwitchToCmdMode())
     {
         printf("+TEST:BLE,FAIL,CMD_MODE\r\n");
@@ -746,18 +758,17 @@ static uint8_t AT_BleName(void)
     delay_ms(TEST_BLE_SETTLE_MS);
     CheckBleRecvMsg();
 
-    Sys_SetDeviceName("", 0u);
+    Sys_ClearDeviceName();
     BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_NAME_QUERY);
 
     uint32_t start = get_ticks_ms();
     while (!is_timeout(start, TEST_BLE_NAME_TIMEOUT_MS))
     {
         CheckBleRecvMsg();
-        const char *name = Sys_GetDeviceName();
-        if (name && name[0] != '\0')
+        if (Test_BLE_CopyDeviceNameSnapshot(device_name, (uint32_t)sizeof(device_name)))
         {
-            uint8_t ok = (strstr(name, "ROPR_") || strstr(name, "ROPE_")) ? 1u : 0u;
-            printf("+TEST:BLE,%s,NAME=%s\r\n", ok ? "PASS" : "FAIL", name);
+            uint8_t ok = (strstr(device_name, "ROPR_") || strstr(device_name, "ROPE_")) ? 1u : 0u;
+            printf("+TEST:BLE,%s,NAME=%s\r\n", ok ? "PASS" : "FAIL", device_name);
             Test_BLE_SwitchToDataMode();
             return ok;
         }
@@ -771,6 +782,8 @@ static uint8_t AT_BleName(void)
 
 static uint8_t AT_BleMac(void)
 {
+    char mac_addr[SYS_MAC_ADDR_BUF_SIZE];
+
     if (!Test_BLE_SwitchToCmdMode())
     {
         printf("+TEST:BLE,FAIL,CMD_MODE\r\n");
@@ -778,17 +791,16 @@ static uint8_t AT_BleMac(void)
     }
 
     delay_ms(200u);
-    Sys_SetMacAddr("", 0u);
+    Sys_ClearMacAddr();
     BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
 
     uint32_t start = get_ticks_ms();
     while (!is_timeout(start, 2000u))
     {
         CheckBleRecvMsg();
-        const char *mac = Sys_GetMacAddr();
-        if (mac && mac[0] != '\0')
+        if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
         {
-            printf("+TEST:BLE,PASS,MAC=%s\r\n", mac);
+            printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
             Test_BLE_SwitchToDataMode();
             return 1u;
         }
@@ -870,6 +882,10 @@ static uint8_t AT_Pwr(const char *param)
 static void AT_All_Ble(uint32_t *pass, uint32_t *fail)
 {
     uint8_t ble_ok = 0u;
+    uint8_t got_name_resp = 0u;
+    char device_name[SYS_DEVICE_NAME_BUF_SIZE];
+    char mac_addr[SYS_MAC_ADDR_BUF_SIZE];
+
     if (Test_BLE_SwitchToCmdMode())
     {
         /* Let BLE module settle after CMD mode switch */
@@ -877,46 +893,45 @@ static void AT_All_Ble(uint32_t *pass, uint32_t *fail)
         CheckBleRecvMsg();
 
         /* NAME */
-        Sys_SetDeviceName("", 0u);
+        Sys_ClearDeviceName();
         BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_NAME_QUERY);
         uint32_t start = get_ticks_ms();
         while (!is_timeout(start, TEST_BLE_NAME_TIMEOUT_MS))
         {
             CheckBleRecvMsg();
-            const char *name = Sys_GetDeviceName();
-            if (name && name[0] != '\0')
+            if (Test_BLE_CopyDeviceNameSnapshot(device_name, (uint32_t)sizeof(device_name)))
             {
-                if (strstr(name, "ROPR_") || strstr(name, "ROPE_"))
+                got_name_resp = 1u;
+                if (strstr(device_name, "ROPR_") || strstr(device_name, "ROPE_"))
                 {
-                    printf("+TEST:BLE,PASS,NAME=%s\r\n", name);
+                    printf("+TEST:BLE,PASS,NAME=%s\r\n", device_name);
                     ble_ok = 1u;
                 }
                 else
                 {
-                    printf("+TEST:BLE,FAIL,NAME=%s\r\n", name);
+                    printf("+TEST:BLE,FAIL,NAME=%s\r\n", device_name);
                 }
                 break;
             }
             delay_ms(5u);
         }
-        if (!ble_ok && !Sys_GetDeviceName()[0])
+        if (!ble_ok && !got_name_resp)
         {
             printf("+TEST:BLE,FAIL,NO_RESPONSE\r\n");
         }
 
         /* MAC (reuse CMD mode — gap after NAME response) */
         delay_ms(200u);
-        Sys_SetMacAddr("", 0u);
+        Sys_ClearMacAddr();
         BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
         start = get_ticks_ms();
         uint8_t mac_ok = 0u;
         while (!is_timeout(start, 2000u))
         {
             CheckBleRecvMsg();
-            const char *mac = Sys_GetMacAddr();
-            if (mac && mac[0] != '\0')
+            if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
             {
-                printf("+TEST:BLE,PASS,MAC=%s\r\n", mac);
+                printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
                 mac_ok = 1u;
                 break;
             }

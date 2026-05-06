@@ -11,6 +11,9 @@
 
 #include <stdint.h>
 
+#define SYS_MAC_ADDR_BUF_SIZE 24u
+#define SYS_DEVICE_NAME_BUF_SIZE 30u
+
 /* BLE connection state */
 typedef enum
 {
@@ -34,8 +37,8 @@ typedef struct
     volatile uint8_t keyA_state; // 0: Released , 1: Press
     volatile uint16_t jump_times;
     volatile uint16_t left_time_ms;
-    volatile uint8_t mac_addr[24];
-    volatile uint8_t device_name[30];
+    volatile uint8_t mac_addr[SYS_MAC_ADDR_BUF_SIZE];
+    volatile uint8_t device_name[SYS_DEVICE_NAME_BUF_SIZE];
     volatile uint8_t keyA_flag;
     volatile uint8_t hall_pb7_irq_flag;
     volatile uint8_t hall_pb7_edge_pending;
@@ -63,14 +66,14 @@ static inline void Sys_SetGameState(GameState state) { g_sys.game_state = state;
 
 /* Jump counter accessors */
 static inline uint16_t Sys_GetJumpTimes(void) { return g_sys.jump_times; }
-static inline void Sys_SetJumpTimes(uint16_t times) { g_sys.jump_times = times; }
-static inline void Sys_IncrementJumpTimes(void) { g_sys.jump_times++; }
+void Sys_SetJumpTimes(uint16_t times);
 /**
  * @brief Atomically add jump count delta.
  * @param delta Number of jumps to add.
  */
 void Sys_AddJumpTimes(uint16_t delta);
-static inline void Sys_ResetJumpTimes(void) { g_sys.jump_times = 0; }
+static inline void Sys_IncrementJumpTimes(void) { Sys_AddJumpTimes(1u); }
+static inline void Sys_ResetJumpTimes(void) { Sys_SetJumpTimes(0u); }
 
 /* Button/sensor flag accessors */
 static inline uint8_t Sys_GetKeyAFlag(void) { return g_sys.keyA_flag; }
@@ -98,10 +101,12 @@ static inline uint8_t Sys_GetLedOverride(void) { return g_sys.repl_led_override;
 static inline void Sys_SetLedOverride(uint8_t v) { g_sys.repl_led_override = v; }
 
 /* MAC address and device name accessors */
-const char *Sys_GetMacAddr(void);
 void Sys_SetMacAddr(const char *addr, uint32_t len);
-const char *Sys_GetDeviceName(void);
+uint32_t Sys_CopyMacAddr(char *dst, uint32_t dst_size);
+static inline void Sys_ClearMacAddr(void) { Sys_SetMacAddr("", 0u); }
 void Sys_SetDeviceName(const char *name, uint32_t len);
+uint32_t Sys_CopyDeviceName(char *dst, uint32_t dst_size);
+static inline void Sys_ClearDeviceName(void) { Sys_SetDeviceName("", 0u); }
 
 /* Initialization */
 void Sys_Init(void);
