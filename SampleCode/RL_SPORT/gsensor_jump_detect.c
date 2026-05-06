@@ -30,7 +30,7 @@ typedef struct
 
 #include "system_status.h"
 #include "drivers/timer.h"
-#include "buzzer.h"
+#include "drivers/buzzer.h"
 #include "drivers/gsensor.h"
 #include "drivers/led.h"
 #include <string.h>

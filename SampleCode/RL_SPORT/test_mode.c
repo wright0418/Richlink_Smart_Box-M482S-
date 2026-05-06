@@ -6,7 +6,7 @@
 #include "project_config.h"
 #include "drivers/timer.h"
 #include "drivers/led.h"
-#include "buzzer.h"
+#include "drivers/buzzer.h"
 #include "drivers/gsensor.h"
 #include "drivers/adc.h"
 #include "board/gpio.h"

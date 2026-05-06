@@ -17,7 +17,7 @@
 #include "game_logic.h"
 #include "ble.h"
 #include "drivers/led.h"
-#include "buzzer.h"
+#include "drivers/buzzer.h"
 #include "board/gpio.h"
 #include "drivers/gsensor.h"
 #include "board/board_test_gpio.h"

@@ -73,7 +73,7 @@ project:
         - file: ../protocol/ble_parser.c
         - file: ../ble_at_repl.c
         - file: ../drivers/led.c
-        - file: ../buzzer.c
+        - file: ../drivers/buzzer.c
         - file: ../board/gpio.c
         - file: ../drivers/adc.c
         - file: ../test_mode.c
