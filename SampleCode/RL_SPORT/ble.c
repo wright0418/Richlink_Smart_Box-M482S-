@@ -441,6 +441,8 @@ typedef struct
   uint32_t state_enter_ms;
   BleRenameState state;
   char mac_suffix[5];
+  char name_suffix[5];
+  uint8_t has_name_suffix;
 } BleRenameFlowCtx;
 
 static BleRenameFlowCtx s_rename = {0};
@@ -452,6 +454,15 @@ static uint8_t Ble_IsHexChar(char c)
                    (c >= 'a' && c <= 'f'));
 }
 
+static char Ble_ToUpperHex(char c)
+{
+  if (c >= 'a' && c <= 'f')
+  {
+    return (char)(c - ('a' - 'A'));
+  }
+  return c;
+}
+
 static uint8_t Ble_ExtractMacSuffix4(const char *src, char *out4)
 {
   if (!src || !out4)
@@ -459,36 +470,39 @@ static uint8_t Ble_ExtractMacSuffix4(const char *src, char *out4)
     return 0u;
   }
 
-  char hex_buf[16];
-  uint8_t hex_len = 0u;
-  for (size_t i = 0u; src[i] != '\0'; i++)
+  /* Extract rightmost 4 hex chars from response line to avoid prefix
+     contamination like "MAC_ADDR" and support multiple MAC formats. */
+  char rev_hex4[4];
+  uint8_t found = 0u;
+  size_t len = strlen(src);
+
+  while (len > 0u && found < 4u)
   {
-    if (Ble_IsHexChar(src[i]))
+    char c = src[len - 1u];
+    if (Ble_IsHexChar(c))
     {
-      if (hex_len < (uint8_t)sizeof(hex_buf))
-      {
-        hex_buf[hex_len++] = src[i];
-      }
+      rev_hex4[found++] = Ble_ToUpperHex(c);
     }
+    len--;
   }
 
-  if (hex_len < 4u)
+  if (found < 4u)
   {
     out4[0] = '\0';
     return 0u;
   }
 
-  out4[0] = hex_buf[hex_len - 4u];
-  out4[1] = hex_buf[hex_len - 3u];
-  out4[2] = hex_buf[hex_len - 2u];
-  out4[3] = hex_buf[hex_len - 1u];
+  out4[0] = rev_hex4[3];
+  out4[1] = rev_hex4[2];
+  out4[2] = rev_hex4[1];
+  out4[3] = rev_hex4[0];
   out4[4] = '\0';
   return 1u;
 }
 
-static uint8_t Ble_HasValidRopeSuffix(const char *name)
+static uint8_t Ble_ExtractRopeSuffix4(const char *name, char *out4)
 {
-  if (!name)
+  if (!name || !out4)
   {
     return 0u;
   }
@@ -496,6 +510,7 @@ static uint8_t Ble_HasValidRopeSuffix(const char *name)
   const char *p = strstr(name, "ROPE_");
   if (!p)
   {
+    out4[0] = '\0';
     return 0u;
   }
 
@@ -504,9 +519,13 @@ static uint8_t Ble_HasValidRopeSuffix(const char *name)
   {
     if (!Ble_IsHexChar(p[i]))
     {
+      out4[0] = '\0';
       return 0u;
     }
+    out4[i] = Ble_ToUpperHex(p[i]);
   }
+
+  out4[4] = '\0';
   return 1u;
 }
 
@@ -630,22 +649,17 @@ void Ble_RenameFlowProcess(void)
         break;
       }
 
-      uint8_t has_valid_rope = Ble_HasValidRopeSuffix(Sys_GetDeviceName());
-      s_rename.need_rename = (uint8_t)(!has_valid_rope);
-      if (s_rename.need_rename)
-      {
-        s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
-      }
-      else
-      {
-        s_rename.state = BLE_RENAME_SEND_MODE_DATA;
-      }
+      /* Always compare current name suffix with MAC suffix to remediate
+         old FW wrong rename cases. */
+      s_rename.has_name_suffix = Ble_ExtractRopeSuffix4(Sys_GetDeviceName(), s_rename.name_suffix);
+      s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
       s_rename.state_enter_ms = now;
     }
     else if (is_timeout(s_rename.state_enter_ms, 300u))
     {
-      /* No valid name response in time -> continue with rename path. */
-      s_rename.need_rename = 1u;
+      /* No valid name response in time -> still query MAC and decide. */
+      s_rename.has_name_suffix = 0u;
+      s_rename.name_suffix[0] = '\0';
       s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
       s_rename.state_enter_ms = now;
     }
@@ -668,16 +682,26 @@ void Ble_RenameFlowProcess(void)
       }
 
       uint8_t has_suffix = Ble_ExtractMacSuffix4(Sys_GetMacAddr(), s_rename.mac_suffix);
-      if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
-      {
-        memcpy(s_rename.mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4u);
-        s_rename.mac_suffix[4] = '\0';
-        has_suffix = 1u;
-      }
-
       if (has_suffix)
       {
-        s_rename.state = BLE_RENAME_SEND_SET_NAME;
+        if (s_rename.has_name_suffix &&
+            strncmp((const char *)s_rename.name_suffix,
+                    (const char *)s_rename.mac_suffix, 4u) == 0)
+        {
+          /* Name already matches MAC suffix. */
+          s_rename.need_rename = 0u;
+          s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+        }
+        else
+        {
+          /* Name missing/invalid/mismatched: repair name. */
+          s_rename.need_rename = 1u;
+          s_rename.state = BLE_RENAME_SEND_SET_NAME;
+        }
+        DBG_PRINT("[BLE] rename check name_suffix=%s mac_suffix=%s need_rename=%u\n",
+                  s_rename.has_name_suffix ? s_rename.name_suffix : "NONE",
+                  s_rename.mac_suffix,
+                  (unsigned)s_rename.need_rename);
         s_rename.state_enter_ms = now;
       }
       else
