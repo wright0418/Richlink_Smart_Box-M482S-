@@ -10,7 +10,7 @@
 #include "gsensor.h"
 #include "adc.h"
 #include "buzzer.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "project_config.h"
 
 /* Simple blocking delay (approx) */

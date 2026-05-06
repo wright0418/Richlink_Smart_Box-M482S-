@@ -4,7 +4,7 @@
  */
 #include "game_logic.h"
 #include "system_status.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "led.h"
 #include "ble.h"
 #include "gsensor.h"

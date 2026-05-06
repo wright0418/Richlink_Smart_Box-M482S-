@@ -35,13 +35,13 @@ void *memmove(void *dest, const void *src, size_t n);
 #endif
 
 #include "ble.h"
-#include "ble_parser.h"
+#include "protocol/ble_parser.h"
 #include "ble_at_repl.h"
 #include "system_status.h"
 #include "buzzer.h"
 #include "led.h"
 #include "game_logic.h"
-#include "timer.h"
+#include "drivers/timer.h"
 
 /* Reuse buffer sizes from header */
 volatile uint8_t g_u8RecData[RXBUFSIZE] = {0};

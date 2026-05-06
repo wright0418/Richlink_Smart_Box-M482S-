@@ -1,0 +1,6 @@
+chore(rl_sport): move timer to drivers/ and update includes
+
+Moved timer.c/timer.h into SampleCode/RL_SPORT/drivers/ to group hardware drivers.
+Updated source files to include "drivers/timer.h" and adjusted project file.
+
+All changes validated with static checks, unit compile-only tests, and AC6 build.

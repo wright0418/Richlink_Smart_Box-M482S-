@@ -33,7 +33,7 @@ $testTargets = @(
         Name    = "test_ble_parser"
         Sources = @(
             (Join-Path $PSScriptRoot "test_ble_parser.c"),
-            (Join-Path $PSScriptRoot "..\ble_parser.c")
+            (Join-Path $PSScriptRoot "..\protocol\ble_parser.c")
         )
     }
 )

@@ -66,11 +66,11 @@ project:
     - group: User
       files:
         - file: ../main.c
-        - file: ../timer.c
+        - file: ../drivers/timer.c
         - file: ../system_status.c
         - file: ../game_logic.c
         - file: ../ble.c
-        - file: ../ble_parser.c
+        - file: ../protocol/ble_parser.c
         - file: ../ble_at_repl.c
         - file: ../led.c
         - file: ../buzzer.c

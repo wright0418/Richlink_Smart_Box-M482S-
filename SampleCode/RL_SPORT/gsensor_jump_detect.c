@@ -29,7 +29,7 @@ typedef struct
 #if USE_GSENSOR_JUMP_DETECT
 
 #include "system_status.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "buzzer.h"
 #include "gsensor.h"
 #include "led.h"

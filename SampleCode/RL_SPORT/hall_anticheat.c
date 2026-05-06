@@ -14,7 +14,7 @@
 #include <math.h>
 #include <string.h>
 #include "gsensor.h"
-#include "timer.h"
+#include "drivers/timer.h"
 
 extern float sqrtf(float);
 

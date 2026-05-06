@@ -1,5 +1,5 @@
 /**
- * @file ble_parser.h
+ * @file protocol/ble_parser.h
  * @brief Pure BLE text parsing helpers for response classification and suffix extraction.
  *
  * This module intentionally contains only string parsing logic so it can be

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../ble_parser.h"
+#include "../protocol/ble_parser.h"
 
 static int s_failed = 0;
 

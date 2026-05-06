@@ -13,7 +13,7 @@
 /* Project configuration and common definitions */
 #include "project_config.h"
 #include "system_status.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "game_logic.h"
 #include "ble.h"
 #include "led.h"
@@ -221,8 +221,8 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 /*
  * Module implementation notes:
  * - BLE transport/UART IRQ are implemented in ble.c; pure text parsing helpers
- *   (e.g. BleParser_ParseCommand) are split into ble_parser.c/.h for unit tests.
- * - System status and global `g_sys` live in system_status.c and are initialized by Sys_Init()
+ *   (e.g. BleParser_ParseCommand) are split into protocol/ble_parser.c/.h for unit tests.
+ * - System status storage and accessor APIs live in system_status.c and are initialized by Sys_Init()
  * - GPIO interrupts, buttons and board-level pin config are in gpio.c
  * - LED, Buzzer, Timer and G-sensor drivers live in led.c, buzzer.c, timer.c and gsensor.c
  *
@@ -235,7 +235,7 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 /*---------------------------------------------------------------------------------------------------------*/
 
 /**
- * @brief Handle KeyA event: clear g_keyA_state
+ * @brief Handle KeyA event and refresh the movement inactivity timer.
  */
 
 void ProcessKeyAEvent(void)

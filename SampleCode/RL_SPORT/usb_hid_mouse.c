@@ -5,7 +5,7 @@
 #include <string.h>
 #include "NuMicro.h"
 #include "project_config.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "usb_hid_mouse.h"
 #include "usb_hid_mouse_internal.h"
 

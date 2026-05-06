@@ -15,7 +15,7 @@
 - 測試檔：
   - `tests/test_game_algorithms.c`
   - `tests/test_ble_parser.c`
-- parser module：`ble_parser.c`, `ble_parser.h`
+- parser module：`protocol/ble_parser.c`, `protocol/ble_parser.h`
 - 腳本：`tests/run_tests.ps1`
 - 說明：
   - 若電腦有 host `gcc` 或 `clang`，腳本會編譯並執行測試。

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "NuMicro.h"
 #include "project_config.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "led.h"
 #include "buzzer.h"
 #include "gsensor.h"

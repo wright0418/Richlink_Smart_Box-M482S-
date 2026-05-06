@@ -5,8 +5,8 @@
 #include "power_mgmt.h"
 #include "NuMicro.h"
 #include "project_config.h"
-#include "gpio.h"  /* For GPIO helpers */
-#include "timer.h" /* For get_ticks if needed */
+#include "gpio.h"          /* For GPIO helpers */
+#include "drivers/timer.h" /* For get_ticks if needed */
 
 /* Wake flag masks (from clk_reg.h) for readability */
 #ifndef CLK_PMUSTS_GPAWK_Msk

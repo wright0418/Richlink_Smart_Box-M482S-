@@ -34,9 +34,7 @@ typedef struct
     volatile BleState ble_state;
     volatile uint8_t ble_mode; // 0:CMD , 1:DATA
     volatile GameState game_state;
-    volatile uint8_t keyA_state; // 0: Released , 1: Press
     volatile uint16_t jump_times;
-    volatile uint16_t left_time_ms;
     volatile uint8_t mac_addr[SYS_MAC_ADDR_BUF_SIZE];
     volatile uint8_t device_name[SYS_DEVICE_NAME_BUF_SIZE];
     volatile uint8_t keyA_flag;
@@ -47,39 +45,36 @@ typedef struct
     volatile uint8_t repl_led_override; /* 0: main LED allowed, 1: REPL/override controls LED */
 } SystemStatus;
 
-/* Global instance (defined in system_status.c) */
-extern SystemStatus g_sys;
-
 /***************************************************************************
  * Accessor APIs (encapsulate state access to avoid direct g_sys manipulation)
  ***************************************************************************/
 
 /* BLE state accessors */
-static inline BleState Sys_GetBleState(void) { return g_sys.ble_state; }
-static inline void Sys_SetBleState(BleState state) { g_sys.ble_state = state; }
-static inline uint8_t Sys_GetBleMode(void) { return g_sys.ble_mode; }
-static inline void Sys_SetBleMode(uint8_t mode) { g_sys.ble_mode = mode; }
+BleState Sys_GetBleState(void);
+void Sys_SetBleState(BleState state);
+uint8_t Sys_GetBleMode(void);
+void Sys_SetBleMode(uint8_t mode);
 
 /* Game state accessors */
-static inline GameState Sys_GetGameState(void) { return g_sys.game_state; }
-static inline void Sys_SetGameState(GameState state) { g_sys.game_state = state; }
+GameState Sys_GetGameState(void);
+void Sys_SetGameState(GameState state);
 
 /* Jump counter accessors */
-static inline uint16_t Sys_GetJumpTimes(void) { return g_sys.jump_times; }
+uint16_t Sys_GetJumpTimes(void);
 void Sys_SetJumpTimes(uint16_t times);
 /**
  * @brief Atomically add jump count delta.
  * @param delta Number of jumps to add.
  */
 void Sys_AddJumpTimes(uint16_t delta);
-static inline void Sys_IncrementJumpTimes(void) { Sys_AddJumpTimes(1u); }
-static inline void Sys_ResetJumpTimes(void) { Sys_SetJumpTimes(0u); }
+void Sys_IncrementJumpTimes(void);
+void Sys_ResetJumpTimes(void);
 
 /* Button/sensor flag accessors */
-static inline uint8_t Sys_GetKeyAFlag(void) { return g_sys.keyA_flag; }
-static inline void Sys_SetKeyAFlag(uint8_t flag) { g_sys.keyA_flag = flag; }
-static inline uint8_t Sys_GetHallPb7IrqFlag(void) { return g_sys.hall_pb7_irq_flag; }
-static inline void Sys_SetHallPb7IrqFlag(uint8_t flag) { g_sys.hall_pb7_irq_flag = flag; }
+uint8_t Sys_GetKeyAFlag(void);
+void Sys_SetKeyAFlag(uint8_t flag);
+uint8_t Sys_GetHallPb7IrqFlag(void);
+void Sys_SetHallPb7IrqFlag(uint8_t flag);
 /**
  * @brief Atomically accumulate one pending Hall PB7 edge event.
  *
@@ -91,22 +86,22 @@ void Sys_AccumulateHallPb7Edge(void);
  * @return Pending edge count accumulated since last take.
  */
 uint8_t Sys_TakeHallPb7PendingEdges(void);
-static inline uint8_t Sys_GetIdleState(void) { return g_sys.idle_state; }
-static inline void Sys_SetIdleState(uint8_t state) { g_sys.idle_state = state; }
-static inline uint8_t Sys_GetReplMode(void) { return g_sys.repl_mode; }
-static inline void Sys_SetReplMode(uint8_t mode) { g_sys.repl_mode = mode; }
+uint8_t Sys_GetIdleState(void);
+void Sys_SetIdleState(uint8_t state);
+uint8_t Sys_GetReplMode(void);
+void Sys_SetReplMode(uint8_t mode);
 
 /* LED override accessors: when set, main LED update should skip reapplying blink */
-static inline uint8_t Sys_GetLedOverride(void) { return g_sys.repl_led_override; }
-static inline void Sys_SetLedOverride(uint8_t v) { g_sys.repl_led_override = v; }
+uint8_t Sys_GetLedOverride(void);
+void Sys_SetLedOverride(uint8_t v);
 
 /* MAC address and device name accessors */
 void Sys_SetMacAddr(const char *addr, uint32_t len);
 uint32_t Sys_CopyMacAddr(char *dst, uint32_t dst_size);
-static inline void Sys_ClearMacAddr(void) { Sys_SetMacAddr("", 0u); }
+void Sys_ClearMacAddr(void);
 void Sys_SetDeviceName(const char *name, uint32_t len);
 uint32_t Sys_CopyDeviceName(char *dst, uint32_t dst_size);
-static inline void Sys_ClearDeviceName(void) { Sys_SetDeviceName("", 0u); }
+void Sys_ClearDeviceName(void);
 
 /* Initialization */
 void Sys_Init(void);

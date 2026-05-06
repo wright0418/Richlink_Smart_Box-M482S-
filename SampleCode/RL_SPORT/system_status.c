@@ -6,8 +6,8 @@
 #include "NuMicro.h"
 #include <string.h>
 
-/* Global system status instance (extern declaration in header) */
-SystemStatus g_sys;
+/* Global system status instance kept private to this translation unit. */
+static SystemStatus g_sys;
 
 static void Sys_SetString(volatile uint8_t *dst, uint32_t dst_size, const char *src, uint32_t len)
 {
@@ -56,15 +56,108 @@ static uint32_t Sys_CopyString(const volatile uint8_t *src, uint32_t src_size, c
     return i;
 }
 
+BleState Sys_GetBleState(void)
+{
+    return g_sys.ble_state;
+}
+
+void Sys_SetBleState(BleState state)
+{
+    g_sys.ble_state = state;
+}
+
+uint8_t Sys_GetBleMode(void)
+{
+    return g_sys.ble_mode;
+}
+
+void Sys_SetBleMode(uint8_t mode)
+{
+    g_sys.ble_mode = mode;
+}
+
+GameState Sys_GetGameState(void)
+{
+    return g_sys.game_state;
+}
+
+void Sys_SetGameState(GameState state)
+{
+    g_sys.game_state = state;
+}
+
+uint16_t Sys_GetJumpTimes(void)
+{
+    return g_sys.jump_times;
+}
+
+void Sys_IncrementJumpTimes(void)
+{
+    Sys_AddJumpTimes(1u);
+}
+
+void Sys_ResetJumpTimes(void)
+{
+    Sys_SetJumpTimes(0u);
+}
+
+uint8_t Sys_GetKeyAFlag(void)
+{
+    return g_sys.keyA_flag;
+}
+
+void Sys_SetKeyAFlag(uint8_t flag)
+{
+    g_sys.keyA_flag = flag;
+}
+
+uint8_t Sys_GetHallPb7IrqFlag(void)
+{
+    return g_sys.hall_pb7_irq_flag;
+}
+
+void Sys_SetHallPb7IrqFlag(uint8_t flag)
+{
+    g_sys.hall_pb7_irq_flag = flag;
+}
+
+uint8_t Sys_GetIdleState(void)
+{
+    return g_sys.idle_state;
+}
+
+void Sys_SetIdleState(uint8_t state)
+{
+    g_sys.idle_state = state;
+}
+
+uint8_t Sys_GetReplMode(void)
+{
+    return g_sys.repl_mode;
+}
+
+void Sys_SetReplMode(uint8_t mode)
+{
+    g_sys.repl_mode = mode;
+}
+
+uint8_t Sys_GetLedOverride(void)
+{
+    return g_sys.repl_led_override;
+}
+
+void Sys_SetLedOverride(uint8_t v)
+{
+    g_sys.repl_led_override = v;
+}
+
 void Sys_Init(void)
 {
     /* Initialize all system status fields to default values */
     g_sys.ble_state = BLE_DISCONNECTED;
     g_sys.ble_mode = 0;
     g_sys.game_state = GAME_STOP;
-    g_sys.keyA_state = 0;
     g_sys.jump_times = 0;
-    g_sys.left_time_ms = 0;
     memset((void *)g_sys.mac_addr, 0, sizeof(g_sys.mac_addr));
     memset((void *)g_sys.device_name, 0, sizeof(g_sys.device_name));
     g_sys.keyA_flag = 0;
@@ -119,6 +212,11 @@ uint32_t Sys_CopyMacAddr(char *dst, uint32_t dst_size)
     return Sys_CopyString(g_sys.mac_addr, (uint32_t)sizeof(g_sys.mac_addr), dst, dst_size);
 }
 
+void Sys_ClearMacAddr(void)
+{
+    Sys_SetMacAddr("", 0u);
+}
+
 void Sys_SetDeviceName(const char *name, uint32_t len)
 {
     Sys_SetString(g_sys.device_name, (uint32_t)sizeof(g_sys.device_name), name, len);
@@ -127,4 +225,9 @@ void Sys_SetDeviceName(const char *name, uint32_t len)
 uint32_t Sys_CopyDeviceName(char *dst, uint32_t dst_size)
 {
     return Sys_CopyString(g_sys.device_name, (uint32_t)sizeof(g_sys.device_name), dst, dst_size);
+}
+
+void Sys_ClearDeviceName(void)
+{
+    Sys_SetDeviceName("", 0u);
 }

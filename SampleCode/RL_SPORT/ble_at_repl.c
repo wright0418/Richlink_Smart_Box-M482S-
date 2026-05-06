@@ -16,7 +16,7 @@
 #include "project_config.h"
 #include "ble_at_repl.h"
 #include "system_status.h"
-#include "timer.h"
+#include "drivers/timer.h"
 #include "led.h"
 #include "buzzer.h"
 #include "gsensor.h"
