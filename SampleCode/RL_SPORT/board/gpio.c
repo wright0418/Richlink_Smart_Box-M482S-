@@ -1,8 +1,8 @@
-/* gpio.c - Button and G-sensor GPIO implementation */
+/* board/gpio.c - Button and G-sensor GPIO implementation */
 #include "gpio.h"
 #include "NuMicro.h"
-#include "system_status.h"
-#include "project_config.h"
+#include "../system_status.h"
+#include "../project_config.h"
 
 void Gpio_Init(void)
 {

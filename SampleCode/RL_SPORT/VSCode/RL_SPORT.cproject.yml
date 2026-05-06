@@ -74,7 +74,7 @@ project:
         - file: ../ble_at_repl.c
         - file: ../led.c
         - file: ../buzzer.c
-        - file: ../gpio.c
+        - file: ../board/gpio.c
         - file: ../drivers/adc.c
         - file: ../test_mode.c
         - file: ../usb_hid_mouse.c

@@ -6,7 +6,7 @@
 #include "board_test_gpio.h"
 #include <stdio.h>
 #include "NuMicro.h"
-#include "gpio.h"
+#include "board/gpio.h"
 #include "gsensor.h"
 #include "drivers/adc.h"
 #include "buzzer.h"

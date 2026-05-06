@@ -9,7 +9,7 @@
 #include "buzzer.h"
 #include "gsensor.h"
 #include "drivers/adc.h"
-#include "gpio.h"
+#include "board/gpio.h"
 #include "usb_hid_mouse.h"
 #include "ble.h"
 #include "drivers/i2c.h"

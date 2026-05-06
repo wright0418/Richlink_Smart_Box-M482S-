@@ -1,6 +1,9 @@
 /**
- * @file gpio.h
+ * @file board/gpio.h
  * @brief Button and G-sensor GPIO initialization helpers
+ *
+ * NOTE: moved from top-level RL_SPORT directory into board/.
+ * API and behavior remain unchanged.
  *
  * This header exposes board-level GPIO helpers used by `main.c` and
  * other modules. It focuses on configuring buttons, G-sensor pins and

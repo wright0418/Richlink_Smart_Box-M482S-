@@ -18,7 +18,7 @@
 #include "ble.h"
 #include "led.h"
 #include "buzzer.h"
-#include "gpio.h"
+#include "board/gpio.h"
 #include "gsensor.h"
 #include "board_test_gpio.h"
 #include "drivers/adc.h"
@@ -223,11 +223,11 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
  * - BLE transport/UART IRQ are implemented in ble.c; pure text parsing helpers
  *   (e.g. BleParser_ParseCommand) are split into protocol/ble_parser.c/.h for unit tests.
  * - System status storage and accessor APIs live in system_status.c and are initialized by Sys_Init()
- * - GPIO interrupts, buttons and board-level pin config are in gpio.c
+ * - GPIO interrupts, buttons and board-level pin config are in board/gpio.c
  * - LED, Buzzer, Timer and G-sensor drivers live in led.c, buzzer.c, timer.c and gsensor.c
  *
  * Rationale: keep main.c focused on initialization and high-level flow; use module public APIs
- * (see respective headers: ble.h, gpio.h, led.h, gsensor.h).
+ * (see respective headers: ble.h, board/gpio.h, led.h, gsensor.h).
  */
 
 /*---------------------------------------------------------------------------------------------------------*/
