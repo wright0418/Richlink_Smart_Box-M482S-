@@ -1,15 +1,16 @@
 # RL_SPORT_FW_規格
 
 ## 目的
-此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `gsensor.c`, `game_logic.c`, `board/power_mgmt.c`, `board/gpio.c`, `drivers/i2c.c`, `led.c`, `drivers/timer.c`, `drivers/adc.c`, `system_status.c`, `project_config.h`）。
+此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `drivers/gsensor.c`, `game_logic.c`, `board/power_mgmt.c`, `board/gpio.c`, `drivers/i2c.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`, `board/usb_hid/usb_hid_mouse.c`, `app/algorithms/hall_anticheat.c`, `system_status.c`, `project_config.h`）。
 
 ## 總覽架構
 - 系統核心與板級初始化：`main.c`（`RL_InitSystemCore`, `RL_InitBoardInputs`, `RL_InitDrivers`, `RL_InitApplication`）
-- 周邊驅動：`drivers/i2c.c`, `gsensor.c`, `led.c`, `drivers/timer.c`, `drivers/adc.c`（電池量測）
-- 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）
+- 周邊驅動：`drivers/i2c.c`, `drivers/gsensor.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`（電池量測）
+- 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）、`app/algorithms/hall_anticheat.c`（可選 HALL 防作弊驗證）
 - 通訊：`ble.c`（UART1 作為 BLE transport，命令解析與 AT 流程）
 - 電源管理：`board/power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
 - 板級 I/O 與中斷：`board/gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
+- 板級 USB 測試：`board/usb_hid/usb_hid_mouse.c`（USB FS HID mouse 測試 helper）
 - 全域狀態：`system_status.c`（私有狀態 storage + accessor API）
 
 ## 啟動流程（Boot）

@@ -15,7 +15,7 @@
 #define _HALL_ANTICHEAT_H_
 
 #include <stdint.h>
-#include "project_config.h"
+#include "../../project_config.h"
 
 #ifdef __cplusplus
 extern "C"

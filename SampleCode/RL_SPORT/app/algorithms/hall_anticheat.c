@@ -13,13 +13,13 @@
 
 #include <math.h>
 #include <string.h>
-#include "drivers/gsensor.h"
-#include "drivers/timer.h"
+#include "../../drivers/gsensor.h"
+#include "../../drivers/timer.h"
 
 extern float sqrtf(float);
 
 #ifdef ARM_MATH_CM4
-#include "../../../Library/CMSIS/Include/arm_math.h"
+#include "arm_math.h"
 #endif
 
 /* Fallback types/stubs when CMSIS DSP headers are not visible to linter */

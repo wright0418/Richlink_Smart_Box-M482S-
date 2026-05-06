@@ -31,7 +31,7 @@
 #include "gsensor_jump_detect.h"
 #endif
 #if USE_HALL_ANTICHEAT
-#include "hall_anticheat.h"
+#include "app/algorithms/hall_anticheat.h"
 #endif
 
 static volatile uint8_t g_usb_charge_mode = 0u;
