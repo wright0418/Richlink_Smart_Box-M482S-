@@ -21,7 +21,7 @@
 #include "gpio.h"
 #include "gsensor.h"
 #include "board_test_gpio.h"
-#include "adc.h"
+#include "drivers/adc.h"
 #include "test_mode.h"
 #include "usb_hid_mouse.h"
 #include "power_mgmt.h"

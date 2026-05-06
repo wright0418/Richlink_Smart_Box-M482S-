@@ -10,7 +10,7 @@
 - 通訊：`ble.c`（UART1 作為 BLE transport，命令解析與 AT 流程）
 - 電源管理：`power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
 - 板級 I/O 與中斷：`gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
-- 全域狀態：`system_status.c`（`g_sys`）
+- 全域狀態：`system_status.c`（私有狀態 storage + accessor API）
 
 ## 啟動流程（Boot）
 1. Reset → 進入 `main()`。
@@ -59,7 +59,7 @@
 	- G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `gsensor_jump_detect` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
 
 ## BLE 行為 / AT 流程（`ble.c`）
-- 使用 UART1 作為 BLE module transport，ISR 收到一整行後由 `CheckBleRecvMsg()` 進行處理，純文字分類邏輯已抽到 `ble_parser.c` 的 `BleParser_ParseCommand()`
+- 使用 UART1 作為 BLE module transport，ISR 收到一整行後由 `CheckBleRecvMsg()` 進行處理，純文字分類邏輯已抽到 `protocol/ble_parser.c` 的 `BleParser_ParseCommand()`
 - 支援命令示例：
 	- 連線/斷線通知（改變 `g_sys.ble_state`）
 	- `get cycle` → 進入 `GAME_START` 並回應、蜂鳴提示

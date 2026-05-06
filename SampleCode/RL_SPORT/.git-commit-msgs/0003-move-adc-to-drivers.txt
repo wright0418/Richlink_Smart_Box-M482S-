@@ -1,0 +1,11 @@
+refactor(rl_sport): move adc to drivers and sync phase5 docs
+
+- Move adc.c/adc.h to SampleCode/RL_SPORT/drivers/
+- Update include paths in main/test/board/ble_at_repl
+- Update RL_SPORT.cproject.yml source path
+- Sync refactor plan progress and doc paths
+
+Validation:
+- VS Code problems: no new errors
+- tests/run_tests.ps1: compile-only passed (2 targets)
+- cbuild (AC6): succeeded (Code=33432 RO-data=2996 RW-data=104 ZI-data=7136)

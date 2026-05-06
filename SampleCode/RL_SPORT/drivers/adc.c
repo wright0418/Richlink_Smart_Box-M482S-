@@ -1,6 +1,6 @@
 #include "NuMicro.h"
 #include "adc.h"
-#include "project_config.h"
+#include "../project_config.h"
 
 /* Measured AVDD (V), updated by Adc_UpdateVdda(). Initialised to nominal 3.3V. */
 static float s_vdda = 3.3f;

@@ -8,7 +8,7 @@
 #include "led.h"
 #include "buzzer.h"
 #include "gsensor.h"
-#include "adc.h"
+#include "drivers/adc.h"
 #include "gpio.h"
 #include "usb_hid_mouse.h"
 #include "ble.h"

@@ -26,19 +26,25 @@
   - `ble.c` 原先直接寫入 `g_sys.*` 的路徑已改為 `Sys_*()` API。
   - MAC / device name 清空已改為語意化的 `Sys_ClearMacAddr()` / `Sys_ClearDeviceName()`。
 - **Phase 3 核心項目已完成**
-  - 純文字解析已拆到 `ble_parser.c/h`。
+  - 純文字解析已拆到 `protocol/ble_parser.c/h`。
   - 新增 `tests/test_ble_parser.c`。
   - `tests/run_tests.ps1` 已擴充為 2 個 target（演算法 + BLE parser）。
-  - `SampleCode/RL_SPORT/VSCode/RL_SPORT.cproject.yml` 已納入 `ble_parser.c`。
+  - `SampleCode/RL_SPORT/VSCode/RL_SPORT.cproject.yml` 已納入 `protocol/ble_parser.c`。
+  - Phase 5 第一批已完成：`ble_parser.*` 已搬入 `protocol/`，對應 include 與 host test/build 路徑已同步更新。
 - **Phase 4 第一波已完成**
   - `system_status.c/h` 已新增 `Sys_CopyMacAddr()`、`Sys_CopyDeviceName()`。
   - `ble.c` rename flow 與 `test_mode.c` 已改為讀取字串快照，不再直接持有內部 buffer pointer。
   - 舊的字串 pointer getter 已移除，改以 copy-out / clear API 為主。
   - `jump_times` 的寫入已收斂到 `system_status.c`（`Sys_SetJumpTimes()` / `Sys_AddJumpTimes()`）。
+  - 剩餘的 state accessor 已從 `system_status.h` inline 收斂到 `system_status.c`，`g_sys` 不再由 header 外露。
+  - 未使用的 `keyA_state` / `left_time_ms` 欄位已移除，相關註解同步修正。
 - **截至目前的驗證結果**
   - VS Code Problems：相關檔案持續無錯誤。
   - `tests/run_tests.ps1`：compile-only check 持續通過 2 個 target。
   - CMSIS/AC6：多次重建成功。
+  - 本輪 `system_status` accessor 收斂後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `protocol/ble_parser.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `drivers/timer.*`、`drivers/adc.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 板上 smoke test / BLE 實機驗證：仍需在有硬體時依本文流程執行。
 
 ## 現有模組分層
@@ -49,10 +55,10 @@
    - `main.c`：`SYS_Init()`, `RL_InitSystemCore()`, 初始化順序 orchestration
    - `gpio.c/h`：MFP、GPIO、Power Lock、USB detect、wake pin helper
 2. **Driver / peripheral 層**
-   - `timer.c/h`：1 ms tick、`delay_ms()`、timeout helper
+  - `drivers/timer.c/h`：1 ms tick、`delay_ms()`、timeout helper
    - `i2c.c/h`：I2C wrapper、retry、debug log gate
    - `gsensor.c/h`：MXC400 sensor init/read/power
-   - `adc.c/h`：VDDA / low-battery
+  - `drivers/adc.c/h`：VDDA / low-battery
    - `led.c/h`, `buzzer.c/h`, `usb_hid_mouse.c/h`
 3. **System state 層**
    - `system_status.c/h`：BLE/game/key/hall/idle/repl 狀態
@@ -78,10 +84,10 @@
 - `SampleCode/RL_SPORT/ble.c`
   - `CheckBleRecvMsg()` 內重複的 marker strip / REPL dispatch 已整理為單一 helper。
   - 直接操作 `g_sys.*` 的路徑已收斂到 `Sys_*()` API。
-  - BLE parser 已拆成 `ble_parser.c/h`；若後續還要再切，下一個候選是把 rename FSM 再進一步純化或做更細的 host test。
+  - BLE parser 已拆成 `protocol/ble_parser.c/h`；若後續還要再切，下一個候選是把 rename FSM 再進一步純化或做更細的 host test。
 - `SampleCode/RL_SPORT/system_status.c/h`
   - 已新增 `Sys_CopyMacAddr()` / `Sys_CopyDeviceName()` 與 `Sys_ClearMacAddr()` / `Sys_ClearDeviceName()`；舊的字串 pointer getter 已移除。
-  - `jump_times` 與字串 buffer 的寫入已集中在 `system_status.c`；後續若要再收斂，可評估是否把其他 header inline accessor 也移到 `.c`。
+  - `jump_times` 與字串 buffer 的寫入已集中在 `system_status.c`；剩餘 state getter/setter 也已移到 `.c`，header 不再暴露 `g_sys`。
 
 ### 中長期結構風險
 
@@ -169,7 +175,7 @@
 建議變更：
 
 - 將純字串解析邏輯從 `ble.c` 拆出，例如：
-  - `ble_parser.c/h`
+  - `protocol/ble_parser.c/h`
   - `BleParser_ParseCommand()`
   - `BleParser_ExtractMacSuffix4()`
   - `BleParser_ExtractRopeSuffix4()`
@@ -178,7 +184,7 @@
 
 已完成項目：
 
-- `ble_parser.c/h` 已建立並納入 firmware build。
+- `protocol/ble_parser.c/h` 已建立並納入 firmware build。
 - `tests/test_ble_parser.c` 已建立。
 - `tests/run_tests.ps1` 已可驗證 2 個 test target。
 - rename FSM 仍保留在 `ble.c`，符合「parser 純化、硬體操作留在 transport 檔」的原始策略。
@@ -206,6 +212,8 @@
 - `ble.c` rename flow、`test_mode.c` 已改用字串快照。
 - 未用字串 pointer getter 已移除。
 - `jump_times` 的 set/reset/increment 寫入已集中到 `system_status.c`。
+- `system_status.h` 剩餘 inline accessor 已移到 `system_status.c`，`g_sys` 現在是 translation-unit private。
+- 未使用的 `keyA_state` / `left_time_ms` 已從 `SystemStatus` 移除。
 
 驗證門檻：
 
@@ -217,6 +225,11 @@
 
 目的：將板級/硬體相依與應用邏輯更清楚分界，方便換板或新增功能。
 
+目前進度：
+
+- 第一批已完成：`ble_parser.*` 已搬移到 `protocol/`，`ble.c` / host test / `RL_SPORT.cproject.yml` / 文件皆已同步更新並完成 build/test 驗證。
+- 第二批進行中：`timer.*`、`adc.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過；`i2c.*` 尚待處理。
+
 建議方向：
 
 - 不建議一次搬目錄；先以 header/API boundary 收斂。
@@ -226,6 +239,11 @@
   - `board/`：`gpio.*`, power/pin helpers
   - `protocol/`：`ble.*`, `ble_at_repl.*`, parser
   - `tests/`：host tests
+- 建議實際搬移順序（由低風險到高風險）：
+  1. `protocol/`：先搬 `ble_parser.*`（純文字解析、已可 host test，已完成）。
+  2. `drivers/`：再搬 `timer.*`、`adc.*`、`i2c.*` 這類相對獨立的周邊 wrapper。
+  3. `board/`：之後處理 `gpio.*`、`power_mgmt.*` 這類板級相依較高的模組。
+  4. 最後才碰 `main.c`、`ble.c`、`test_mode.c` 這些 orchestration / protocol glue 檔案。
 - 每搬一小批就更新 `RL_SPORT.cproject.yml` 並立即 build。
 
 驗證門檻：
@@ -245,9 +263,10 @@
 
 ## 目前建議的下一步
 
-目前建議先做 **Phase 4 收尾 + Phase 5 前置盤點**，而不是直接搬目錄：
+目前建議先做 **Phase 5 小批次 boundary 收斂**，而不是直接搬大批目錄：
 
-- 盤點 `system_status.h` 中仍留在 header inline 的 accessor，區分哪些保留即可、哪些值得再移到 `.c`。
+- `system_status` 的狀態封裝已完成第二波收斂；`protocol/ble_parser.*` 也已完成第一批搬移，下一步可評估 `drivers`（`timer.*`、`adc.*`、`i2c.*`）是否適合進行第二批搬移。
+- `drivers` 第二批目前已完成 `timer.*`、`adc.*`，建議下一步以同樣節奏搬移 `i2c.*`。
 - `pwm_timer` 已移動到 `legacy/` 並標註為 deprecated，建議暫時保留於 legacy 資料夾；若未來確定不用再刪除。
 - 在有硬體時，依本文驗證順序補齊 UART0 / BLE / rename / power-mode 的 smoke test 紀錄。
 - 等上述都穩定後，再進 Phase 5 做 HAL boundary / 目錄整理，風險會低很多。

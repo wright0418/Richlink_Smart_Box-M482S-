@@ -268,7 +268,7 @@ void SaveCalibrationToFlash(const CalibrationData *data)
 
 ### 2. BLE 遠端校正觸發
 
-在目前架構中，建議在 `ble_parser.c` 增加對應命令分類，並在 `ble.c` 的 `CheckBleRecvMsg()` switch 中新增處理：
+在目前架構中，建議在 `protocol/ble_parser.c` 增加對應命令分類，並在 `ble.c` 的 `CheckBleRecvMsg()` switch 中新增處理：
 
 ```c
 if (strstr(buffer, "calib start") != NULL)

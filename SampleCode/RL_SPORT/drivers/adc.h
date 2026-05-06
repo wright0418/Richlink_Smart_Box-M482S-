@@ -1,6 +1,9 @@
 /**
- * @file adc.h
+ * @file drivers/adc.h
  * @brief VDDA measurement via internal band-gap for low-voltage detection.
+ *
+ * NOTE: moved from top-level RL_SPORT directory into drivers/.
+ * API and behavior remain unchanged.
  */
 #ifndef _ADC_H_
 #define _ADC_H_

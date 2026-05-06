@@ -75,7 +75,7 @@ project:
         - file: ../led.c
         - file: ../buzzer.c
         - file: ../gpio.c
-        - file: ../adc.c
+        - file: ../drivers/adc.c
         - file: ../test_mode.c
         - file: ../usb_hid_mouse.c
         - file: ../usb_hid_mouse_desc.c

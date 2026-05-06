@@ -20,7 +20,7 @@
 #include "led.h"
 #include "buzzer.h"
 #include "gsensor.h"
-#include "adc.h"
+#include "drivers/adc.h"
 #include "ble.h"
 #include "fmc.h"
 
