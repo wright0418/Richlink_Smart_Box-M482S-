@@ -3,16 +3,16 @@
  * @brief Game logic module implementation
  */
 #include "game_logic.h"
-#include "system_status.h"
-#include "drivers/timer.h"
-#include "drivers/led.h"
-#include "ble.h"
-#include "drivers/gsensor.h"
-#include "project_config.h"
+#include "../system_status.h"
+#include "../drivers/timer.h"
+#include "../drivers/led.h"
+#include "../ble.h"
+#include "../drivers/gsensor.h"
+#include "../project_config.h"
 #include <stdio.h>
 #include <math.h>
 #if USE_GSENSOR_JUMP_DETECT
-#include "app/algorithms/gsensor_jump_detect.h"
+#include "algorithms/gsensor_jump_detect.h"
 #endif
 
 /* Internal state */

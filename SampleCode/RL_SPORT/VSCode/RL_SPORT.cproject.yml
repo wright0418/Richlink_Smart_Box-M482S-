@@ -68,7 +68,7 @@ project:
         - file: ../main.c
         - file: ../drivers/timer.c
         - file: ../system_status.c
-        - file: ../game_logic.c
+        - file: ../app/game_logic.c
         - file: ../ble.c
         - file: ../protocol/ble_parser.c
         - file: ../ble_at_repl.c

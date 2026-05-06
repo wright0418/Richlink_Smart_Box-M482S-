@@ -40,7 +40,7 @@ void *memmove(void *dest, const void *src, size_t n);
 #include "system_status.h"
 #include "drivers/buzzer.h"
 #include "drivers/led.h"
-#include "game_logic.h"
+#include "app/game_logic.h"
 #include "drivers/timer.h"
 
 /* Reuse buffer sizes from header */

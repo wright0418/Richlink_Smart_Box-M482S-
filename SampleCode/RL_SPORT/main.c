@@ -14,7 +14,7 @@
 #include "project_config.h"
 #include "system_status.h"
 #include "drivers/timer.h"
-#include "game_logic.h"
+#include "app/game_logic.h"
 #include "ble.h"
 #include "drivers/led.h"
 #include "drivers/buzzer.h"
