@@ -39,7 +39,7 @@ void *memmove(void *dest, const void *src, size_t n);
 #include "ble_at_repl.h"
 #include "system_status.h"
 #include "buzzer.h"
-#include "led.h"
+#include "drivers/led.h"
 #include "game_logic.h"
 #include "drivers/timer.h"
 

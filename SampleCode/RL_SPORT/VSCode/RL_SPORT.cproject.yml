@@ -72,7 +72,7 @@ project:
         - file: ../ble.c
         - file: ../protocol/ble_parser.c
         - file: ../ble_at_repl.c
-        - file: ../led.c
+        - file: ../drivers/led.c
         - file: ../buzzer.c
         - file: ../board/gpio.c
         - file: ../drivers/adc.c

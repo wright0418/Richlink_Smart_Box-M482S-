@@ -5,7 +5,7 @@
 */
 
 #include "pwm_timer.h"
-#include "led.h" /* for delay/get_ticks */
+#include "drivers/led.h" /* for delay/get_ticks */
 
 void PWM_Timer_Init(void)
 {
