@@ -119,4 +119,72 @@ tools: add ai_fw_debug_loop.ps1 and enable DEBUG in project_config.h (add debug 
 
 ---
 
+## 本次自動化測試的修正與注意事項（2026-05-07）
+
+以下為本次執行 `ai_fw_fast_validation.ps1` / `ai_fw_debug_loop.ps1` 所發現並已修正或加強的要點，請日後依此操作或讓 Copilot 依此產生測試腳本：
+
+- 主要修正摘要：
+  - 在 `tools/ai_fw_fast_validation.ps1` 與 `tools/ai_fw_debug_loop.ps1` 中加入：
+    - COM open 重試與 `Open-PortIfNeeded`（MaxOpenAttempts=3, OpenRetryDelayMs=150）
+    - `Read-UntilMatch`：採用 FirstByteTimeout / IdleTimeout，且偵測 `+TEST:...,FAIL` 或 `ERROR` 以提早判定失敗
+    - 自動復原 `Reset-TargetByLoad`（在讀取例外或無回應時以 `pyocd load` 重灌並等待 Port 重現）
+    - `Wait-NuLinkSerialPort`：在重灌後等待 Virtual COM 重現（預設 3000 ms）以避免立刻打開造成 I/O aborted
+
+- Timeout 與重試行為（參數來源於腳本）：
+  - 全套 suite 預設：`-SuiteTimeoutMs 25000`（可用參數覆蓋）
+  - 全域預設：`DefaultFirstByteTimeoutMs = 250 ms`，`DefaultIdleTimeoutMs = 180 ms`
+  - 個別測試可 override（在 `$tests` 內定義）。例：
+    - `BLE_NAME` 首字節等待 3000 ms
+    - `BLE_MAC` 首字節等待 2400 ms
+    - `USB_LOGIC` 首字節等待 5600 ms（長測試，預設可由 `-SkipLongTests` 跳過）
+    - `ALL_SMOKE` IdleTimeout 可達 2800 ms（用於整合 smoke）
+
+- Recovery 行為說明：
+  - 當 `Read-UntilMatch` 發現：
+    - 讀取例外 (ReadExceptionMessage)、或
+    - 首字節逾時 (FirstByteTimedOut)、或
+    - 空回應 (no UART response)
+    時，將觸發一次 `Reset-TargetByLoad`（預設 `MaxRecoveryAttempts = 1`）；此機制會：關閉 serial、執行 `pyocd load`、等待 `SettleMs`（預設 300 ms）、再等候 Virtual COM 重現（3s）。
+  - 若不穩定可考慮調整 `SettleMs` 至 500–1000 ms，或把 `MaxRecoveryAttempts` 調高（但會拉長總測試時間）。
+
+- BLE_MAC 行為觀察與建議：
+  - 觀察：單獨執行 `AT+TEST=BLE,MAC` 時偶有 `NO_RESPONSE`；但以 `AT+TEST=ALL` 執行時（流程內可能含等待/重試），整體 `ALL` 有時會回報 PASS。
+  - 建議：
+    - 在 CI/快速驗證中，把 `BLE_MAC` 視為非阻斷項目（允許暫時的 NO_RESPONSE），以 `AT+TEST=ALL` 作為 smoke 判定；
+    - 若需嚴格檢查，將該測試的 `FirstByteTimeoutMs` 拉高（例如 3000 ms 以上），或在 FW 端強化在 command-mode 下立即回應 MAC 查詢。
+
+- 常見故障排查快速指南：
+  - 未偵測到 NuLink COM：手動指定 `-PortName COMx`，或在 Device Manager 確認驅動與線材。
+  - pyOCD load 失敗：單獨執行 `pyocd load --probe 'cmsisdap:' --cbuild-run <file>` 檢查錯誤。
+  - ReadExisting 時 I/O aborted：把 `Reset-TargetByLoad` 的 `SettleMs` 提高到 500–1000 ms，或拉長 `Wait-NuLinkSerialPort` timeout。
+  - 首字節 (FirstByte) 經常逾時：提高 `-DefaultFirstByteTimeoutMs` 或針對該 test 在 `$tests` 調整 `FirstByteTimeoutMs`。
+
+- 日誌與路徑：
+  - `ai_fw_fast_validation.ps1` 會將完整 log 存於：
+
+```
+%TEMP%\rl_sport_ai_fw_fast_validation\rl_sport_ai_fw_fast_validation_<timestamp>.log
+```
+
+- 常用啟動範例：
+  - 跳過 build/load（已手動燒錄或模擬）並略過長測試：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\ai_fw_fast_validation.ps1 -SkipBuild -SkipLoad -PortName COM13 -SkipLongTests
+```
+
+  - 完整執行（含重灌與長測試）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\ai_fw_fast_validation.ps1
+```
+
+- 建議的 Commit message（中文範例）：
+
+```
+docs: update AI_FW_Debug_Guide — add fixes, timeout and recovery notes for fast validation
+```
+
+如需我把這些變更同步 commit（或把整份指南轉成 repo README / CI 文件），或是把 PowerShell 腳本改寫成 cross-platform 的 Python 版本，我可以接著幫你完成。
+
 如需我把這份指南轉成 repository 的 `README.md`（或整合進 CI 文件），或改寫成 Python 版本的自動化腳本，我可以接著幫你完成。
