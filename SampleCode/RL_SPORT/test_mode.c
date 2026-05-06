@@ -73,6 +73,7 @@ static void AT_DispatchCommand(const char *line);
 #define TEST_I2C_MAG_MAX_G 2.0f
 #define TEST_BLE_SETTLE_MS 200u
 #define TEST_BLE_NAME_TIMEOUT_MS 2500u
+#define TEST_BLE_MAC_TIMEOUT_MS 3000u
 #define TEST_GSENSOR_CAL_SAMPLES 64u
 #define TEST_GSENSOR_CAL_SAMPLE_INTERVAL_MS 20u
 
@@ -790,21 +791,37 @@ static uint8_t AT_BleMac(void)
         return 0u;
     }
 
-    delay_ms(200u);
-    Sys_ClearMacAddr();
-    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
-
-    uint32_t start = get_ticks_ms();
-    while (!is_timeout(start, 2000u))
+    /* Attempt MAC query with a small retry to tolerate transient CMD-mode entry
+       or brief UART scheduling delays observed in some hardware runs. */
+    for (int attempt = 0; attempt < 2; ++attempt)
     {
-        CheckBleRecvMsg();
-        if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
+        /* small gap to allow module to settle after mode switch */
+        delay_ms(200u);
+        Sys_ClearMacAddr();
+        BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
+
+        uint32_t start = get_ticks_ms();
+        while (!is_timeout(start, TEST_BLE_MAC_TIMEOUT_MS))
         {
-            printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
-            Test_BLE_SwitchToDataMode();
-            return 1u;
+            CheckBleRecvMsg();
+            if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
+            {
+                printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
+                Test_BLE_SwitchToDataMode();
+                return 1u;
+            }
+            delay_ms(5u);
         }
-        delay_ms(5u);
+
+        /* If first attempt failed, try to re-enter command mode once before giving up */
+        if (attempt == 0)
+        {
+            /* try to re-enter CMD mode and retry */
+            if (!Test_BLE_SwitchToCmdMode())
+            {
+                break; /* cannot recover */
+            }
+        }
     }
 
     printf("+TEST:BLE,FAIL,NO_RESPONSE\r\n");
