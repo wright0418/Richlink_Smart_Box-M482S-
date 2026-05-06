@@ -288,7 +288,7 @@ if (strstr(buffer, "calib start") != NULL)
     if (g_gsensor_sample_counter >= interval) {
       /* 處理已達採樣間隔：讀取 sensor 資料、執行 FIR、峰值偵測並更新計數 */
       g_gsensor_sample_counter = 0;
-      /* 具體實作在 jump_detect.c 的 JumpDetect_ProcessSample() 中 */
+      /* 具體實作在 app/algorithms/gsensor_jump_detect.c 的 JumpDetect_Process() 中 */
     }
 #endif
 ```

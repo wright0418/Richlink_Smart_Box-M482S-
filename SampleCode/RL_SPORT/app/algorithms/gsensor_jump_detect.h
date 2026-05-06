@@ -19,7 +19,7 @@
 #define _GSENSOR_JUMP_DETECT_H_
 
 #include <stdint.h>
-#include "project_config.h"
+#include "../../project_config.h"
 
 #ifdef __cplusplus
 extern "C"

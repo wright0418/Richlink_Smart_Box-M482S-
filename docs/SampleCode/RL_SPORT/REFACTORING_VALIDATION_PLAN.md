@@ -54,6 +54,7 @@
   - 本輪 `drivers/buzzer.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `board/usb_hid/*` 搬移並修正遺留 `board_test_gpio.c` include 後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `app/algorithms/hall_anticheat.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `app/algorithms/gsensor_jump_detect.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 板上 smoke test / BLE 實機驗證：仍需在有硬體時依本文流程執行。
 
 ## 現有模組分層
@@ -80,7 +81,7 @@
     - `board/board_test_gpio.c/h`：板測流程
 5. **Application / game 層**
    - `game_logic.c/h`：idle/movement 判定、BLE jump count 上報
-    - `gsensor_jump_detect.c/h`, `app/algorithms/hall_anticheat.c/h`：可選演算法
+    - `app/algorithms/gsensor_jump_detect.c/h`, `app/algorithms/hall_anticheat.c/h`：可選演算法
    - `main.c`：主迴圈整合與狀態調度
 
 ## 已觀察到的整理重點
@@ -244,12 +245,13 @@
 - 第四批已完成：`gsensor.*`、`led.*`、`buzzer.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 - 第五批已完成：`usb_hid_mouse.*`、`usb_hid_mouse_desc.c`、`usb_hid_mouse_internal.h` 已搬移到 `board/usb_hid/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 - 第六批已完成：`hall_anticheat.*` 已搬移到 `app/algorithms/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
+- 第七批已完成：`gsensor_jump_detect.*` 已搬移到 `app/algorithms/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 
 建議方向：
 
 - 不建議一次搬目錄；先以 header/API boundary 收斂。
 - 若要搬，建議後續分成：
-  - `app/`：`game_logic.*`, optional algorithms（例如 `app/algorithms/hall_anticheat.*`）
+  - `app/`：`game_logic.*`, optional algorithms（例如 `app/algorithms/gsensor_jump_detect.*`, `app/algorithms/hall_anticheat.*`）
   - `drivers/`：`gsensor.*`, `i2c.*`, `adc.*`, `led.*`, `buzzer.*`, `timer.*`
   - `board/`：`gpio.*`, power/pin helpers, `usb_hid/` board test USB helper
   - `protocol/`：`ble.*`, `ble_at_repl.*`, parser

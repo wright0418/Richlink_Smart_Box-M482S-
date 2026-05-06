@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <math.h>
 #if USE_GSENSOR_JUMP_DETECT
-#include "gsensor_jump_detect.h"
+#include "app/algorithms/gsensor_jump_detect.h"
 #endif
 
 /* Internal state */

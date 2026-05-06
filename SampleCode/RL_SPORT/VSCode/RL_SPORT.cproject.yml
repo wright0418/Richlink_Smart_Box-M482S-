@@ -80,7 +80,7 @@ project:
         - file: ../board/usb_hid/usb_hid_mouse.c
         - file: ../board/usb_hid/usb_hid_mouse_desc.c
         - file: ../drivers/gsensor.c
-        - file: ../gsensor_jump_detect.c
+        - file: ../app/algorithms/gsensor_jump_detect.c
         - file: ../app/algorithms/hall_anticheat.c
         - file: ../drivers/i2c.c
         - file: ../board/board_test_gpio.c

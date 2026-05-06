@@ -28,7 +28,7 @@
 #include "ble_at_repl.h"
 
 #if USE_GSENSOR_JUMP_DETECT
-#include "gsensor_jump_detect.h"
+#include "app/algorithms/gsensor_jump_detect.h"
 #endif
 #if USE_HALL_ANTICHEAT
 #include "app/algorithms/hall_anticheat.h"

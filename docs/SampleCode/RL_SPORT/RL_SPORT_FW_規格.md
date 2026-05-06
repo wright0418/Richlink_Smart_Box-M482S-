@@ -1,12 +1,12 @@
 # RL_SPORT_FW_規格
 
 ## 目的
-此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `drivers/gsensor.c`, `game_logic.c`, `board/power_mgmt.c`, `board/gpio.c`, `drivers/i2c.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`, `board/usb_hid/usb_hid_mouse.c`, `app/algorithms/hall_anticheat.c`, `system_status.c`, `project_config.h`）。
+此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `drivers/gsensor.c`, `game_logic.c`, `board/power_mgmt.c`, `board/gpio.c`, `drivers/i2c.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`, `board/usb_hid/usb_hid_mouse.c`, `app/algorithms/gsensor_jump_detect.c`, `app/algorithms/hall_anticheat.c`, `system_status.c`, `project_config.h`）。
 
 ## 總覽架構
 - 系統核心與板級初始化：`main.c`（`RL_InitSystemCore`, `RL_InitBoardInputs`, `RL_InitDrivers`, `RL_InitApplication`）
 - 周邊驅動：`drivers/i2c.c`, `drivers/gsensor.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`（電池量測）
-- 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）、`app/algorithms/hall_anticheat.c`（可選 HALL 防作弊驗證）
+- 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）、`app/algorithms/gsensor_jump_detect.c`（可選 G-sensor 跳繩演算法）、`app/algorithms/hall_anticheat.c`（可選 HALL 防作弊驗證）
 - 通訊：`ble.c`（UART1 作為 BLE transport，命令解析與 AT 流程）
 - 電源管理：`board/power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
 - 板級 I/O 與中斷：`board/gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
@@ -57,7 +57,7 @@
 	- 若無動作且超時（聯線/未聯線分別不同 timeout），則設定 `idle_state` -> 觸發 `RL_HandleIdlePowerOff()`
 - 跳繩計數：兩種模式擇一
 	- HALL 模式（`USE_GSENSOR_JUMP_DETECT == 0`）：PB7 中斷僅累積 edge 事件；主迴圈以 2 edge = 1 jump 規則換算跳數（ISR 減負）
-	- G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `gsensor_jump_detect` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
+	- G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `app/algorithms/gsensor_jump_detect.c` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
 
 ## BLE 行為 / AT 流程（`ble.c`）
 - 使用 UART1 作為 BLE module transport，ISR 收到一整行後由 `CheckBleRecvMsg()` 進行處理，純文字分類邏輯已抽到 `protocol/ble_parser.c` 的 `BleParser_ParseCommand()`

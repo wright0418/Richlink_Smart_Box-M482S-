@@ -10,8 +10,7 @@
 /* Ensure prototype visible to strict linters */
 extern float sqrtf(float);
 #ifdef ARM_MATH_CM4
-/* Try project-relative path first to satisfy static analysis */
-#include "../../../Library/CMSIS/Include/arm_math.h"
+#include "arm_math.h"
 #endif
 
 /* Fallback types/functions if CMSIS DSP headers are not available to linter */
@@ -28,11 +27,11 @@ typedef struct
 
 #if USE_GSENSOR_JUMP_DETECT
 
-#include "system_status.h"
-#include "drivers/timer.h"
-#include "drivers/buzzer.h"
-#include "drivers/gsensor.h"
-#include "drivers/led.h"
+#include "../../system_status.h"
+#include "../../drivers/timer.h"
+#include "../../drivers/buzzer.h"
+#include "../../drivers/gsensor.h"
+#include "../../drivers/led.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
