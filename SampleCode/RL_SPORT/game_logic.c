@@ -7,7 +7,7 @@
 #include "drivers/timer.h"
 #include "led.h"
 #include "ble.h"
-#include "gsensor.h"
+#include "drivers/gsensor.h"
 #include "project_config.h"
 #include <stdio.h>
 #include <math.h>

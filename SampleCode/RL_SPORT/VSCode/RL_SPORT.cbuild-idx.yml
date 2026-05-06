@@ -12,5 +12,5 @@ build-idx:
       messages:
         info:
           - RL_SPORT.cbuild-pack.yml - file is already up-to-date
-          - RL_SPORT+ARMCLANG.cbuild-run.yml - file generated successfully
+          - RL_SPORT+ARMCLANG.cbuild-run.yml - file is already up-to-date
           - RL_SPORT.debug+ARMCLANG.cbuild.yml - file is already up-to-date

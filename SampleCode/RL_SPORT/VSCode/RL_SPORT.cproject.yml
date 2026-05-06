@@ -79,7 +79,7 @@ project:
         - file: ../test_mode.c
         - file: ../usb_hid_mouse.c
         - file: ../usb_hid_mouse_desc.c
-        - file: ../gsensor.c
+        - file: ../drivers/gsensor.c
         - file: ../gsensor_jump_detect.c
         - file: ../hall_anticheat.c
         - file: ../drivers/i2c.c

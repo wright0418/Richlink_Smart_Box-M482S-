@@ -1,7 +1,7 @@
 #include "NuMicro.h"
 #include "gsensor.h"
-#include "drivers/i2c.h"
-#include "project_config.h"
+#include "i2c.h"
+#include "../project_config.h"
 #include <math.h>
 
 /* Store the configured full-scale range so power mode functions know which

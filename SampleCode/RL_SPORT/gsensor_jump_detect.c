@@ -31,7 +31,7 @@ typedef struct
 #include "system_status.h"
 #include "drivers/timer.h"
 #include "buzzer.h"
-#include "gsensor.h"
+#include "drivers/gsensor.h"
 #include "led.h"
 #include <string.h>
 

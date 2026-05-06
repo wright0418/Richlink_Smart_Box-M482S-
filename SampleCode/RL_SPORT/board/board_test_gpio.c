@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "NuMicro.h"
 #include "gpio.h"
-#include "../gsensor.h"
+#include "../drivers/gsensor.h"
 #include "../drivers/adc.h"
 #include "../buzzer.h"
 #include "../drivers/timer.h"

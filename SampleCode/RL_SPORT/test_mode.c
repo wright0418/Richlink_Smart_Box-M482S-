@@ -7,7 +7,7 @@
 #include "drivers/timer.h"
 #include "led.h"
 #include "buzzer.h"
-#include "gsensor.h"
+#include "drivers/gsensor.h"
 #include "drivers/adc.h"
 #include "board/gpio.h"
 #include "usb_hid_mouse.h"

@@ -19,7 +19,7 @@
 #include "led.h"
 #include "buzzer.h"
 #include "board/gpio.h"
-#include "gsensor.h"
+#include "drivers/gsensor.h"
 #include "board/board_test_gpio.h"
 #include "drivers/adc.h"
 #include "test_mode.h"
