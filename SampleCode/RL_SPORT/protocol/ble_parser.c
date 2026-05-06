@@ -36,6 +36,86 @@ static char BleParser_ToUpperHex(char c)
     return c;
 }
 
+static uint8_t BleParser_HasSeparatedMacPattern(const char *msg)
+{
+    if (!msg)
+    {
+        return 0u;
+    }
+
+    for (const char *p = msg; p[0] != '\0'; ++p)
+    {
+        char sep = p[2];
+        if ((sep != ':' && sep != '-') ||
+            !BleParser_IsHexChar(p[0]) || !BleParser_IsHexChar(p[1]))
+        {
+            continue;
+        }
+
+        uint8_t match = 1u;
+        for (uint8_t i = 0u; i < 6u; ++i)
+        {
+            uint32_t base = (uint32_t)i * 3u;
+            if (!BleParser_IsHexChar(p[base]) || !BleParser_IsHexChar(p[base + 1u]))
+            {
+                match = 0u;
+                break;
+            }
+
+            if (i < 5u && p[base + 2u] != sep)
+            {
+                match = 0u;
+                break;
+            }
+        }
+
+        if (match)
+        {
+            char prev = (p == msg) ? '\0' : p[-1];
+            char next = p[17];
+            if (!BleParser_IsHexChar(prev) && !BleParser_IsHexChar(next))
+            {
+                return 1u;
+            }
+        }
+    }
+
+    return 0u;
+}
+
+static uint8_t BleParser_HasContiguousMacPattern(const char *msg)
+{
+    if (!msg)
+    {
+        return 0u;
+    }
+
+    for (const char *p = msg; p[0] != '\0'; ++p)
+    {
+        uint8_t match = 1u;
+        for (uint8_t i = 0u; i < 12u; ++i)
+        {
+            if (!BleParser_IsHexChar(p[i]))
+            {
+                match = 0u;
+                break;
+            }
+        }
+
+        if (match)
+        {
+            char prev = (p == msg) ? '\0' : p[-1];
+            char next = p[12];
+            if (!BleParser_IsHexChar(prev) && !BleParser_IsHexChar(next))
+            {
+                return 1u;
+            }
+        }
+    }
+
+    return 0u;
+}
+
 BleCmdType BleParser_ParseCommand(const char *msg)
 {
     if (!msg)
@@ -49,6 +129,11 @@ BleCmdType BleParser_ParseCommand(const char *msg)
         {
             return s_ble_cmd_table[i].type;
         }
+    }
+
+    if (BleParser_HasSeparatedMacPattern(msg) || BleParser_HasContiguousMacPattern(msg))
+    {
+        return BLE_CMD_MAC_ADDR;
     }
 
     return BLE_CMD_NONE;

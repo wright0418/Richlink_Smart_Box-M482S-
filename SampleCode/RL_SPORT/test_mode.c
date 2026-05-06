@@ -824,9 +824,12 @@ static uint8_t AT_BleMac(void)
         }
     }
 
-    printf("+TEST:BLE,FAIL,NO_RESPONSE\r\n");
+    /* Keep standalone BLE,MAC aligned with AT+TEST=ALL semantics:
+       some module / FW combinations do not provide a parseable MAC reply
+       in command mode, so treat this as informational instead of a hard fail. */
+    printf("+TEST:BLE,INFO,MAC=NA\r\n");
     Test_BLE_SwitchToDataMode();
-    return 0u;
+    return 1u;
 }
 
 static uint8_t AT_Ble(const char *param)

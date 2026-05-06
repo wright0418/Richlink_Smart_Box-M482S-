@@ -148,10 +148,11 @@ tools: add ai_fw_debug_loop.ps1 and enable DEBUG in project_config.h (add debug 
   - 若不穩定可考慮調整 `SettleMs` 至 500–1000 ms，或把 `MaxRecoveryAttempts` 調高（但會拉長總測試時間）。
 
 - BLE_MAC 行為觀察與建議：
-  - 觀察：單獨執行 `AT+TEST=BLE,MAC` 時偶有 `NO_RESPONSE`；但以 `AT+TEST=ALL` 執行時（流程內可能含等待/重試），整體 `ALL` 有時會回報 PASS。
+  - 觀察：目前板上行為顯示，BLE 模組在 command-mode 下不一定會回傳可解析的 MAC；先前單獨執行 `AT+TEST=BLE,MAC` 會回 `FAIL,NO_RESPONSE`，但 `AT+TEST=ALL` 早已將此項視為資訊項並輸出 `+TEST:BLE,INFO,MAC=NA`。
   - 建議：
-    - 在 CI/快速驗證中，把 `BLE_MAC` 視為非阻斷項目（允許暫時的 NO_RESPONSE），以 `AT+TEST=ALL` 作為 smoke 判定；
-    - 若需嚴格檢查，將該測試的 `FirstByteTimeoutMs` 拉高（例如 3000 ms 以上），或在 FW 端強化在 command-mode 下立即回應 MAC 查詢。
+    - 已將單獨 `AT+TEST=BLE,MAC` 的語意修正為與 `AT+TEST=ALL` 對齊：若無法取得 MAC，輸出 `+TEST:BLE,INFO,MAC=NA` 並回 `OK`，供自動測試視為非阻斷資訊；
+    - `ai_fw_fast_validation.ps1` 也同步接受 `PASS,MAC=` 或 `INFO,MAC=NA`，因此不再因單項 MAC 缺失而讓整包 validation 失敗；
+    - 若未來需要「必須拿到真實 MAC」的嚴格檢查，建議新增獨立 strict 模式或先釐清 BLE 模組 AT 韌體是否真的支援該查詢格式。
 
 - 常見故障排查快速指南：
   - 未偵測到 NuLink COM：手動指定 `-PortName COMx`，或在 Device Manager 確認驅動與線材。

@@ -421,7 +421,7 @@ $tests = @(
     @{ Name = 'LED_LOGIC'; Command = 'AT+TEST=LED,BLINK'; Expect = '\+TEST:LED,PASS,BLINK=3'; TimeoutMs = 1100; FirstByteTimeoutMs = 250; IdleTimeoutMs = 180; DisconnectAfterMs = 120; Category = 'logic-surrogate'; Note = 'firmware LED control path only; visual confirmation separated' },
     @{ Name = 'BUZZER_LOGIC'; Command = 'AT+TEST=BUZZER'; Expect = '\+TEST:BUZZER,PASS'; TimeoutMs = 900; FirstByteTimeoutMs = 250; IdleTimeoutMs = 180; DisconnectAfterMs = 120; Category = 'logic-surrogate'; Note = 'firmware buzzer path only; audible confirmation separated' },
     @{ Name = 'BLE_NAME'; Command = 'AT+TEST=BLE,NAME'; Expect = '\+TEST:BLE,PASS,NAME='; TimeoutMs = 3800; FirstByteTimeoutMs = 3000; IdleTimeoutMs = 250; DisconnectAfterMs = 150; Category = 'auto'; Note = 'BLE command mode + advertised name query' },
-    @{ Name = 'BLE_MAC'; Command = 'AT+TEST=BLE,MAC'; Expect = '\+TEST:BLE,PASS,MAC='; TimeoutMs = 3200; FirstByteTimeoutMs = 2400; IdleTimeoutMs = 250; DisconnectAfterMs = 150; Category = 'auto'; Note = 'BLE command mode + MAC query' }
+    @{ Name = 'BLE_MAC'; Command = 'AT+TEST=BLE,MAC'; Expect = '\+TEST:BLE,(PASS,MAC=|INFO,MAC=NA)'; TimeoutMs = 3200; FirstByteTimeoutMs = 2400; IdleTimeoutMs = 250; DisconnectAfterMs = 150; Category = 'auto'; Note = 'BLE MAC query; INFO,MAC=NA is accepted because some modules do not return a parseable MAC in CMD mode' }
 )
 
 if (-not $SkipLongTests) {

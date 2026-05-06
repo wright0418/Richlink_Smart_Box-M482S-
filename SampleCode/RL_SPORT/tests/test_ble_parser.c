@@ -67,6 +67,12 @@ static void test_parse_command(void)
                   "parse: set end");
     EXPECT_EQ_INT(BleParser_ParseCommand("DEVICE_NAME: ROPE_1A2B"), BLE_CMD_DEVICE_NAME,
                   "parse: device name");
+    EXPECT_EQ_INT(BleParser_ParseCommand("12:34:56:78:9A:BC"), BLE_CMD_MAC_ADDR,
+                  "parse: plain colon mac");
+    EXPECT_EQ_INT(BleParser_ParseCommand("A1-B2-C3-D4-E5-F6"), BLE_CMD_MAC_ADDR,
+                  "parse: plain dash mac");
+    EXPECT_EQ_INT(BleParser_ParseCommand("001122AABBCC"), BLE_CMD_MAC_ADDR,
+                  "parse: plain contiguous mac");
     EXPECT_EQ_INT(BleParser_ParseCommand("unknown response"), BLE_CMD_NONE,
                   "parse: unknown");
 }
