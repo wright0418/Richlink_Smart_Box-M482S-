@@ -1,0 +1,11 @@
+refactor(rl_sport): move i2c to drivers and finish phase5 batch-2
+
+- Move i2c.c/i2c.h to SampleCode/RL_SPORT/drivers/
+- Update include paths in gsensor.c and test_mode.c
+- Update RL_SPORT.cproject.yml source path
+- Sync REFACTORING_VALIDATION_PLAN.md progress
+
+Validation:
+- VS Code problems: no new errors
+- tests/run_tests.ps1: compile-only passed (2 targets)
+- cbuild (AC6): succeeded (Code=33432 RO-data=2996 RW-data=104 ZI-data=7136)

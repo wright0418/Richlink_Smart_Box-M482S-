@@ -45,6 +45,7 @@
   - 本輪 `system_status` accessor 收斂後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `protocol/ble_parser.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `drivers/timer.*`、`drivers/adc.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `drivers/i2c.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 板上 smoke test / BLE 實機驗證：仍需在有硬體時依本文流程執行。
 
 ## 現有模組分層
@@ -56,7 +57,7 @@
    - `gpio.c/h`：MFP、GPIO、Power Lock、USB detect、wake pin helper
 2. **Driver / peripheral 層**
   - `drivers/timer.c/h`：1 ms tick、`delay_ms()`、timeout helper
-   - `i2c.c/h`：I2C wrapper、retry、debug log gate
+  - `drivers/i2c.c/h`：I2C wrapper、retry、debug log gate
    - `gsensor.c/h`：MXC400 sensor init/read/power
   - `drivers/adc.c/h`：VDDA / low-battery
    - `led.c/h`, `buzzer.c/h`, `usb_hid_mouse.c/h`
@@ -228,7 +229,7 @@
 目前進度：
 
 - 第一批已完成：`ble_parser.*` 已搬移到 `protocol/`，`ble.c` / host test / `RL_SPORT.cproject.yml` / 文件皆已同步更新並完成 build/test 驗證。
-- 第二批進行中：`timer.*`、`adc.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過；`i2c.*` 尚待處理。
+- 第二批已完成：`timer.*`、`adc.*`、`i2c.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 
 建議方向：
 
@@ -241,7 +242,7 @@
   - `tests/`：host tests
 - 建議實際搬移順序（由低風險到高風險）：
   1. `protocol/`：先搬 `ble_parser.*`（純文字解析、已可 host test，已完成）。
-  2. `drivers/`：再搬 `timer.*`、`adc.*`、`i2c.*` 這類相對獨立的周邊 wrapper。
+  2. `drivers/`：再搬 `timer.*`、`adc.*`、`i2c.*` 這類相對獨立的周邊 wrapper（已完成）。
   3. `board/`：之後處理 `gpio.*`、`power_mgmt.*` 這類板級相依較高的模組。
   4. 最後才碰 `main.c`、`ble.c`、`test_mode.c` 這些 orchestration / protocol glue 檔案。
 - 每搬一小批就更新 `RL_SPORT.cproject.yml` 並立即 build。
@@ -266,7 +267,7 @@
 目前建議先做 **Phase 5 小批次 boundary 收斂**，而不是直接搬大批目錄：
 
 - `system_status` 的狀態封裝已完成第二波收斂；`protocol/ble_parser.*` 也已完成第一批搬移，下一步可評估 `drivers`（`timer.*`、`adc.*`、`i2c.*`）是否適合進行第二批搬移。
-- `drivers` 第二批目前已完成 `timer.*`、`adc.*`，建議下一步以同樣節奏搬移 `i2c.*`。
+- `drivers` 第二批已完成（`timer.*`、`adc.*`、`i2c.*`）；建議下一步評估 `board` 層（`gpio.*`、`power_mgmt.*`）或其他 drivers（如 `gsensor.*`）的邊界整理。
 - `pwm_timer` 已移動到 `legacy/` 並標註為 deprecated，建議暫時保留於 legacy 資料夾；若未來確定不用再刪除。
 - 在有硬體時，依本文驗證順序補齊 UART0 / BLE / rename / power-mode 的 smoke test 紀錄。
 - 等上述都穩定後，再進 Phase 5 做 HAL boundary / 目錄整理，風險會低很多。

@@ -1,6 +1,6 @@
 #include "NuMicro.h"
 #include "i2c.h"
-#include "project_config.h"
+#include "../project_config.h"
 
 /* Simple wrapper to initialize I2C0 with requested bus speed. Keeps main.c smaller. */
 void I2C_Init(uint32_t u32BusHz)

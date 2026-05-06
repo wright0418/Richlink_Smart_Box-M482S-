@@ -82,6 +82,6 @@ project:
         - file: ../gsensor.c
         - file: ../gsensor_jump_detect.c
         - file: ../hall_anticheat.c
-        - file: ../i2c.c
+        - file: ../drivers/i2c.c
         - file: ../board_test_gpio.c
         - file: ../power_mgmt.c

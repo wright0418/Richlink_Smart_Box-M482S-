@@ -12,7 +12,7 @@
 #include "gpio.h"
 #include "usb_hid_mouse.h"
 #include "ble.h"
-#include "i2c.h"
+#include "drivers/i2c.h"
 #include "system_status.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;

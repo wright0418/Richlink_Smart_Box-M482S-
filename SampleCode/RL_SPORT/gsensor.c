@@ -1,6 +1,6 @@
 #include "NuMicro.h"
 #include "gsensor.h"
-#include "i2c.h"
+#include "drivers/i2c.h"
 #include "project_config.h"
 #include <math.h>
 

@@ -1,6 +1,9 @@
 /**
- * @file i2c.h
+ * @file drivers/i2c.h
  * @brief Simple I2C wrapper used by board modules (G-sensor etc.)
+ *
+ * NOTE: moved from top-level RL_SPORT directory into drivers/.
+ * API and behavior remain unchanged.
  */
 #ifndef _I2C_WRAPPER_H_
 #define _I2C_WRAPPER_H_
@@ -29,11 +32,6 @@ uint8_t RL_I2C_GetDebugLog(void);
  * This wrapper performs up to I2C_XFER_RETRY_COUNT retries when transfer
  * fails (including timeout-flag recovery).
  * @return 0 on success; non-zero on failure after retries.
- *
- * Error semantics:
- * - non-zero return means write failure (NACK/timeout/arbitration issues).
- * - when debug log is enabled via RL_I2C_SetDebugLog(), abnormal status and
- *   timeout info are printed for diagnosis.
  */
 uint8_t RL_I2C_WriteByteOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t data);
 
@@ -43,11 +41,6 @@ uint8_t RL_I2C_WriteByteOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAd
  * This wrapper performs up to I2C_XFER_RETRY_COUNT retries when read length
  * is shorter than requested.
  * @return Number of bytes read. Expected value is u32rLen.
- *
- * Error semantics:
- * - return < u32rLen indicates incomplete read/failure after retries.
- * - when debug log is enabled via RL_I2C_SetDebugLog(), abnormal status and
- *   timeout info are printed for diagnosis.
  */
 uint32_t RL_I2C_ReadMultiBytesOneReg(I2C_T *i2c, uint8_t u8SlaveAddr, uint8_t u8DataAddr, uint8_t rdata[], uint32_t u32rLen);
 
