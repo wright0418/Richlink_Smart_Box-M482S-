@@ -1,17 +1,17 @@
 /*
- * board_test_gpio.c
+ * board/board_test_gpio.c
  * Minimal GPIO hardware test for RL_SPORT V3
  */
 
 #include "board_test_gpio.h"
 #include <stdio.h>
 #include "NuMicro.h"
-#include "board/gpio.h"
-#include "gsensor.h"
-#include "drivers/adc.h"
-#include "buzzer.h"
-#include "drivers/timer.h"
-#include "project_config.h"
+#include "gpio.h"
+#include "../gsensor.h"
+#include "../drivers/adc.h"
+#include "../buzzer.h"
+#include "../drivers/timer.h"
+#include "../project_config.h"
 
 /* Simple blocking delay (approx) */
 static void bt_delay(uint32_t ms)

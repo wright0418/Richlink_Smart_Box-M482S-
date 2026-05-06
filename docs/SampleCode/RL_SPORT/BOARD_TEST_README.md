@@ -84,7 +84,7 @@
 
 檔案與實作參考
 - 測試模式實作：`SampleCode/RL_SPORT/test_mode.c`（包含選單、每項測試函式與 BLE 測試流程）
-- GPIO 板級測試：`SampleCode/RL_SPORT/board_test_gpio.c`
+- GPIO 板級測試：`SampleCode/RL_SPORT/board/board_test_gpio.c`
 - 電源 / 充電檢測：`SampleCode/RL_SPORT/board/power_mgmt.c`
 
 建議

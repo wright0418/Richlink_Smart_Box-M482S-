@@ -1,0 +1,11 @@
+refactor(rl_sport): move board_test_gpio to board layer
+
+- Move board_test_gpio.c/h to SampleCode/RL_SPORT/board/
+- Update main include to board/board_test_gpio.h
+- Update RL_SPORT.cproject.yml source path
+- Sync refactoring and board-test docs for new path
+
+Validation:
+- VS Code problems: no new errors
+- tests/run_tests.ps1: compile-only passed (2 targets)
+- cbuild (AC6): succeeded (Code=33432 RO-data=2996 RW-data=104 ZI-data=7136)

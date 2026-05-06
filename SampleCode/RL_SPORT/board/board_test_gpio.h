@@ -1,5 +1,5 @@
 /*
- * board_test_gpio.h
+ * board/board_test_gpio.h
  * RL_SPORT V3 - GPIO hardware test API
  */
 #ifndef __BOARD_TEST_GPIO_H__

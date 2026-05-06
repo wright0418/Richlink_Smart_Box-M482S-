@@ -20,7 +20,7 @@
 #include "buzzer.h"
 #include "board/gpio.h"
 #include "gsensor.h"
-#include "board_test_gpio.h"
+#include "board/board_test_gpio.h"
 #include "drivers/adc.h"
 #include "test_mode.h"
 #include "usb_hid_mouse.h"

@@ -48,6 +48,7 @@
   - 本輪 `drivers/i2c.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `board/power_mgmt.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `board/gpio.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `board/board_test_gpio.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 板上 smoke test / BLE 實機驗證：仍需在有硬體時依本文流程執行。
 
 ## 現有模組分層
@@ -70,7 +71,7 @@
    - `ble.c/h`：UART1 BLE transport、AT response parser、rename FSM
    - `ble_at_repl.c/h`：BLE `AT+TEST,` REPL
    - `test_mode.c/h`：UART0 `AT+TEST=` board auto-test
-   - `board_test_gpio.c/h`：板測流程
+  - `board/board_test_gpio.c/h`：板測流程
 5. **Application / game 層**
    - `game_logic.c/h`：idle/movement 判定、BLE jump count 上報
    - `gsensor_jump_detect.c/h`, `hall_anticheat.c/h`：可選演算法
@@ -233,7 +234,7 @@
 
 - 第一批已完成：`ble_parser.*` 已搬移到 `protocol/`，`ble.c` / host test / `RL_SPORT.cproject.yml` / 文件皆已同步更新並完成 build/test 驗證。
 - 第二批已完成：`timer.*`、`adc.*`、`i2c.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
-- 第三批已完成：`power_mgmt.*`、`gpio.*` 已搬移到 `board/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
+- 第三批已完成：`power_mgmt.*`、`gpio.*`、`board_test_gpio.*` 已搬移到 `board/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 
 建議方向：
 
