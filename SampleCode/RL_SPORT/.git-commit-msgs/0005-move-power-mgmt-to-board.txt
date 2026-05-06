@@ -1,0 +1,11 @@
+refactor(rl_sport): move power_mgmt to board layer and sync docs
+
+- Move power_mgmt.c/h to SampleCode/RL_SPORT/board/
+- Update main include path to board/power_mgmt.h
+- Update RL_SPORT.cproject.yml to compile board/power_mgmt.c
+- Sync docs for new board/drivers file layout and phase progress
+
+Validation:
+- VS Code problems: no new errors
+- tests/run_tests.ps1: compile-only passed (2 targets)
+- cbuild (AC6): succeeded (Code=33432 RO-data=2996 RW-data=104 ZI-data=7136)

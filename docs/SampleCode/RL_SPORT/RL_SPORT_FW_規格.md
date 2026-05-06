@@ -1,14 +1,14 @@
 # RL_SPORT_FW_規格
 
 ## 目的
-此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `gsensor.c`, `game_logic.c`, `power_mgmt.c`, `gpio.c`, `i2c.c`, `led.c`, `timer.c`, `system_status.c`, `project_config.h`）。
+此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `gsensor.c`, `game_logic.c`, `board/power_mgmt.c`, `gpio.c`, `drivers/i2c.c`, `led.c`, `drivers/timer.c`, `drivers/adc.c`, `system_status.c`, `project_config.h`）。
 
 ## 總覽架構
 - 系統核心與板級初始化：`main.c`（`RL_InitSystemCore`, `RL_InitBoardInputs`, `RL_InitDrivers`, `RL_InitApplication`）
-- 周邊驅動：`i2c.c`, `gsensor.c`, `led.c`, `timer.c`, `adc`（電池量測）
+- 周邊驅動：`drivers/i2c.c`, `gsensor.c`, `led.c`, `drivers/timer.c`, `drivers/adc.c`（電池量測）
 - 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）
 - 通訊：`ble.c`（UART1 作為 BLE transport，命令解析與 AT 流程）
-- 電源管理：`power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
+- 電源管理：`board/power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
 - 板級 I/O 與中斷：`gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
 - 全域狀態：`system_status.c`（私有狀態 storage + accessor API）
 
@@ -88,7 +88,7 @@
 - 適合：遠端診斷、狀態查詢、感測器/LED/Buzzer/DFLASH 測試
 
 ## LED / Buzzer 行為
-- `SetGreenLedMode(freq, duty)` 控制綠燈閃爍模式（模組化，LED 時序由 `timer.c` 每 1ms callback 更新）
+- `SetGreenLedMode(freq, duty)` 控制綠燈閃爍模式（模組化，LED 時序由 `drivers/timer.c` 每 1ms callback 更新）
 - LED 模式優先級（簡述）:
 	- 低電模式：高頻閃爍（`LOW_BATT_LED_FREQ_HZ`）
 	- 遊戲中 (`GAME_START`)：快速短亮
@@ -176,7 +176,7 @@ flowchart LR
 6. 測試驅動：加入自動板測函式 `BoardTest_RunAll()` 作為啟動健康檢查範例。
 
 ## 常見維護注意事項
-- 若改變 G-sensor 型號或 I2C 位址，請同時更新 `gsensor.c` 與 `i2c` wrapper，並在 `project_config.h` 調整對應參數。
+- 若改變 G-sensor 型號或 I2C 位址，請同時更新 `gsensor.c` 與 `drivers/i2c` wrapper，並在 `project_config.h` 調整對應參數。
 - BLE 模組 AT 命令回應字串若不同（不同廠牌），需更新 `ble.c` 中的 `BleCmdTable` 與解析邏輯。
 - 若要在低功耗下保留 UART1 接收，需評估 BLE module 的低功耗協定（目前以 AT/暫停方式處理）。
 

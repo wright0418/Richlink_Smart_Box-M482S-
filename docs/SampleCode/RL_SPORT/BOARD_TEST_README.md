@@ -73,7 +73,7 @@
 實務注意事項與硬體設定
 - 進入測試模式需要在 UART0 接收到 `test` 並送出換行；如果主程式已經大量使用 UART0 做其他工作，請在進入測試前暫停或確保序列埠交互不會被搶佔。
 - Key (PB15) 必須設為 Quasi mode（韌體預設於 `Gpio_Init()` 與 `BoardTest_GPIO_Init()` 已設定）。
-- Power Lock (PA11) 與充電行為：韌體在啟動時會偵測 USB 充電，若偵測到則會進入充電模式（不啟動遊戲），且 `PowerMgmt_ChargeModeInit()` 會在必要時將 PA11 設為可驅動狀態以釋放/控制電源鎖（實作請參考 `power_mgmt.c`）。若測試需要控制/驗證 power lock，請注意此腳位為輸出模式。
+- Power Lock (PA11) 與充電行為：韌體在啟動時會偵測 USB 充電，若偵測到則會進入充電模式（不啟動遊戲），且 `PowerMgmt_ChargeModeInit()` 會在必要時將 PA11 設為可驅動狀態以釋放/控制電源鎖（實作請參考 `board/power_mgmt.c`）。若測試需要控制/驗證 power lock，請注意此腳位為輸出模式。
 
 範例 PC 測試腳本摘錄（流程摘要）
 1) 開啟 COM 與 115200 8N1
@@ -85,7 +85,7 @@
 檔案與實作參考
 - 測試模式實作：`SampleCode/RL_SPORT/test_mode.c`（包含選單、每項測試函式與 BLE 測試流程）
 - GPIO 板級測試：`SampleCode/RL_SPORT/board_test_gpio.c`
-- 電源 / 充電檢測：`SampleCode/RL_SPORT/power_mgmt.c`
+- 電源 / 充電檢測：`SampleCode/RL_SPORT/board/power_mgmt.c`
 
 建議
 - 若要自動化全部測項，建議在硬體測試夾具上加上可控按鍵與檢測回授點（例如 LED 回讀或 ADC 閾值），以把人工檢查項目改為可自動判斷。

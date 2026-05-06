@@ -84,4 +84,4 @@ project:
         - file: ../hall_anticheat.c
         - file: ../drivers/i2c.c
         - file: ../board_test_gpio.c
-        - file: ../power_mgmt.c
+        - file: ../board/power_mgmt.c

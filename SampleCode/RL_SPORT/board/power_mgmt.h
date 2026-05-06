@@ -1,6 +1,9 @@
 /**
- * @file power_mgmt.h
+ * @file board/power_mgmt.h
  * @brief Power management module for Deep/Shallow Power-Down modes
+ *
+ * NOTE: moved from top-level RL_SPORT directory into board/.
+ * API and behavior remain unchanged.
  *
  * This module centralizes all power management functionality including:
  *  - Deep Power-Down (DPD) mode configuration and wake-up
