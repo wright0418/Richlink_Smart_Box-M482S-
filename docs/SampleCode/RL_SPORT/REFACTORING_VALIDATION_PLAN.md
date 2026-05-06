@@ -49,6 +49,10 @@
   - 本輪 `board/power_mgmt.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `board/gpio.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 本輪 `board/board_test_gpio.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `drivers/gsensor.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `drivers/led.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `drivers/buzzer.*` 搬移後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
+  - 本輪 `board/usb_hid/*` 搬移並修正遺留 `board_test_gpio.c` include 後再次驗證：`tests/run_tests.ps1` compile-only 2 個 target 通過，`cbuild` 成功（Code=`33432`, RO-data=`2996`, RW-data=`104`, ZI-data=`7136`）。
   - 板上 smoke test / BLE 實機驗證：仍需在有硬體時依本文流程執行。
 
 ## 現有模組分層
@@ -59,12 +63,13 @@
    - `main.c`：`SYS_Init()`, `RL_InitSystemCore()`, 初始化順序 orchestration
   - `board/gpio.c/h`：MFP、GPIO、Power Lock、USB detect、wake pin helper
   - `board/power_mgmt.c/h`：SPD/DPD、charge mode、wake/release flow
+  - `board/usb_hid/usb_hid_mouse.*`：USB FS HID test helper 與 descriptor（板級 USB clock/pin/PHY 設定）
 2. **Driver / peripheral 層**
   - `drivers/timer.c/h`：1 ms tick、`delay_ms()`、timeout helper
   - `drivers/i2c.c/h`：I2C wrapper、retry、debug log gate
-   - `gsensor.c/h`：MXC400 sensor init/read/power
+   - `drivers/gsensor.c/h`：MXC400 sensor init/read/power
   - `drivers/adc.c/h`：VDDA / low-battery
-   - `led.c/h`, `buzzer.c/h`, `usb_hid_mouse.c/h`
+   - `drivers/led.c/h`, `drivers/buzzer.c/h`
 3. **System state 層**
    - `system_status.c/h`：BLE/game/key/hall/idle/repl 狀態
 4. **Protocol / test 層**
@@ -235,6 +240,8 @@
 - 第一批已完成：`ble_parser.*` 已搬移到 `protocol/`，`ble.c` / host test / `RL_SPORT.cproject.yml` / 文件皆已同步更新並完成 build/test 驗證。
 - 第二批已完成：`timer.*`、`adc.*`、`i2c.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 - 第三批已完成：`power_mgmt.*`、`gpio.*`、`board_test_gpio.*` 已搬移到 `board/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
+- 第四批已完成：`gsensor.*`、`led.*`、`buzzer.*` 已搬移到 `drivers/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
+- 第五批已完成：`usb_hid_mouse.*`、`usb_hid_mouse_desc.c`、`usb_hid_mouse_internal.h` 已搬移到 `board/usb_hid/`，include 與 `RL_SPORT.cproject.yml` 已同步，build/test 驗證通過。
 
 建議方向：
 
@@ -242,7 +249,7 @@
 - 若要搬，建議後續分成：
   - `app/`：`game_logic.*`, optional algorithms
   - `drivers/`：`gsensor.*`, `i2c.*`, `adc.*`, `led.*`, `buzzer.*`, `timer.*`
-  - `board/`：`gpio.*`, power/pin helpers
+  - `board/`：`gpio.*`, power/pin helpers, `usb_hid/` board test USB helper
   - `protocol/`：`ble.*`, `ble_at_repl.*`, parser
   - `tests/`：host tests
 - 建議實際搬移順序（由低風險到高風險）：

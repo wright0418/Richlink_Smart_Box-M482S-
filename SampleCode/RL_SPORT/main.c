@@ -23,7 +23,7 @@
 #include "board/board_test_gpio.h"
 #include "drivers/adc.h"
 #include "test_mode.h"
-#include "usb_hid_mouse.h"
+#include "board/usb_hid/usb_hid_mouse.h"
 #include "board/power_mgmt.h"
 #include "ble_at_repl.h"
 

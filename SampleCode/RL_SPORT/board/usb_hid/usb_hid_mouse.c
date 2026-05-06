@@ -4,8 +4,8 @@
                                                                               ******************************************************************************/
 #include <string.h>
 #include "NuMicro.h"
-#include "project_config.h"
-#include "drivers/timer.h"
+#include "../../project_config.h"
+#include "../../drivers/timer.h"
 #include "usb_hid_mouse.h"
 #include "usb_hid_mouse_internal.h"
 

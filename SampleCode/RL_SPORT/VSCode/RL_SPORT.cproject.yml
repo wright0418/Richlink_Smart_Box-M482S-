@@ -77,8 +77,8 @@ project:
         - file: ../board/gpio.c
         - file: ../drivers/adc.c
         - file: ../test_mode.c
-        - file: ../usb_hid_mouse.c
-        - file: ../usb_hid_mouse_desc.c
+        - file: ../board/usb_hid/usb_hid_mouse.c
+        - file: ../board/usb_hid/usb_hid_mouse_desc.c
         - file: ../drivers/gsensor.c
         - file: ../gsensor_jump_detect.c
         - file: ../hall_anticheat.c

@@ -10,7 +10,7 @@
 #include "drivers/gsensor.h"
 #include "drivers/adc.h"
 #include "board/gpio.h"
-#include "usb_hid_mouse.h"
+#include "board/usb_hid/usb_hid_mouse.h"
 #include "ble.h"
 #include "drivers/i2c.h"
 #include "system_status.h"

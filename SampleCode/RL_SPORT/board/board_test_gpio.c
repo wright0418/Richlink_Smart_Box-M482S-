@@ -9,7 +9,7 @@
 #include "gpio.h"
 #include "../drivers/gsensor.h"
 #include "../drivers/adc.h"
-#include "../buzzer.h"
+#include "../drivers/buzzer.h"
 #include "../drivers/timer.h"
 #include "../project_config.h"
 
