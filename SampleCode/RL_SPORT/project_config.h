@@ -52,7 +52,7 @@
 #endif
 
 /* Firmware version and board identification */
-#define FW_VERSION "1.4.0"
+#define FW_VERSION "1.4.1"
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
