@@ -1,0 +1,15 @@
+RELEASE v1.4.1
+
+Changelog (high level):
+- 修正 BLE parser/REPL 的 race 與 MAC 格式偵測
+- 增大 SYS_MAC_ADDR_BUF_SIZE
+- 新增 host-side PowerShell 自動化 (ai_fw_fast_validation.ps1, ai_fw_debug_loop.ps1)
+- Bump FW_VERSION → 1.4.1
+
+Assets:
+- RELEASES/assets/V1.4.1/RL_SPORT.bin
+- RELEASES/assets/V1.4.1/RL_SPORT.axf
+
+Build artifacts: RL_SPORT.axf (300,228 bytes), RL_SPORT.bin (37,080 bytes)
+
+Fast validation: PASS
