@@ -13,25 +13,25 @@
 /* Project configuration and common definitions */
 #include "project_config.h"
 #include "system_status.h"
-#include "timer.h"
-#include "game_logic.h"
+#include "drivers/timer.h"
+#include "app/game_logic.h"
 #include "ble.h"
-#include "led.h"
-#include "buzzer.h"
-#include "gpio.h"
-#include "gsensor.h"
-#include "board_test_gpio.h"
-#include "adc.h"
+#include "drivers/led.h"
+#include "drivers/buzzer.h"
+#include "board/gpio.h"
+#include "drivers/gsensor.h"
+#include "board/board_test_gpio.h"
+#include "drivers/adc.h"
 #include "test_mode.h"
-#include "usb_hid_mouse.h"
-#include "power_mgmt.h"
+#include "board/usb_hid/usb_hid_mouse.h"
+#include "board/power_mgmt.h"
 #include "ble_at_repl.h"
 
 #if USE_GSENSOR_JUMP_DETECT
-#include "gsensor_jump_detect.h"
+#include "app/algorithms/gsensor_jump_detect.h"
 #endif
 #if USE_HALL_ANTICHEAT
-#include "hall_anticheat.h"
+#include "app/algorithms/hall_anticheat.h"
 #endif
 
 static volatile uint8_t g_usb_charge_mode = 0u;
@@ -220,13 +220,14 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 
 /*
  * Module implementation notes:
- * - BLE (BLEParseCommand, UART IRQ/RX handling, BLE transport) implemented in ble.c, declared in ble.h
- * - System status and global `g_sys` live in system_status.c and are initialized by Sys_Init()
- * - GPIO interrupts, buttons and board-level pin config are in gpio.c
+ * - BLE transport/UART IRQ are implemented in ble.c; pure text parsing helpers
+ *   (e.g. BleParser_ParseCommand) are split into protocol/ble_parser.c/.h for unit tests.
+ * - System status storage and accessor APIs live in system_status.c and are initialized by Sys_Init()
+ * - GPIO interrupts, buttons and board-level pin config are in board/gpio.c
  * - LED, Buzzer, Timer and G-sensor drivers live in led.c, buzzer.c, timer.c and gsensor.c
  *
  * Rationale: keep main.c focused on initialization and high-level flow; use module public APIs
- * (see respective headers: ble.h, gpio.h, led.h, gsensor.h).
+ * (see respective headers: ble.h, board/gpio.h, led.h, gsensor.h).
  */
 
 /*---------------------------------------------------------------------------------------------------------*/
@@ -234,7 +235,7 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 /*---------------------------------------------------------------------------------------------------------*/
 
 /**
- * @brief Handle KeyA event: clear g_keyA_state
+ * @brief Handle KeyA event and refresh the movement inactivity timer.
  */
 
 void ProcessKeyAEvent(void)

@@ -1,0 +1,14 @@
+refactor(rl_sport): move gsensor to drivers layer
+
+Move G-sensor implementation and public header from project root
+into `drivers/` to better reflect its role as a hardware driver.
+
+Changes:
+- Added: drivers/gsensor.c, drivers/gsensor.h
+- Removed: gsensor.c, gsensor.h
+- Updated includes to use "drivers/gsensor.h"
+- Updated RL_SPORT.cproject.yml to reference ../drivers/gsensor.c
+
+Validation:
+- Static checks and unit compile (run_tests) must pass
+- AC6 cbuild should complete with no size regression

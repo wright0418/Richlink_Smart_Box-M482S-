@@ -19,6 +19,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 char *strstr(const char *haystack, const char *needle);
 size_t strlen(const char *s);
 void *memcpy(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n);
 #endif
 #else
 #include <string.h>
@@ -34,12 +35,13 @@ void *memcpy(void *dest, const void *src, size_t n);
 #endif
 
 #include "ble.h"
+#include "protocol/ble_parser.h"
 #include "ble_at_repl.h"
 #include "system_status.h"
-#include "buzzer.h"
-#include "led.h"
-#include "game_logic.h"
-#include "timer.h"
+#include "drivers/buzzer.h"
+#include "drivers/led.h"
+#include "app/game_logic.h"
+#include "drivers/timer.h"
 
 /* Reuse buffer sizes from header */
 volatile uint8_t g_u8RecData[RXBUFSIZE] = {0};
@@ -48,40 +50,6 @@ volatile uint8_t g_u8DataReady = 0;
 static volatile uint8_t s_uart_line_buf[RXBUFSIZE] = {0};
 static volatile uint32_t s_uart_line_len = 0;
 static volatile uint8_t s_uart_line_overflow = 0;
-
-/* BLE command enum and table (moved from main.c) */
-typedef enum
-{
-  BLE_CMD_NONE = 0,
-  BLE_CMD_CONNECTED,
-  BLE_CMD_DISCONNECTED,
-  BLE_CMD_CMD_MODE,
-  BLE_CMD_DATA_MODE,
-  BLE_CMD_CONN_START,
-  BLE_CMD_GET_CYCLE,
-  BLE_CMD_SET_END,
-  BLE_CMD_DISC_MSG,
-  BLE_CMD_MAC_ADDR,
-  BLE_CMD_DEVICE_NAME
-} BleCmdType;
-
-static const struct
-{
-  BleCmdType type;
-  const char *keyword;
-} BleCmdTable[] = {
-    {BLE_CMD_CONNECTED, ": CONNECTED OK"},
-    {BLE_CMD_DISCONNECTED, ": DISCONNECTED OK"},
-    {BLE_CMD_CMD_MODE, ": CMD_MODE OK"},
-    {BLE_CMD_DATA_MODE, ": DATA_MODE OK"},
-    {BLE_CMD_CONN_START, "conn st"},
-    {BLE_CMD_GET_CYCLE, "get cycle"},
-    {BLE_CMD_SET_END, "set end"},
-    {BLE_CMD_DISC_MSG, "disc"},
-    {BLE_CMD_MAC_ADDR, "MAC_ADDR"},
-    {BLE_CMD_MAC_ADDR, "ADDR"},
-    {BLE_CMD_DEVICE_NAME, "DEVICE_NAME"},
-    {BLE_CMD_DEVICE_NAME, "NAME"}};
 
 static size_t BLE_TrimLineLen(const char *src, size_t len)
 {
@@ -92,37 +60,26 @@ static size_t BLE_TrimLineLen(const char *src, size_t len)
   return len;
 }
 
-static void BLE_CopyClamp(volatile uint8_t *dst, size_t dst_size, const char *src, size_t len)
+static uint8_t BLE_NormalizeAndHandleRepl(char *msg)
 {
-  if (!dst || !src || dst_size == 0u)
+  if (!msg)
   {
-    return;
+    return 0u;
   }
 
-  size_t copy_len = len;
-  if (copy_len >= dst_size)
+  BleParser_StripCmdModeMarker(msg, BLE_CMD_CCMD);
+
+  /* BLE module/system replies (CMD mode ACK, name/MAC query results, etc.)
+     must continue through the normal BLE parser / rename flow. If we send
+     them into the REPL handler first, they can be consumed as unknown REPL
+     commands before Sys_SetMacAddr()/Sys_SetDeviceName() ever sees them. */
+  if (BleParser_ParseCommand((const char *)msg) != BLE_CMD_NONE)
   {
-    copy_len = dst_size - 1u;
+    return 0u;
   }
 
-  memcpy((void *)dst, src, copy_len);
-  dst[copy_len] = '\0';
+  return BleAtRepl_HandleMessage((const char *)msg);
 }
-
-BleCmdType BLEParseCommand(const char *msg)
-{
-  uint8_t i;
-  for (i = 0; i < sizeof(BleCmdTable) / sizeof(BleCmdTable[0]); ++i)
-  {
-    if (strstr(msg, BleCmdTable[i].keyword))
-    {
-      return BleCmdTable[i].type;
-    }
-  }
-  return BLE_CMD_NONE;
-}
-
-extern SystemStatus g_sys; /* defined in system_status.c via system_status.h */
 
 void UART1_IRQHandler(void)
 {
@@ -251,77 +208,46 @@ void CheckBleRecvMsg(void)
 
   if (BLE_TakeMessageSnapshot(msg, sizeof(msg)))
   {
-    /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
-       which may appear anywhere in the received line (echoes, concatenated
-       fragments). Treat all occurrences as noise and strip them out so the
-       AT payload is parsed cleanly. */
-    {
-      char *p = NULL;
-      while ((p = strstr(msg, BLE_CMD_CCMD)) != NULL)
-      {
-        size_t tail_len = strlen(p + strlen(BLE_CMD_CCMD));
-        memmove(p, p + strlen(BLE_CMD_CCMD), tail_len + 1); /* include null */
-      }
-    }
-
-    if (BleAtRepl_HandleMessage((const char *)msg))
+    if (BLE_NormalizeAndHandleRepl(msg))
     {
       return;
     }
 
-    /* Remove any occurrences of the module mode-prefix marker ("!CCMD@")
-       which may appear anywhere in the received line (echoes, concatenated
-       fragments). Treat all occurrences as noise and strip them out so the
-       AT payload is parsed cleanly. */
-    {
-      char *p = NULL;
-      while ((p = strstr(msg, BLE_CMD_CCMD)) != NULL)
-      {
-        size_t tail_len = strlen(p + strlen(BLE_CMD_CCMD));
-        memmove(p, p + strlen(BLE_CMD_CCMD), tail_len + 1); /* include null */
-      }
-    }
-
-    if (BleAtRepl_HandleMessage((const char *)msg))
-    {
-      return;
-    }
-
-    BleCmdType cmdType = BLEParseCommand((const char *)msg);
+    BleCmdType cmdType = BleParser_ParseCommand((const char *)msg);
     switch (cmdType)
     {
     case BLE_CMD_CONNECTED:
-      g_sys.ble_state = BLE_CONNECTED;
+      Sys_SetBleState(BLE_CONNECTED);
       /* Reset movement inactivity timer on BLE connect so user hold doesn't
         immediately trigger idle state. */
       Game_ResetMovementTimer();
       Game_ResetBleTimer(); /* Reset BLE send timer on reconnect */
       break;
     case BLE_CMD_DISCONNECTED:
-      g_sys.ble_state = BLE_DISCONNECTED;
-      g_sys.game_state = GAME_STOP;
+      Sys_SetBleState(BLE_DISCONNECTED);
+      Sys_SetGameState(GAME_STOP);
       /* BLE disconnected: restart idle countdown (rule 4 - 30s) */
       Game_ResetMovementTimer();
       break;
     case BLE_CMD_CMD_MODE:
-      g_sys.ble_mode = 0;
+      Sys_SetBleMode(0u);
       break;
     case BLE_CMD_DATA_MODE:
-      g_sys.ble_mode = 1;
+      Sys_SetBleMode(1u);
       break;
     case BLE_CMD_CONN_START:
       BLE_UART_SEND((void *)UART1, "Connecting\n");
-      g_sys.jump_times = 0;
+      Sys_ResetJumpTimes();
       break;
     case BLE_CMD_GET_CYCLE:
-      g_sys.jump_times = 0;
+      Sys_ResetJumpTimes();
       BLE_UART_SEND((void *)UART1, "Connecting\n");
       BuzzerPlay(2000, 800);
-      g_sys.game_state = GAME_START;
+      Sys_SetGameState(GAME_START);
       break;
     case BLE_CMD_SET_END:
-      g_sys.game_state = GAME_STOP;
-      g_sys.jump_times = 0;
+      Sys_SetGameState(GAME_STOP);
+      Sys_ResetJumpTimes();
       /* Game ended: restart idle countdown (rule 2) */
       Game_ResetMovementTimer();
       for (i = 0; i < 5; i++)
@@ -331,8 +257,8 @@ void CheckBleRecvMsg(void)
       }
       break;
     case BLE_CMD_DISC_MSG:
-      g_sys.game_state = GAME_STOP;
-      g_sys.jump_times = 0;
+      Sys_SetGameState(GAME_STOP);
+      Sys_ResetJumpTimes();
       Game_ResetMovementTimer();
       break;
     case BLE_CMD_MAC_ADDR:
@@ -341,7 +267,7 @@ void CheckBleRecvMsg(void)
       len = BLE_TrimLineLen((const char *)msg, len);
       if (len > 0u)
       {
-        BLE_CopyClamp(g_sys.mac_addr, sizeof(g_sys.mac_addr), (const char *)msg, len);
+        Sys_SetMacAddr((const char *)msg, (uint32_t)len);
       }
     }
     break;
@@ -351,7 +277,7 @@ void CheckBleRecvMsg(void)
       len = BLE_TrimLineLen((const char *)msg, len);
       if (len > 0u)
       {
-        BLE_CopyClamp(g_sys.device_name, sizeof(g_sys.device_name), (const char *)msg, len);
+        Sys_SetDeviceName((const char *)msg, (uint32_t)len);
       }
     }
     break;
@@ -441,92 +367,11 @@ typedef struct
   uint32_t state_enter_ms;
   BleRenameState state;
   char mac_suffix[5];
+  char name_suffix[5];
+  uint8_t has_name_suffix;
 } BleRenameFlowCtx;
 
 static BleRenameFlowCtx s_rename = {0};
-
-static uint8_t Ble_IsHexChar(char c)
-{
-  return (uint8_t)((c >= '0' && c <= '9') ||
-                   (c >= 'A' && c <= 'F') ||
-                   (c >= 'a' && c <= 'f'));
-}
-
-static uint8_t Ble_ExtractMacSuffix4(const char *src, char *out4)
-{
-  if (!src || !out4)
-  {
-    return 0u;
-  }
-
-  char hex_buf[16];
-  uint8_t hex_len = 0u;
-  for (size_t i = 0u; src[i] != '\0'; i++)
-  {
-    if (Ble_IsHexChar(src[i]))
-    {
-      if (hex_len < (uint8_t)sizeof(hex_buf))
-      {
-        hex_buf[hex_len++] = src[i];
-      }
-    }
-  }
-
-  if (hex_len < 4u)
-  {
-    out4[0] = '\0';
-    return 0u;
-  }
-
-  out4[0] = hex_buf[hex_len - 4u];
-  out4[1] = hex_buf[hex_len - 3u];
-  out4[2] = hex_buf[hex_len - 2u];
-  out4[3] = hex_buf[hex_len - 1u];
-  out4[4] = '\0';
-  return 1u;
-}
-
-static uint8_t Ble_HasValidRopeSuffix(const char *name)
-{
-  if (!name)
-  {
-    return 0u;
-  }
-
-  const char *p = strstr(name, "ROPE_");
-  if (!p)
-  {
-    return 0u;
-  }
-
-  p += 5; /* skip "ROPE_" */
-  for (uint8_t i = 0u; i < 4u; i++)
-  {
-    if (!Ble_IsHexChar(p[i]))
-    {
-      return 0u;
-    }
-  }
-  return 1u;
-}
-
-static uint8_t Ble_IsNameQueryEcho(const char *s)
-{
-  if (!s)
-  {
-    return 0u;
-  }
-  return (uint8_t)(strstr(s, "AT+NAME=?") != NULL);
-}
-
-static uint8_t Ble_IsAddrQueryEcho(const char *s)
-{
-  if (!s)
-  {
-    return 0u;
-  }
-  return (uint8_t)(strstr(s, "AT+ADDR=?") != NULL);
-}
 
 void Ble_RenameFlow(uint8_t *device_name, uint8_t *mac)
 {
@@ -564,9 +409,9 @@ void Ble_RenameFlowStart(void)
   s_rename.mac_suffix[0] = '\0';
 
   /* Force WAIT_CCMD to rely on fresh BLE reply instead of stale mode value. */
-  g_sys.ble_mode = 1u;
-  g_sys.mac_addr[0] = '\0';
-  g_sys.device_name[0] = '\0';
+  Sys_SetBleMode(1u);
+  Sys_ClearMacAddr();
+  Sys_ClearDeviceName();
 }
 
 uint8_t Ble_RenameFlowIsDone(void)
@@ -576,6 +421,9 @@ uint8_t Ble_RenameFlowIsDone(void)
 
 void Ble_RenameFlowProcess(void)
 {
+  char device_name[SYS_DEVICE_NAME_BUF_SIZE];
+  char mac_addr[SYS_MAC_ADDR_BUF_SIZE];
+
   if (!s_rename.active || s_rename.done)
   {
     return;
@@ -615,75 +463,80 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_SEND_NAME_QUERY:
-    g_sys.device_name[0] = '\0';
+    Sys_ClearDeviceName();
     BLE_UART_SEND(UART1, BLE_CMD_NAME_QUERY);
     s_rename.state = BLE_RENAME_WAIT_NAME;
     s_rename.state_enter_ms = now;
     break;
 
   case BLE_RENAME_WAIT_NAME:
-    if (strlen((const char *)Sys_GetDeviceName()) > 0u)
+    if (Sys_CopyDeviceName(device_name, (uint32_t)sizeof(device_name)) > 0u)
     {
-      if (Ble_IsNameQueryEcho(Sys_GetDeviceName()))
+      if (BleParser_IsNameQueryEcho(device_name))
       {
-        g_sys.device_name[0] = '\0';
+        Sys_ClearDeviceName();
         break;
       }
 
-      uint8_t has_valid_rope = Ble_HasValidRopeSuffix(Sys_GetDeviceName());
-      s_rename.need_rename = (uint8_t)(!has_valid_rope);
-      if (s_rename.need_rename)
-      {
-        s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
-      }
-      else
-      {
-        s_rename.state = BLE_RENAME_SEND_MODE_DATA;
-      }
+      /* Always compare current name suffix with MAC suffix to remediate
+         old FW wrong rename cases. */
+      s_rename.has_name_suffix = BleParser_ExtractRopeSuffix4(device_name, s_rename.name_suffix);
+      s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
       s_rename.state_enter_ms = now;
     }
     else if (is_timeout(s_rename.state_enter_ms, 300u))
     {
-      /* No valid name response in time -> continue with rename path. */
-      s_rename.need_rename = 1u;
+      /* No valid name response in time -> still query MAC and decide. */
+      s_rename.has_name_suffix = 0u;
+      s_rename.name_suffix[0] = '\0';
       s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
       s_rename.state_enter_ms = now;
     }
     break;
 
   case BLE_RENAME_SEND_ADDR_QUERY:
-    g_sys.mac_addr[0] = '\0';
+    Sys_ClearMacAddr();
     BLE_UART_SEND(UART1, BLE_CMD_ADDR_QUERY);
     s_rename.state = BLE_RENAME_WAIT_ADDR;
     s_rename.state_enter_ms = now;
     break;
 
   case BLE_RENAME_WAIT_ADDR:
-    if (strlen((const char *)Sys_GetMacAddr()) > 0u)
+    if (Sys_CopyMacAddr(mac_addr, (uint32_t)sizeof(mac_addr)) > 0u)
     {
-      if (Ble_IsAddrQueryEcho(Sys_GetMacAddr()))
+      if (BleParser_IsAddrQueryEcho(mac_addr))
       {
-        g_sys.mac_addr[0] = '\0';
+        Sys_ClearMacAddr();
         break;
       }
 
-      uint8_t has_suffix = Ble_ExtractMacSuffix4(Sys_GetMacAddr(), s_rename.mac_suffix);
-      if (!has_suffix && strlen((const char *)Sys_GetMacAddr()) >= 21u)
-      {
-        memcpy(s_rename.mac_suffix, (const void *)&Sys_GetMacAddr()[17], 4u);
-        s_rename.mac_suffix[4] = '\0';
-        has_suffix = 1u;
-      }
-
+      uint8_t has_suffix = BleParser_ExtractMacSuffix4(mac_addr, s_rename.mac_suffix);
       if (has_suffix)
       {
-        s_rename.state = BLE_RENAME_SEND_SET_NAME;
+        if (s_rename.has_name_suffix &&
+            strncmp((const char *)s_rename.name_suffix,
+                    (const char *)s_rename.mac_suffix, 4u) == 0)
+        {
+          /* Name already matches MAC suffix. */
+          s_rename.need_rename = 0u;
+          s_rename.state = BLE_RENAME_SEND_MODE_DATA;
+        }
+        else
+        {
+          /* Name missing/invalid/mismatched: repair name. */
+          s_rename.need_rename = 1u;
+          s_rename.state = BLE_RENAME_SEND_SET_NAME;
+        }
+        DBG_PRINT("[BLE] rename check name_suffix=%s mac_suffix=%s need_rename=%u\n",
+                  s_rename.has_name_suffix ? s_rename.name_suffix : "NONE",
+                  s_rename.mac_suffix,
+                  (unsigned)s_rename.need_rename);
         s_rename.state_enter_ms = now;
       }
       else
       {
         /* Response arrived but not parseable yet, keep waiting until timeout. */
-        g_sys.mac_addr[0] = '\0';
+        Sys_ClearMacAddr();
       }
     }
     else if (is_timeout(s_rename.state_enter_ms, 400u))

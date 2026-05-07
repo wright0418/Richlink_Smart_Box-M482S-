@@ -22,26 +22,68 @@ if (-not $compiler) {
     Write-Error "No suitable compiler found. Install gcc/clang (host) or arm-none-eabi-gcc/armclang (compile check)."
 }
 
-$src = Join-Path $PSScriptRoot "test_game_algorithms.c"
-$out = Join-Path $PSScriptRoot "test_game_algorithms.exe"
+$testTargets = @(
+    @{
+        Name    = "test_game_algorithms"
+        Sources = @(
+            (Join-Path $PSScriptRoot "test_game_algorithms.c")
+        )
+    },
+    @{
+        Name    = "test_ble_parser"
+        Sources = @(
+            (Join-Path $PSScriptRoot "test_ble_parser.c"),
+            (Join-Path $PSScriptRoot "..\protocol\ble_parser.c")
+        )
+    }
+)
 
-if ($compiler.Name -eq 'gcc') {
-    & gcc -std=c11 -Wall -Wextra -pedantic $src -o $out -lm
+function Assert-LastExitCode {
+    param(
+        [string]$StepName
+    )
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$StepName failed with exit code $LASTEXITCODE"
+    }
 }
-elseif ($compiler.Name -eq 'clang') {
-    & clang -std=c11 -Wall -Wextra -pedantic $src -o $out -lm
-}
-elseif ($compiler.Name -eq 'arm-none-eabi-gcc') {
-    & arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -std=c11 -Wall -Wextra -pedantic -c $src -o (Join-Path $PSScriptRoot "test_game_algorithms.o")
-}
-else {
-    & armclang --target=arm-arm-none-eabi -mcpu=cortex-m4 -mthumb -std=c11 -Wall -Wextra -c $src -o (Join-Path $PSScriptRoot "test_game_algorithms.o")
+
+foreach ($target in $testTargets) {
+    $out = Join-Path $PSScriptRoot ("{0}.exe" -f $target.Name)
+
+    if ($compiler.Name -eq 'gcc') {
+        & gcc -std=c11 -Wall -Wextra -pedantic @($target.Sources) -o $out -lm
+        Assert-LastExitCode "Build $($target.Name)"
+    }
+    elseif ($compiler.Name -eq 'clang') {
+        & clang -std=c11 -Wall -Wextra -pedantic @($target.Sources) -o $out -lm
+        Assert-LastExitCode "Build $($target.Name)"
+    }
+    elseif ($compiler.Name -eq 'arm-none-eabi-gcc') {
+        foreach ($src in $target.Sources) {
+            $objName = "{0}.{1}.o" -f $target.Name, [System.IO.Path]::GetFileNameWithoutExtension($src)
+            & arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -std=c11 -Wall -Wextra -pedantic -c $src -o (Join-Path $PSScriptRoot $objName)
+            Assert-LastExitCode "Compile-only $($target.Name): $src"
+        }
+    }
+    else {
+        foreach ($src in $target.Sources) {
+            $objName = "{0}.{1}.o" -f $target.Name, [System.IO.Path]::GetFileNameWithoutExtension($src)
+            & armclang --target=arm-arm-none-eabi -mcpu=cortex-m4 -mthumb -std=c11 -Wall -Wextra -c $src -o (Join-Path $PSScriptRoot $objName)
+            Assert-LastExitCode "Compile-only $($target.Name): $src"
+        }
+    }
+
+    if ($mode -eq "host") {
+        & $out
+        Assert-LastExitCode "Run $($target.Name)"
+    }
 }
 
 if ($mode -eq "host") {
-    & $out
+    Write-Host "All host test targets passed."
 }
 else {
-    Write-Host "Cross compiler detected ($($compiler.Name)). Compile-only check passed."
+    Write-Host "Cross compiler detected ($($compiler.Name)). Compile-only check passed for $($testTargets.Count) test target(s)."
     Write-Host "Install host gcc/clang to execute tests on this machine."
 }

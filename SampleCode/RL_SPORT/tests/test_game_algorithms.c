@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "../game_logic.h"
+#include "../app/game_logic.h"
 
 static int s_failed = 0;
 

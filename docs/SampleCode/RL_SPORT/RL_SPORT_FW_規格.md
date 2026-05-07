@@ -1,16 +1,17 @@
 # RL_SPORT_FW_規格
 
 ## 目的
-此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `gsensor.c`, `game_logic.c`, `power_mgmt.c`, `gpio.c`, `i2c.c`, `led.c`, `timer.c`, `system_status.c`, `project_config.h`）。
+此文件為 `RL_SPORT` 韌體之流程與行為規格（中文，繁體），供團隊後續維護、測試與作為新專案撰寫範例。內容來源為 `SampleCode/RL_SPORT` 程式碼檢視（主要檔案：`main.c`, `ble.c`, `drivers/gsensor.c`, `app/game_logic.c`, `board/power_mgmt.c`, `board/gpio.c`, `drivers/i2c.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`, `board/usb_hid/usb_hid_mouse.c`, `app/algorithms/gsensor_jump_detect.c`, `app/algorithms/hall_anticheat.c`, `system_status.c`, `project_config.h`）。
 
 ## 總覽架構
 - 系統核心與板級初始化：`main.c`（`RL_InitSystemCore`, `RL_InitBoardInputs`, `RL_InitDrivers`, `RL_InitApplication`）
-- 周邊驅動：`i2c.c`, `gsensor.c`, `led.c`, `timer.c`, `adc`（電池量測）
-- 應用邏輯：`game_logic.c`（運動/靜止偵測、上報機制）
+- 周邊驅動：`drivers/i2c.c`, `drivers/gsensor.c`, `drivers/led.c`, `drivers/buzzer.c`, `drivers/timer.c`, `drivers/adc.c`（電池量測）
+- 應用邏輯：`app/game_logic.c`（運動/靜止偵測、上報機制）、`app/algorithms/gsensor_jump_detect.c`（可選 G-sensor 跳繩演算法）、`app/algorithms/hall_anticheat.c`（可選 HALL 防作弊驗證）
 - 通訊：`ble.c`（UART1 作為 BLE transport，命令解析與 AT 流程）
-- 電源管理：`power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
-- 板級 I/O 與中斷：`gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
-- 全域狀態：`system_status.c`（`g_sys`）
+- 電源管理：`board/power_mgmt.c`（SPD/DPD 模式、USB 偵測、PowerLock）
+- 板級 I/O 與中斷：`board/gpio.c`（按鍵 PB15、HALL PB7/PB8、PC5 G-sensor INT）
+- 板級 USB 測試：`board/usb_hid/usb_hid_mouse.c`（USB FS HID mouse 測試 helper）
+- 全域狀態：`system_status.c`（私有狀態 storage + accessor API）
 
 ## 啟動流程（Boot）
 1. Reset → 進入 `main()`。
@@ -18,24 +19,27 @@
 	 - 解鎖受保護暫存器、時脈（HXT, PLL → HCLK 設定）、PCLK 設定
 	 - `Board_ReleaseIOPD()` 釋放 I/O hold
 	 - 呼叫 `PowerMgmt_DetectUsbCharge()` 檢查 USB 充電模式
-	- 若為 USB 充電模式則在主迴圈以 `PowerMgmt_ChargeModeInit()` + `PowerMgmt_ChargeModeProcess()` 進行充電流程（非阻塞狀態式處理）
+	- 若為 USB 充電模式，`main()` 會在初始化板級輸入後先進入 `PowerMgmt_RunChargeLoop()`；此 wrapper 內部反覆呼叫 `PowerMgmt_ChargeModeProcess()` 直到 USB 移除
 3. `RL_InitBoardInputs()`：設定按鍵/中斷腳位（`Gpio_Init()`）
 4. `RL_InitDrivers()`：
 	 - `Timer_Init()`（1ms tick）
 	 - `Gsensor_Init()`（I2C 打開、設定 FSR）
-	 - `Adc_InitBattery()`（電池 ADC）
+	 - `Adc_Init()`（電池 / VDDA ADC）
 	 - `UART_Open(UART0,115200)`（Debug）
 	 - `Ble_Init(115200)`（UART1）
 	 - `Led_Init()`, `Buzzer_Init()`
 5. `RL_InitApplication()`：
 	 - `Sys_Init()`, `Game_Init()`，若啟用 Jump Detect 則啟動校正流程
-6. 執行 `BoardTest_RunAll()`（啟動時一次性板測）
-7. 進入主迴圈
+6. 若 `BOARD_TEST_AUTORUN == 1`，則執行 `BoardTest_RunAll()`（啟動時一次性板測）
+7. 啟動 BLE rename flow：`Ble_RenameFlowStart()`
+8. 進入主迴圈
 
 ## 主迴圈行為（high-level）
 每回合主迴圈（`while(1)`）:
 - 處理測試模式（`TestMode_PollEnter()` / `TestMode_RunMenuIfActive()`）
 - 若 `UsbHidMouse_TestIsActive()`：以 1ms 更新 USB 測試循環，跳過一般流程
+- 若 BLE rename flow 尚未完成，呼叫 `Ble_RenameFlowProcess()`
+- 若 BLE REPL 啟用，優先由 `BleAtRepl_RunIfActive()` 處理遠端測試命令
 - G-sensor 自動校正週期與跳躍偵測（若啟用 `USE_GSENSOR_JUMP_DETECT`）
 - 定期讀取 G-sensor、印出 debug（200ms）
 - 每秒檢查電池電壓（`LOW_BATT_CHECK_INTERVAL_MS`）並設定低電旗標
@@ -48,15 +52,15 @@
 ## 狀態機與行為細節
 - BLE 狀態（`g_sys.ble_state`）：`BLE_CONNECTED` / `BLE_DISCONNECTED`。由 `ble.c` 的 UART 接收回應解析決定。
 - 遊戲狀態（`g_sys.game_state`）：`GAME_START` / `GAME_STOP`。由 BLE 指令（例如 `get cycle` 觸發 start，`set end` 觸發 stop）或本機事件變更。
-- 運動/閒置偵測（`game_logic.c`）：
+- 運動/閒置偵測（`app/game_logic.c`）：
 	- 以 sliding window 計算 magnitude 的 mean 與 stddev（參數在 `project_config.h`），判定「無動作」
 	- 若無動作且超時（聯線/未聯線分別不同 timeout），則設定 `idle_state` -> 觸發 `RL_HandleIdlePowerOff()`
 - 跳繩計數：兩種模式擇一
 	- HALL 模式（`USE_GSENSOR_JUMP_DETECT == 0`）：PB7 中斷僅累積 edge 事件；主迴圈以 2 edge = 1 jump 規則換算跳數（ISR 減負）
-	- G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `gsensor_jump_detect` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
+	- G-sensor 模式（`USE_GSENSOR_JUMP_DETECT == 1`）：在 `app/algorithms/gsensor_jump_detect.c` 模組執行濾波/閾值/校正並在主迴圈或模組內增加跳數
 
 ## BLE 行為 / AT 流程（`ble.c`）
-- 使用 UART1 作為 BLE module transport，ISR 收到一整行後透過 `BLEParseCommand()` 判斷
+- 使用 UART1 作為 BLE module transport，ISR 收到一整行後由 `CheckBleRecvMsg()` 進行處理，純文字分類邏輯已抽到 `protocol/ble_parser.c` 的 `BleParser_ParseCommand()`
 - 支援命令示例：
 	- 連線/斷線通知（改變 `g_sys.ble_state`）
 	- `get cycle` → 進入 `GAME_START` 並回應、蜂鳴提示
@@ -65,8 +69,27 @@
 - BLE 模組啟動流程包含 rename（`Ble_RenameFlow`）以將裝置名稱改為 `ROPE_XXXX`（取 MAC 後 4 碼）
 - BLE 模組啟動流程改為非阻塞 rename 狀態機（`Ble_RenameFlowStart()` / `Ble_RenameFlowProcess()` / `Ble_RenameFlowIsDone()`）以避免開機卡住
 
+## 測試 / 診斷通道
+
+### UART0：板測 / 產線測試
+- 由 `test_mode.c` 提供
+- 兩種入口：
+	- 輸入 `test`：進入互動式選單
+	- 輸入 `AT+TEST=<CMD>\r\n`：執行結構化板測
+- 適合：產線、自動化 smoke test、板上周邊基本驗證
+
+### BLE：遠端 REPL
+- 由 `ble_at_repl.c` 提供
+- 命令格式：`AT+TEST,<CMD>`
+- 常用控制：
+	- `AT+TEST,REPL_START`
+	- `AT+TEST,REPL_STOP`
+	- `AT+TEST,STATUS`
+	- `AT+TEST,SENSOR_READ`
+- 適合：遠端診斷、狀態查詢、感測器/LED/Buzzer/DFLASH 測試
+
 ## LED / Buzzer 行為
-- `SetGreenLedMode(freq, duty)` 控制綠燈閃爍模式（模組化，LED 時序由 `timer.c` 每 1ms callback 更新）
+- `SetGreenLedMode(freq, duty)` 控制綠燈閃爍模式（模組化，LED 時序由 `drivers/timer.c` 每 1ms callback 更新）
 - LED 模式優先級（簡述）:
 	- 低電模式：高頻閃爍（`LOW_BATT_LED_FREQ_HZ`）
 	- 遊戲中 (`GAME_START`)：快速短亮
@@ -83,8 +106,8 @@
 
 ## 電源管理
 - 支援 SPD（Shallow Power-Down）與 DPD（Deep Power-Down）
-- `PowerMgmt_DetectUsbCharge()` 讀取 PA12 偵測 USB 充電；若為充電模式，系統進入 `PowerMgmt_RunChargeLoop()`（充電模式特殊行為）
-- `PowerMgmt_DetectUsbCharge()` 讀取 PA12 偵測 USB 充電；充電模式建議使用 `PowerMgmt_ChargeModeInit()` / `PowerMgmt_ChargeModeProcess()`（非阻塞）
+- `PowerMgmt_DetectUsbCharge()` 讀取 PA12 偵測 USB 充電；若為充電模式，系統進入 `PowerMgmt_RunChargeLoop()`（blocking wrapper）
+- `PowerMgmt_RunChargeLoop()` 內部會先呼叫 `PowerMgmt_ChargeModeInit()`，之後持續執行 `PowerMgmt_ChargeModeProcess()` 直到 USB low 穩定並離開 charge mode
 - 電源鎖（Power Lock）：PA11，高表示鎖定電源（保持開機），低表示允許關機
 - SPD 進入前需將非必要 GPIO 設為輸入以降低漏電（`PowerMgmt_ConfigGpioForSPD`）
 - Wake-up sources：PB15（按鍵, SPD）、PC0（DPD）等，Wake flag 由 `CLK->PMUSTS` 驗證
@@ -92,15 +115,18 @@
 ## 重要常數與可調參數（皆在 `project_config.h`）
 - `PLL_CLOCK`：PLL 設定
 - 移動/閒置判定參數：`MOVEMENT_SAMPLE_INTERVAL_MS`, `MOVEMENT_WINDOW_SAMPLES`, `MOVEMENT_STDDEV_THRESHOLD_G`, `NO_MOVEMENT_TIMEOUT_*`
-- 電池量測閾值：`ADC_BATT_LOW_V`, `LOW_BATT_CHECK_INTERVAL_MS`
+- 電池量測閾值：`ADC_VDDA_LOW_V`, `LOW_BATT_CHECK_INTERVAL_MS`
 - G-sensor jump detect 參數（若啟用）
 
 ## 測試建議與檢查清單（開發/驗收時）
 1. 啟動流程：確認 BLE rename 流程、UART1 收發正常、UART0 debug 能顯示 log
-2. 電源模式測試：測試從 SPD / DPD 喚醒、測試 PB15 與 PC0 喚醒
-3. 充電模式：插拔 USB 檢查 `PowerMgmt_DetectUsbCharge()` 與 `PowerMgmt_ChargeModeProcess()` 的進出行為
-4. 跳繩計數：HALL 與 G-sensor 模式下各做 50 次跳繩比對
-5. 閒置關機：模擬停止移動並觀察 LED 與最終關機流程
+2. 測試入口：
+	 - UART0：先跑 `AT+TEST=INFO`、再跑 `AT+TEST=ALL`
+	 - BLE：需要遠端診斷時，跑 `AT+TEST,REPL_START`、`AT+TEST,STATUS`、`AT+TEST,REPL_STOP`
+3. 電源模式測試：測試從 SPD / DPD 喚醒、測試 PB15 與 PC0 喚醒
+4. 充電模式：插拔 USB 檢查 `PowerMgmt_DetectUsbCharge()` 與 `PowerMgmt_RunChargeLoop()` / `PowerMgmt_ChargeModeProcess()` 的進出行為
+5. 跳繩計數：HALL 與 G-sensor 模式下各做 50 次跳繩比對
+6. 閒置關機：模擬停止移動並觀察 LED 與最終關機流程
 
 ## 單元測試（演算法層）
 - 測試目標：
@@ -151,7 +177,7 @@ flowchart LR
 6. 測試驅動：加入自動板測函式 `BoardTest_RunAll()` 作為啟動健康檢查範例。
 
 ## 常見維護注意事項
-- 若改變 G-sensor 型號或 I2C 位址，請同時更新 `gsensor.c` 與 `i2c` wrapper，並在 `project_config.h` 調整對應參數。
+- 若改變 G-sensor 型號或 I2C 位址，請同時更新 `gsensor.c` 與 `drivers/i2c` wrapper，並在 `project_config.h` 調整對應參數。
 - BLE 模組 AT 命令回應字串若不同（不同廠牌），需更新 `ble.c` 中的 `BleCmdTable` 與解析邏輯。
 - 若要在低功耗下保留 UART1 接收，需評估 BLE module 的低功耗協定（目前以 AT/暫停方式處理）。
 

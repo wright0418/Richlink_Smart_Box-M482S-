@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 0
+#define DEBUG 0 /* Disable DBG_PRINT before committing; enable locally when debugging */
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
@@ -52,7 +52,7 @@
 #endif
 
 /* Firmware version and board identification */
-#define FW_VERSION "1.3.0"
+#define FW_VERSION "1.4.1"
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__

@@ -16,7 +16,7 @@ project:
           -O0,
           -gdwarf-4,
         ]
-      ASM: [-D__MICROLIB]
+      ASM: [ -D__MICROLIB ]
       Link:
         [
           --library_type=microlib,
@@ -34,7 +34,7 @@ project:
 
   setups:
     - output:
-        type: ["elf", "bin"]
+        type: [ "elf", "bin" ]
     - define:
         - ARM_MATH_CM4
         - __FPU_PRESENT
@@ -66,21 +66,22 @@ project:
     - group: User
       files:
         - file: ../main.c
-        - file: ../timer.c
+        - file: ../drivers/timer.c
         - file: ../system_status.c
-        - file: ../game_logic.c
+        - file: ../app/game_logic.c
         - file: ../ble.c
+        - file: ../protocol/ble_parser.c
         - file: ../ble_at_repl.c
-        - file: ../led.c
-        - file: ../buzzer.c
-        - file: ../gpio.c
-        - file: ../adc.c
+        - file: ../drivers/led.c
+        - file: ../drivers/buzzer.c
+        - file: ../board/gpio.c
+        - file: ../drivers/adc.c
         - file: ../test_mode.c
-        - file: ../usb_hid_mouse.c
-        - file: ../usb_hid_mouse_desc.c
-        - file: ../gsensor.c
-        - file: ../gsensor_jump_detect.c
-        - file: ../hall_anticheat.c
-        - file: ../i2c.c
-        - file: ../board_test_gpio.c
-        - file: ../power_mgmt.c
+        - file: ../board/usb_hid/usb_hid_mouse.c
+        - file: ../board/usb_hid/usb_hid_mouse_desc.c
+        - file: ../drivers/gsensor.c
+        - file: ../app/algorithms/gsensor_jump_detect.c
+        - file: ../app/algorithms/hall_anticheat.c
+        - file: ../drivers/i2c.c
+        - file: ../board/board_test_gpio.c
+        - file: ../board/power_mgmt.c
