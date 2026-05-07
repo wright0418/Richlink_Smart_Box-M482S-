@@ -1,0 +1,15 @@
+Release v1.4.1
+
+See RELEASES/assets/V1.4.1/ for attached binary assets (RL_SPORT.bin, RL_SPORT.axf) and RELEASE_NOTES_V1.4.1.txt for detailed notes.
+
+Changelog (high level):
+- BLE parser & REPL race fixes
+- Increased SYS_MAC_ADDR_BUF_SIZE
+- Added host PowerShell automation scripts for fast validation and debug
+- Version bump to 1.4.1
+
+Artifacts:
+- RL_SPORT.axf (300,228 bytes)
+- RL_SPORT.bin (37,080 bytes)
+
+Fast validation: PASS
