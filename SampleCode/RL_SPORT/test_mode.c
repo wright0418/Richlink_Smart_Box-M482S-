@@ -242,7 +242,8 @@ static uint8_t Test_BLE_SwitchToCmdMode(void)
 
     /* Single attempt only: if CMD mode cannot be entered once, fail. */
     BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_CCMD);
-    return Test_BLE_WaitMode(0u, 1200u);
+    uint8_t ok = Test_BLE_WaitMode(0u, 1200u);
+    return ok;
 }
 
 static uint8_t Test_BLE_SwitchToDataMode(void)
@@ -791,37 +792,23 @@ static uint8_t AT_BleMac(void)
         return 0u;
     }
 
-    /* Attempt MAC query with a small retry to tolerate transient CMD-mode entry
-       or brief UART scheduling delays observed in some hardware runs. */
-    for (int attempt = 0; attempt < 2; ++attempt)
+    /* Single attempt MAC query: keep timing simple (one CMD-mode query). */
+    /* small gap to allow module to settle after mode switch */
+    delay_ms(200u);
+    Sys_ClearMacAddr();
+    BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
+
+    uint32_t start = get_ticks_ms();
+    while (!is_timeout(start, TEST_BLE_MAC_TIMEOUT_MS))
     {
-        /* small gap to allow module to settle after mode switch */
-        delay_ms(200u);
-        Sys_ClearMacAddr();
-        BLE_UART_SEND((void *)UART1, "%s", BLE_CMD_ADDR_QUERY);
-
-        uint32_t start = get_ticks_ms();
-        while (!is_timeout(start, TEST_BLE_MAC_TIMEOUT_MS))
+        CheckBleRecvMsg();
+        if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
         {
-            CheckBleRecvMsg();
-            if (Test_BLE_CopyMacAddrSnapshot(mac_addr, (uint32_t)sizeof(mac_addr)))
-            {
-                printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
-                Test_BLE_SwitchToDataMode();
-                return 1u;
-            }
-            delay_ms(5u);
+            printf("+TEST:BLE,PASS,MAC=%s\r\n", mac_addr);
+            Test_BLE_SwitchToDataMode();
+            return 1u;
         }
-
-        /* If first attempt failed, try to re-enter command mode once before giving up */
-        if (attempt == 0)
-        {
-            /* try to re-enter CMD mode and retry */
-            if (!Test_BLE_SwitchToCmdMode())
-            {
-                break; /* cannot recover */
-            }
-        }
+        delay_ms(5u);
     }
 
     /* Keep standalone BLE,MAC aligned with AT+TEST=ALL semantics:

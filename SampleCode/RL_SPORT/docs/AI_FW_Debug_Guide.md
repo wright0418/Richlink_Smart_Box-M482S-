@@ -154,6 +154,18 @@ tools: add ai_fw_debug_loop.ps1 and enable DEBUG in project_config.h (add debug 
     - `ai_fw_fast_validation.ps1` 也同步接受 `PASS,MAC=` 或 `INFO,MAC=NA`，因此不再因單項 MAC 缺失而讓整包 validation 失敗；
     - 若未來需要「必須拿到真實 MAC」的嚴格檢查，建議新增獨立 strict 模式或先釐清 BLE 模組 AT 韌體是否真的支援該查詢格式。
 
+### 根因分析與已實作修正 (Root cause & fix)
+
+- 根因：在某些情況下，BLE 模組回傳的原始回覆 (例如: "MAC_ADDR 700200009266 OK\r\n") 會被 REPL 處理流程先行消耗掉，導致負責儲存 MAC 的系統呼叫未取得該回覆；同時，系統內部用來接收 MAC 的緩衝區原先尺寸為 24 bytes，面對包含關鍵字與狀態字樣的完整回覆時會被視為過長而拒絕寫入，造成看似 "無回應" 的假象。
+
+- 已實作修正：
+  - 讓 BLE 回覆先由 parser 檢查是否為可處理的 module reply（例如 MAC / NAME / CMD_MODE ACK），若是則繞過 REPL handler，避免被誤吞 (在 `ble.c` 中的 `BLE_NormalizeAndHandleRepl()` 變更)；
+  - 擴大 MAC 回覆 buffer（`SYS_MAC_ADDR_BUF_SIZE` 由 24 -> 32），以容納包含關鍵字與回傳狀態的完整回覆字串；
+  - 強化 `protocol/ble_parser.c` 的格式辨識，支援連續與分隔式的 MAC 格式檢測，以及識別 CMD_MODE 與 NAME 回覆；
+  - 調整 `AT+TEST` 單項行為（`AT_BleMac`）與 `AT+TEST=ALL` 的語意一致性：若無法取得可解析的 MAC，回傳 `+TEST:BLE,INFO,MAC=NA` 作為資訊項而非錯誤，避免整體驗證因個別非致命缺失而失敗。
+
+這些修正能讓 host-side 的自動化腳本更穩健地觀察到 BLE 模組回覆，並避免被 REPL handler 或緩衝區限制所誤導。
+
 - 常見故障排查快速指南：
   - 未偵測到 NuLink COM：手動指定 `-PortName COMx`，或在 Device Manager 確認驅動與線材。
   - pyOCD load 失敗：單獨執行 `pyocd load --probe 'cmsisdap:' --cbuild-run <file>` 檢查錯誤。

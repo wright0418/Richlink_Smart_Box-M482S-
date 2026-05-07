@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define SYS_MAC_ADDR_BUF_SIZE 24u
+#define SYS_MAC_ADDR_BUF_SIZE 32u /* fits full replies like "MAC_ADDR 700200009266 OK" + NUL */
 #define SYS_DEVICE_NAME_BUF_SIZE 30u
 
 /* BLE connection state */

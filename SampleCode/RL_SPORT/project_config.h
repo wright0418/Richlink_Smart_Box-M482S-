@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 1 /* Enable UART debug prints for MCU FW closed-loop debug */
+#define DEBUG 0 /* Disable DBG_PRINT before committing; enable locally when debugging */
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>

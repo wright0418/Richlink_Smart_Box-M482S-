@@ -68,6 +68,16 @@ static uint8_t BLE_NormalizeAndHandleRepl(char *msg)
   }
 
   BleParser_StripCmdModeMarker(msg, BLE_CMD_CCMD);
+
+  /* BLE module/system replies (CMD mode ACK, name/MAC query results, etc.)
+     must continue through the normal BLE parser / rename flow. If we send
+     them into the REPL handler first, they can be consumed as unknown REPL
+     commands before Sys_SetMacAddr()/Sys_SetDeviceName() ever sees them. */
+  if (BleParser_ParseCommand((const char *)msg) != BLE_CMD_NONE)
+  {
+    return 0u;
+  }
+
   return BleAtRepl_HandleMessage((const char *)msg);
 }
 
