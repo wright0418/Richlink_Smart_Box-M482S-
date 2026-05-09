@@ -30,8 +30,8 @@ void Gpio_Init(void)
 
 void EnableI2C_Schmitt(void)
 {
-    /* Enable Schmitt trigger for I2C SCL (PB.5) as board helper */
-    PB->SMTEN |= GPIO_SMTEN_SMTEN5_Msk;
+    /* Enable Schmitt trigger for I2C SDA/SCL (PB.4/PB.5) as BSP examples do. */
+    PB->SMTEN |= GPIO_SMTEN_SMTEN4_Msk | GPIO_SMTEN_SMTEN5_Msk;
 }
 
 void Board_ConfigPCLKDiv(void)
@@ -50,6 +50,15 @@ static void Board_ConfigUartPins(void)
 {
     SYS->GPB_MFPH &= ~(SYS_GPB_MFPH_PB12MFP_Msk | SYS_GPB_MFPH_PB13MFP_Msk);
     SYS->GPB_MFPH |= (SYS_GPB_MFPH_PB12MFP_UART0_RXD | SYS_GPB_MFPH_PB13MFP_UART0_TXD);
+
+    /* Be explicit about UART0 electrical direction on PB12/PB13.
+       Some boards are more stable when mode is explicitly set instead of
+       relying on reset-default quasi mode. */
+    GPIO_SetMode(PB, BIT12, GPIO_MODE_INPUT);  /* UART0_RXD */
+    GPIO_SetMode(PB, BIT13, GPIO_MODE_OUTPUT); /* UART0_TXD */
+    /* Improve noise immunity on RX pin for long VCOM wires. */
+    PB->SMTEN |= GPIO_SMTEN_SMTEN12_Msk;
+
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA8MFP_Msk | SYS_GPA_MFPH_PA9MFP_Msk);
     SYS->GPA_MFPH |= (SYS_GPA_MFPH_PA8MFP_UART1_RXD | SYS_GPA_MFPH_PA9MFP_UART1_TXD);
 }

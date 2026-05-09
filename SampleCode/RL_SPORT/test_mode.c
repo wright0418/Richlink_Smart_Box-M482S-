@@ -12,7 +12,6 @@
 #include "board/gpio.h"
 #include "board/usb_hid/usb_hid_mouse.h"
 #include "ble.h"
-#include "drivers/i2c.h"
 #include "system_status.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;
@@ -729,16 +728,18 @@ static uint8_t AT_I2c(const char *param)
     GsensorReadAxis(axis);
 
     float mag_g = Gsensor_CalcMagnitude_g_from_raw(axis);
+    uint8_t addr = GsensorGetI2CAddress();
+    const char *chip = GsensorGetDeviceName();
 
     /* If magnitude is in a reasonable range the sensor is alive. */
-    if (mag_g >= TEST_I2C_MAG_MIN_G && mag_g <= TEST_I2C_MAG_MAX_G)
+    if ((addr != 0u) && (mag_g >= TEST_I2C_MAG_MIN_G) && (mag_g <= TEST_I2C_MAG_MAX_G))
     {
-        printf("+TEST:I2C,FOUND,ADDR=0x%02X\r\n", GSENSOR_ADDR);
+        printf("+TEST:I2C,FOUND,ADDR=0x%02X,CHIP=%s\r\n", addr, chip);
         printf("+TEST:I2C,INFO,G=%.3f\r\n", mag_g);
         printf("+TEST:I2C,PASS,COUNT=1\r\n");
         return 1u;
     }
-    printf("+TEST:I2C,INFO,G=%.3f\r\n", mag_g);
+    printf("+TEST:I2C,INFO,G=%.3f,ADDR=0x%02X,CHIP=%s\r\n", mag_g, addr, chip);
     printf("+TEST:I2C,FAIL,NO_DEVICE\r\n");
     return 0u;
 }

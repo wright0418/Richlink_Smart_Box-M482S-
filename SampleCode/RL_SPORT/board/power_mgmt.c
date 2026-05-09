@@ -170,9 +170,9 @@ void PowerMgmt_EnterSPD(PowerMode mode)
 
 uint8_t PowerMgmt_DetectUsbCharge(void)
 {
-    USBDetect_Init();
-    CLK_SysTickDelay(50000); /* 50 ms debounce */
-    return USBDetect_IsHigh();
+    /* Hardware does not have USB charging circuit. Always report no USB charge. */
+    (void)0; /* keep function body non-empty for clarity */
+    return 0u;
 }
 
 void PowerMgmt_ChargeModeInit(void)
@@ -184,36 +184,12 @@ void PowerMgmt_ChargeModeInit(void)
 
 uint8_t PowerMgmt_ChargeModeProcess(void)
 {
-    static uint32_t s_usb_low_start = 0u;
-
-    if (USBDetect_IsHigh())
-    {
-        s_usb_low_start = 0u;
-        __WFI();
-        return 1u;
-    }
-
-    if (s_usb_low_start == 0u)
-    {
-        s_usb_low_start = get_ticks_ms();
-        return 1u;
-    }
-
-    /* USB low stable for 100ms => exit charge mode */
-    if (!is_timeout(s_usb_low_start, 100u))
-    {
-        return 1u;
-    }
-
-    s_usb_low_start = 0u;
+    /* No USB charging hardware; no charge-mode processing required. */
     return 0u;
 }
 
 void PowerMgmt_RunChargeLoop(void)
 {
-    PowerMgmt_ChargeModeInit();
-    while (PowerMgmt_ChargeModeProcess())
-    {
-        /* USB charging auto-boot mode: no power lock, no game */
-    }
+    /* USB charging not supported on this hardware; do nothing. */
+    (void)PowerMgmt_ChargeModeInit;
 }

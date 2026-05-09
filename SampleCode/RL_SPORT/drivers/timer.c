@@ -12,6 +12,16 @@ static volatile uint32_t g_system_ticks_ms = 0;
 /* Forward declaration for LED update callback */
 extern void Led_TimerCallback(void);
 
+/*
+ * Some library delay paths may transiently use SysTick.
+ * Provide a project-level SysTick handler so we don't fall back to
+ * startup weak default stubs during bring-up/debug.
+ */
+void SysTick_Handler(void)
+{
+    /* Intentionally empty */
+}
+
 void TMR0_IRQHandler(void)
 {
     if (TIMER_GetIntFlag(TIMER0) == 1)
