@@ -142,7 +142,13 @@ static void RL_UpdateLedState(uint8_t low_batt)
   /* Low battery LED takes priority over all other LED states */
   if (low_batt)
   {
+#if USE_MOLE_GAME
+    /* Mole profile: avoid fast low-battery blink (often false-positive during bring-up).
+       Keep a stable heartbeat cadence for field testing. */
+    SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
+#else
     SetGreenLedMode(LOW_BATT_LED_FREQ_HZ, LOW_BATT_LED_DUTY);
+#endif
     return;
   }
 
@@ -151,6 +157,12 @@ static void RL_UpdateLedState(uint8_t low_batt)
   {
     return;
   }
+
+#if USE_MOLE_GAME
+  /* Mole profile keeps PB3 as a constant heartbeat indicator. */
+  SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
+  return;
+#endif
 
   if (Sys_GetGameState() == GAME_START)
   {
