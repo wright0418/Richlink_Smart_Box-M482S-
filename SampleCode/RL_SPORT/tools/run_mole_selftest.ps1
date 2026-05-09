@@ -14,7 +14,11 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $vscode = Join-Path $root 'VSCode'
 $csolution = Join-Path $vscode 'RL_SPORT.csolution.yml'
-$firmware = Join-Path $vscode 'out\RL_SPORT\ARMCLANG\release\RL_SPORT.axf'
+# Prefer release firmware if available, otherwise fall back to debug build output
+$firmwareRelease = Join-Path $vscode 'out\RL_SPORT\ARMCLANG\release\RL_SPORT.axf'
+$firmwareDebug = Join-Path $vscode 'out\RL_SPORT\ARMCLANG\debug\RL_SPORT.axf'
+$firmware = $firmwareRelease
+$buildConfig = 'RL_SPORT.release+ARMCLANG'
 $pyScript = Join-Path $PSScriptRoot 'mole_ble_selftest.py'
 
 if (-not (Test-Path $pyScript)) {
@@ -68,8 +72,19 @@ $pythonCmd = Resolve-PythonExe -Preferred $PythonExe
 Push-Location $vscode
 try {
     if (-not $SkipBuild) {
-        Write-Host "[SELFTEST] Build release firmware..."
-        & cbuild $csolution -c RL_SPORT.release+ARMCLANG
+        # Decide whether to build release or debug based on which AXF exists or is preferred
+        if (Test-Path $firmwareRelease) {
+            $firmware = $firmwareRelease
+            $buildConfig = 'RL_SPORT.release+ARMCLANG'
+            Write-Host "[SELFTEST] Build release firmware..."
+        }
+        else {
+            $firmware = $firmwareDebug
+            $buildConfig = 'RL_SPORT.debug+ARMCLANG'
+            Write-Host "[SELFTEST] Release firmware not found; building debug firmware..."
+        }
+
+        & cbuild $csolution -c $buildConfig
         if ($LASTEXITCODE -ne 0) { throw "cbuild failed: $LASTEXITCODE" }
     }
 
