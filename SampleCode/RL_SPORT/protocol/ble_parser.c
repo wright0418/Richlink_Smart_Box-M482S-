@@ -195,21 +195,21 @@ uint8_t BleParser_ExtractMacSuffix4(const char *src, char *out4)
     return 1u;
 }
 
-uint8_t BleParser_ExtractRopeSuffix4(const char *name, char *out4)
+uint8_t BleParser_ExtractNameSuffix4(const char *name, const char *prefix, char *out4)
 {
-    if (!name || !out4)
+    if (!name || !prefix || !out4)
     {
         return 0u;
     }
 
-    const char *p = strstr(name, "ROPE_");
+    const char *p = strstr(name, prefix);
     if (!p)
     {
         out4[0] = '\0';
         return 0u;
     }
 
-    p += 5;
+    p += strlen(prefix);
     for (uint8_t i = 0u; i < 4u; i++)
     {
         if (!BleParser_IsHexChar(p[i]))
@@ -222,6 +222,11 @@ uint8_t BleParser_ExtractRopeSuffix4(const char *name, char *out4)
 
     out4[4] = '\0';
     return 1u;
+}
+
+uint8_t BleParser_ExtractRopeSuffix4(const char *name, char *out4)
+{
+    return BleParser_ExtractNameSuffix4(name, "ROPE_", out4);
 }
 
 uint8_t BleParser_IsNameQueryEcho(const char *s)

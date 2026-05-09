@@ -42,6 +42,45 @@ void *memmove(void *dest, const void *src, size_t n);
 #include "drivers/led.h"
 #include "app/game_logic.h"
 #include "drivers/timer.h"
+#if USE_MOLE_GAME
+#include "app/mole_game.h"
+#endif
+
+#if MOLE_TEST_TRACE_ENABLE
+#define BLE_TRACE_PRINT(fmt, ...) printf("[MOLE_TEST] " fmt, ##__VA_ARGS__)
+#else
+#define BLE_TRACE_PRINT(fmt, ...)
+#endif
+
+static const char *BLE_CmdTypeToString(BleCmdType type)
+{
+  switch (type)
+  {
+  case BLE_CMD_CONNECTED:
+    return "CONNECTED";
+  case BLE_CMD_DISCONNECTED:
+    return "DISCONNECTED";
+  case BLE_CMD_CMD_MODE:
+    return "CMD_MODE";
+  case BLE_CMD_DATA_MODE:
+    return "DATA_MODE";
+  case BLE_CMD_CONN_START:
+    return "CONN_START";
+  case BLE_CMD_GET_CYCLE:
+    return "GET_CYCLE";
+  case BLE_CMD_SET_END:
+    return "SET_END";
+  case BLE_CMD_DISC_MSG:
+    return "DISC_MSG";
+  case BLE_CMD_MAC_ADDR:
+    return "MAC_ADDR";
+  case BLE_CMD_DEVICE_NAME:
+    return "DEVICE_NAME";
+  case BLE_CMD_NONE:
+  default:
+    return "NONE";
+  }
+}
 
 /* Reuse buffer sizes from header */
 volatile uint8_t g_u8RecData[RXBUFSIZE] = {0};
@@ -50,6 +89,127 @@ volatile uint8_t g_u8DataReady = 0;
 static volatile uint8_t s_uart_line_buf[RXBUFSIZE] = {0};
 static volatile uint32_t s_uart_line_len = 0;
 static volatile uint8_t s_uart_line_overflow = 0;
+
+#define BLE_LINE_QUEUE_DEPTH 4u
+static volatile uint8_t s_line_queue[BLE_LINE_QUEUE_DEPTH][RXBUFSIZE] = {0};
+static volatile uint16_t s_line_queue_len[BLE_LINE_QUEUE_DEPTH] = {0};
+static volatile uint8_t s_line_q_head = 0u;
+static volatile uint8_t s_line_q_tail = 0u;
+static volatile uint8_t s_line_q_count = 0u;
+
+#define BLE_RAW_RX_BUF_SIZE RXBUFSIZE
+static volatile uint8_t s_raw_rx_buf[BLE_RAW_RX_BUF_SIZE] = {0};
+static volatile uint16_t s_raw_rx_head = 0u;
+static volatile uint16_t s_raw_rx_tail = 0u;
+
+static void BLE_DebugDumpBytes(const char *tag, const uint8_t *data, uint32_t len, uint32_t max_show)
+{
+#if MOLE_TEST_TRACE_ENABLE
+  if ((tag == NULL) || (data == NULL) || (len == 0u))
+  {
+    return;
+  }
+
+  uint32_t n = (len > max_show) ? max_show : len;
+  BLE_TRACE_PRINT("%s len=%lu bytes=%02X", tag, (unsigned long)len, (unsigned)data[0]);
+  for (uint32_t i = 1u; i < n; i++)
+  {
+    printf(" %02X", (unsigned)data[i]);
+  }
+  if (len > n)
+  {
+    printf(" ...");
+  }
+  printf("\r\n");
+#else
+  (void)tag;
+  (void)data;
+  (void)len;
+  (void)max_show;
+#endif
+}
+
+static void BLE_RawRxPush(uint8_t byte)
+{
+  uint16_t next = (uint16_t)((s_raw_rx_head + 1u) % BLE_RAW_RX_BUF_SIZE);
+
+  if (next == s_raw_rx_tail)
+  {
+    /* Drop oldest byte to keep the ISR non-blocking and preserve latest stream. */
+    s_raw_rx_tail = (uint16_t)((s_raw_rx_tail + 1u) % BLE_RAW_RX_BUF_SIZE);
+  }
+
+  s_raw_rx_buf[s_raw_rx_head] = byte;
+  s_raw_rx_head = next;
+}
+
+static void BLE_LineQueuePushFromIsr(const uint8_t *line, uint32_t len)
+{
+  if ((line == NULL) || (len == 0u))
+  {
+    return;
+  }
+
+  uint32_t copy_len = len;
+  if (copy_len >= RXBUFSIZE)
+  {
+    copy_len = RXBUFSIZE - 1u;
+  }
+
+  if (s_line_q_count >= BLE_LINE_QUEUE_DEPTH)
+  {
+    /* Queue full: drop oldest line and keep latest, so critical state
+       messages (e.g. CONNECTED/DISCONNECTED) are less likely to be lost. */
+    s_line_q_tail = (uint8_t)((s_line_q_tail + 1u) % BLE_LINE_QUEUE_DEPTH);
+    s_line_q_count--;
+  }
+
+  uint8_t idx = s_line_q_head;
+  memcpy((void *)s_line_queue[idx], (const void *)line, copy_len);
+  s_line_queue[idx][copy_len] = '\0';
+  s_line_queue_len[idx] = (uint16_t)copy_len;
+  s_line_q_head = (uint8_t)((s_line_q_head + 1u) % BLE_LINE_QUEUE_DEPTH);
+  s_line_q_count++;
+
+  /* Keep legacy exported snapshot updated for observers. */
+  memcpy((void *)g_u8RecData, (const void *)s_line_queue[idx], copy_len + 1u);
+  g_u32RecLen = copy_len;
+  g_u8DataReady = 1u;
+}
+
+void Ble_RawRxReset(void)
+{
+  __disable_irq();
+  s_raw_rx_head = 0u;
+  s_raw_rx_tail = 0u;
+  __enable_irq();
+}
+
+uint32_t Ble_TakeRawBytes(uint8_t *dst, uint32_t max_len)
+{
+  uint32_t copied = 0u;
+
+  if ((dst == NULL) || (max_len == 0u))
+  {
+    return 0u;
+  }
+
+  __disable_irq();
+  while ((s_raw_rx_tail != s_raw_rx_head) && (copied < max_len))
+  {
+    dst[copied++] = s_raw_rx_buf[s_raw_rx_tail];
+    s_raw_rx_tail = (uint16_t)((s_raw_rx_tail + 1u) % BLE_RAW_RX_BUF_SIZE);
+  }
+  __enable_irq();
+
+  if (copied > 0u)
+  {
+    /* Receive path debug: BLE module/UART1 -> MCU raw bytes */
+    BLE_DebugDumpBytes("UART1 RX RAW", dst, copied, 12u);
+  }
+
+  return copied;
+}
 
 static size_t BLE_TrimLineLen(const char *src, size_t len)
 {
@@ -91,26 +251,18 @@ void UART1_IRQHandler(void)
     while (UART_IS_RX_READY(UART1))
     {
       u8InChar = UART_READ(UART1);
+      BLE_RawRxPush(u8InChar);
 
-      if (u8InChar == '\n')
+      if ((u8InChar == '\n') || (u8InChar == '\r'))
       {
-        if (!g_u8DataReady)
+        if (s_uart_line_len > 0u)
         {
-          uint32_t copy_len = s_uart_line_len;
-          if (copy_len >= RXBUFSIZE)
-          {
-            copy_len = RXBUFSIZE - 1u;
-          }
-
-          memcpy((void *)g_u8RecData, (const void *)s_uart_line_buf, copy_len);
-          g_u8RecData[copy_len] = '\0';
-          g_u32RecLen = copy_len;
-          g_u8DataReady = 1;
+          BLE_LineQueuePushFromIsr((const uint8_t *)s_uart_line_buf, s_uart_line_len);
         }
 
         s_uart_line_len = 0;
         s_uart_line_overflow = 0;
-        break;
+        continue;
       }
 
       if (!s_uart_line_overflow)
@@ -143,9 +295,10 @@ static uint8_t BLE_TakeMessageSnapshot(char *dst, size_t dst_size)
   uint8_t has_data = 0u;
 
   __disable_irq();
-  if (g_u8DataReady)
+  if (s_line_q_count > 0u)
   {
-    size_t copy_len = (size_t)g_u32RecLen;
+    uint8_t idx = s_line_q_tail;
+    size_t copy_len = (size_t)s_line_queue_len[idx];
     if (copy_len >= dst_size)
     {
       copy_len = dst_size - 1u;
@@ -153,12 +306,27 @@ static uint8_t BLE_TakeMessageSnapshot(char *dst, size_t dst_size)
 
     for (size_t i = 0u; i < copy_len; i++)
     {
-      dst[i] = (char)g_u8RecData[i];
+      dst[i] = (char)s_line_queue[idx][i];
     }
     dst[copy_len] = '\0';
 
-    g_u8DataReady = 0;
-    g_u32RecLen = 0;
+    s_line_q_tail = (uint8_t)((s_line_q_tail + 1u) % BLE_LINE_QUEUE_DEPTH);
+    s_line_q_count--;
+
+    if (s_line_q_count > 0u)
+    {
+      uint8_t next_idx = s_line_q_tail;
+      uint32_t next_len = (uint32_t)s_line_queue_len[next_idx];
+      memcpy((void *)g_u8RecData, (const void *)s_line_queue[next_idx], next_len + 1u);
+      g_u32RecLen = next_len;
+      g_u8DataReady = 1u;
+    }
+    else
+    {
+      g_u8DataReady = 0u;
+      g_u32RecLen = 0u;
+    }
+
     has_data = 1u;
   }
   __enable_irq();
@@ -198,6 +366,9 @@ int BLE_UART_SEND(void *uart, const char *format, ...)
   /* uart is an opaque pointer in the public API; cast back to UART_T* for SDK calls */
   UART_T *u = (UART_T *)uart;
   UART_Write(u, buf, write_len);
+
+  /* Transmit path debug: MCU -> BLE module/UART1 (AT/text command path) */
+  BLE_DebugDumpBytes("UART1 TX TXT", buf, (uint32_t)write_len, 32u);
   return write_len;
 }
 
@@ -208,15 +379,25 @@ void CheckBleRecvMsg(void)
 
   if (BLE_TakeMessageSnapshot(msg, sizeof(msg)))
   {
+    BLE_TRACE_PRINT("UART1 RX LINE: %s\r\n", msg);
+
     if (BLE_NormalizeAndHandleRepl(msg))
     {
       return;
     }
 
     BleCmdType cmdType = BleParser_ParseCommand((const char *)msg);
+    BLE_TRACE_PRINT("BLE TEXT PARSER result=%s(%u) line=%s\r\n",
+                    BLE_CmdTypeToString(cmdType),
+                    (unsigned)cmdType,
+                    msg);
+
     switch (cmdType)
     {
     case BLE_CMD_CONNECTED:
+#if USE_MOLE_GAME
+      MoleGame_ResetFrameState();
+#endif
       Sys_SetBleState(BLE_CONNECTED);
       /* Reset movement inactivity timer on BLE connect so user hold doesn't
         immediately trigger idle state. */
@@ -224,6 +405,9 @@ void CheckBleRecvMsg(void)
       Game_ResetBleTimer(); /* Reset BLE send timer on reconnect */
       break;
     case BLE_CMD_DISCONNECTED:
+#if USE_MOLE_GAME
+      MoleGame_ResetFrameState();
+#endif
       Sys_SetBleState(BLE_DISCONNECTED);
       Sys_SetGameState(GAME_STOP);
       /* BLE disconnected: restart idle countdown (rule 4 - 30s) */
@@ -310,7 +494,12 @@ void BLE_to_DLPS()
 
 void BLEToRunMode()
 {
+  /* Enter CMD mode first so following AT commands are guaranteed to apply.
+     Without this, EN_SYSMSG can be silently ignored in DATA mode and
+     CONNECTED/DISCONNECTED notifications will never be emitted. */
+  ble_send_cmd(BLE_CMD_CCMD, 120);
   ble_send_cmd(BLE_CMD_DLPS_OFF, 100);
+  ble_send_cmd(BLE_CMD_EN_SYSMSG_ON, 50);
   ble_send_cmd(BLE_CMD_ADVERT_ON, 20);
   ble_send_cmd(BLE_CMD_MODE_DATA, 200);
 }
@@ -331,6 +520,20 @@ void BLESetName(const char *name)
 void BLESendData(const char *data)
 {
   BLE_UART_SEND((void *)UART1, data);
+  delay_ms(2);
+}
+
+void BLESendBytes(const uint8_t *data, uint32_t len)
+{
+  if ((data == NULL) || (len == 0u))
+  {
+    return;
+  }
+
+  UART_Write(UART1, (uint8_t *)data, len);
+
+  /* Transmit path debug: MCU -> BLE module/UART1 (binary payload path) */
+  BLE_DebugDumpBytes("UART1 TX BIN", data, len, 32u);
   delay_ms(2);
 }
 
@@ -480,7 +683,11 @@ void Ble_RenameFlowProcess(void)
 
       /* Always compare current name suffix with MAC suffix to remediate
          old FW wrong rename cases. */
+#if USE_MOLE_GAME
+      s_rename.has_name_suffix = BleParser_ExtractNameSuffix4(device_name, MOLE_BLE_NAME_PREFIX, s_rename.name_suffix);
+#else
       s_rename.has_name_suffix = BleParser_ExtractRopeSuffix4(device_name, s_rename.name_suffix);
+#endif
       s_rename.state = BLE_RENAME_SEND_ADDR_QUERY;
       s_rename.state_enter_ms = now;
     }
@@ -548,7 +755,11 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_SEND_SET_NAME:
+#if USE_MOLE_GAME
+    BLE_UART_SEND(UART1, "AT+NAME=%s%s\r\n", MOLE_BLE_NAME_PREFIX, s_rename.mac_suffix);
+#else
     BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", s_rename.mac_suffix);
+#endif
     s_rename.state = BLE_RENAME_WAIT_SET_NAME;
     s_rename.state_enter_ms = now;
     break;

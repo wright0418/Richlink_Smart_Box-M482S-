@@ -28,6 +28,7 @@ typedef enum
 BleCmdType BleParser_ParseCommand(const char *msg);
 void BleParser_StripCmdModeMarker(char *msg, const char *marker);
 uint8_t BleParser_ExtractMacSuffix4(const char *src, char *out4);
+uint8_t BleParser_ExtractNameSuffix4(const char *name, const char *prefix, char *out4);
 uint8_t BleParser_ExtractRopeSuffix4(const char *name, char *out4);
 uint8_t BleParser_IsNameQueryEcho(const char *s);
 uint8_t BleParser_IsAddrQueryEcho(const char *s);

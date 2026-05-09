@@ -212,6 +212,29 @@ static void trim_line_end(char *s)
     }
 }
 
+/* Simple decimal float parser — avoids ARM microlib strtof/strtod which
+ * internally use the global scanf stream (blocking on UART after UART_Open). */
+static float repl_parse_float(const char *s)
+{
+    long int_part = 0;
+    long frac_part = 0;
+    long frac_div = 1;
+    int neg = 0;
+    if (*s == '-') { neg = 1; s++; }
+    while (*s >= '0' && *s <= '9') { int_part = int_part * 10 + (*s++ - '0'); }
+    if (*s == '.')
+    {
+        s++;
+        while (*s >= '0' && *s <= '9')
+        {
+            frac_part = frac_part * 10 + (*s++ - '0');
+            frac_div *= 10;
+        }
+    }
+    float result = (float)int_part + (float)frac_part / (float)frac_div;
+    return neg ? -result : result;
+}
+
 void BleAtRepl_Init(void)
 {
     memset(&s_repl, 0, sizeof(s_repl));
@@ -283,11 +306,11 @@ static void handle_led_cmd(const char *args)
         if (*p == ',')
         {
             p++;
-            freq = (float)atof(p);
+            freq = repl_parse_float(p);
             const char *comma = strchr(p, ',');
             if (comma)
             {
-                duty = (float)atof(comma + 1);
+                duty = repl_parse_float(comma + 1);
             }
         }
         if (freq <= 0.0f)
@@ -703,7 +726,8 @@ static void handle_status_verbose(void)
 
     GsensorReadAxis(axis);
 
-    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEY=%u,PB7=%u,PB8=%u,VDDA=%.3f\r\n",
+    uint32_t vdda_mv = (uint32_t)(vdda * 1000.0f);
+    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEY=%u,PB7=%u,PB8=%u,VDDA=%lu.%03lu\r\n",
               (unsigned)Sys_GetBleState(),
               (unsigned)Sys_GetGameState(),
               (unsigned)Sys_GetReplMode(),
@@ -712,7 +736,7 @@ static void handle_status_verbose(void)
               (unsigned)key_pressed,
               (unsigned)pb7_low,
               (unsigned)pb8_low,
-              vdda);
+              (unsigned long)(vdda_mv / 1000u), (unsigned long)(vdda_mv % 1000u));
     repl_send("+OK,STATUS_VERBOSE_G,AX=%d,AY=%d,AZ=%d\r\n", axis[0], axis[1], axis[2]);
 }
 

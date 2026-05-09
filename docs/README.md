@@ -6,7 +6,9 @@
 
 - `docs/IMPLEMENTATION_NOTES.md` — REPL (BLE AT) 與近期實作細節紀錄
 - `docs/SampleCode/RL_SPORT/` — RL_SPORT 範例文件（包含 BLE AT 指令設計）
+- `docs/SampleCode/RL_SPORT/MOLE_BRANCH_POLICY.md` — Mole 專用分支政策（此分支不回合 main）
 - `docs/SampleCode/Smart_Box/` — Smart_Box 範例文件（Modbus / Mesh / BLE）
+- `SampleCode/RL_SPORT/docs/認知訓練/` — Web BLE 單一裝置測試頁與操作指南
 
 如何使用：
 

@@ -93,6 +93,16 @@ void Board_ConfigMultiFuncPins(void);
 void Board_ReleaseIOPD(void);
 
 /**
+ * @brief Configure PF6 as SPI0_MOSI for WS2812B data output.
+ */
+void Board_ConfigWs2812SpiPin(void);
+
+/**
+ * @brief Force WS2812B data pin (PF6) to GPIO low for a safe/off bus state.
+ */
+void Board_SetWs2812DataPinSafe(void);
+
+/**
  * @brief Initialize Power Lock GPIO (PA11) and assert lock (high).
  */
 void PowerLock_Init(void);

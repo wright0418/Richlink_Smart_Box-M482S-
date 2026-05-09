@@ -1,6 +1,11 @@
 # 專案配置與應用規格
 使用 RL SPORT Board V3 進行開發，以下是專案配置和應用規格的詳細說明：
 
+## 分支聲明（Mole-only）
+- 本分支為 Mole（認知訓練/打地鼠）專用，不會回合 `main`。
+- BLE 裝置命名前綴固定為 `MOLE_XXXX`。
+- 分支政策請見：`../../docs/SampleCode/RL_SPORT/MOLE_BRANCH_POLICY.md`
+
 ## 維護與驗證計畫
 後續系統整理、重構順序與每一步驗證門檻，請參考：`../../docs/SampleCode/RL_SPORT/REFACTORING_VALIDATION_PLAN.md`
 
@@ -72,7 +77,7 @@
   - 使用 Buzzer 通知遊戲狀態
   - Buzzer 使用 Timer 中斷製作方波頻率 發出聲音，關閉時GPIO需要為 Low ,
   - ADC 量測 低電壓 並且 使用快閃Led 通知 低電壓需充電
-  - 開機後檢查 BLE NAME 是否已經被改成  ROPE_開頭 , 如果不是改名
+  - 開機後檢查 BLE NAME 是否已經被改成 `MOLE_` 開頭，若否則進行改名
   - BLE game 開始進入 DATA MODE ，方便傳輸
   - BLE UART 收到 "get cycle\r\n" 就開始遊戲 ，需要發出 Buzzer 告知使用者開始遊戲
   - BLE UART 收到 "set end\r\n" 遊戲結束，發出 Buzzer 提示

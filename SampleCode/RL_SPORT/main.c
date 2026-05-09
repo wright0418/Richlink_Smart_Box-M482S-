@@ -26,6 +26,9 @@
 #include "board/usb_hid/usb_hid_mouse.h"
 #include "board/power_mgmt.h"
 #include "ble_at_repl.h"
+#if USE_MOLE_GAME
+#include "app/mole_game.h"
+#endif
 
 #if USE_GSENSOR_JUMP_DETECT
 #include "app/algorithms/gsensor_jump_detect.h"
@@ -46,6 +49,15 @@ static uint8_t s_ble_rename_started = 0u;
 static uint8_t s_ble_rename_done = 0u;
 static uint8_t s_charge_mode_initialized = 0u;
 static uint8_t s_hall_edge_residual = 0u;
+#if MOLE_TEST_TRACE_ENABLE
+#define MOLE_MAIN_TRACE(fmt, ...) printf("[MOLE_TEST] " fmt, ##__VA_ARGS__)
+#else
+#define MOLE_MAIN_TRACE(fmt, ...)
+#endif
+#if USE_MOLE_GAME && MOLE_LOW_BATT_POWER_OFF
+static uint8_t s_low_batt_shutdown_count = 0u;
+static uint32_t s_low_batt_shutdown_last_check = 0u;
+#endif
 #if USE_HALL_ANTICHEAT
 static uint16_t s_hall_raw_total = 0u;
 static uint8_t s_prev_game_running = 0u;
@@ -179,6 +191,11 @@ static void RL_HandleBleAndGameState(void)
     return;
   }
 
+#if USE_MOLE_GAME
+  MoleGame_Process(get_ticks_ms());
+  return;
+#else
+
   /* Main state machine using new game_logic module */
   switch (Sys_GetBleState())
   {
@@ -197,18 +214,21 @@ static void RL_HandleBleAndGameState(void)
     Game_ProcessDisconnected();
     break;
   }
+#endif
 }
 
 static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 {
+#if USE_MOLE_GAME && MOLE_DISABLE_IDLE_POWER_OFF
+  (void)poweroff_done;
+  return;
+#else
   /* Idle timeout -> power off (PA11 low) */
   if (!(*poweroff_done) && Sys_GetIdleState())
   {
     *poweroff_done = 1u;
     DBG_PRINT("[Main] Idle timeout, power off\n");
-    DBG_PRINT("[Main] BLE disconnect before power off\n");
-    BLEDisconnect();
-    delay_ms(50);
+    DBG_PRINT("[Main] Power off directly (skip BLE DISC command)\n");
     SetGreenLedMode(0, 0);
     PowerLock_Set(0);
     while (1)
@@ -216,6 +236,78 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
       /* wait for power to cut */
     }
   }
+#endif
+}
+
+static void RL_HandleMoleLowBatteryShutdown(uint8_t low_batt)
+{
+#if USE_MOLE_GAME && MOLE_LOW_BATT_POWER_OFF
+  uint32_t now = get_ticks_ms();
+
+  /* Keep low-battery protection for battery operation, but do not force
+     shutdown while USB power is present (common during bring-up/debug).
+     Otherwise the firmware can issue AT+DISC and then park in while(1),
+     which looks like BLE connected-message loss on UART logs. */
+  if (g_usb_charge_mode)
+  {
+    if (low_batt)
+    {
+      MOLE_MAIN_TRACE("LOW_BATT detected but USB mode active, skip shutdown\r\n");
+    }
+    s_low_batt_shutdown_count = 0u;
+    s_low_batt_shutdown_last_check = now;
+    return;
+  }
+
+  if (!low_batt)
+  {
+    s_low_batt_shutdown_count = 0u;
+    s_low_batt_shutdown_last_check = now;
+    return;
+  }
+
+  /* Do not shut down before BLE has a chance to connect.
+     Your logs showed repeated LOW_BATT confirms causing early shutdown
+     before CONNECTED message appears. Keep warning behavior, but defer
+     hard power-off until BLE is connected. */
+  if (Sys_GetBleState() != BLE_CONNECTED)
+  {
+    MOLE_MAIN_TRACE("LOW_BATT deferred, BLE state=%u (need connected)\r\n",
+                    (unsigned)Sys_GetBleState());
+    s_low_batt_shutdown_count = 0u;
+    s_low_batt_shutdown_last_check = now;
+    return;
+  }
+
+  if (get_elapsed_ms(s_low_batt_shutdown_last_check) < LOW_BATT_CHECK_INTERVAL_MS)
+  {
+    return;
+  }
+
+  s_low_batt_shutdown_last_check = now;
+  if (s_low_batt_shutdown_count < MOLE_LOW_BATT_SHUTDOWN_CONFIRM_COUNT)
+  {
+    s_low_batt_shutdown_count++;
+    MOLE_MAIN_TRACE("LOW_BATT confirm %u/%u\r\n",
+                    (unsigned)s_low_batt_shutdown_count,
+                    (unsigned)MOLE_LOW_BATT_SHUTDOWN_CONFIRM_COUNT);
+  }
+
+  if (s_low_batt_shutdown_count >= MOLE_LOW_BATT_SHUTDOWN_CONFIRM_COUNT)
+  {
+    MOLE_MAIN_TRACE("LOW_BATT confirmed, shutdown flow start\r\n");
+    MoleGame_ShutdownOutputs();
+    MOLE_MAIN_TRACE("LOW_BATT shutdown: power cut directly (skip AT+DISC)\r\n");
+    delay_ms(MOLE_LOW_BATT_SHUTDOWN_GRACE_MS);
+    PowerLock_Set(0);
+    while (1)
+    {
+      /* wait for power to cut */
+    }
+  }
+#else
+  (void)low_batt;
+#endif
 }
 
 /*
@@ -323,10 +415,14 @@ static void RL_InitSystemCore(void)
   SYS_Init();
 
   g_usb_charge_mode = PowerMgmt_DetectUsbCharge();
+#if USE_MOLE_GAME && MOLE_DISABLE_USB_CHARGE_LOOP
+  PowerLock_Init();
+#else
   if (!g_usb_charge_mode)
   {
     PowerLock_Init();
   }
+#endif
   // SYS_LockReg();
 }
 
@@ -336,6 +432,24 @@ static void RL_InitBoardInputs(void)
   Gpio_Init();
 }
 
+static void RL_LogResetSource(void)
+{
+  uint32_t rst = SYS->RSTSTS;
+
+  DBG_PRINT("[RST] RSTSTS=0x%08lX POR=%u PIN=%u WDT=%u LVR=%u BOD=%u SYS=%u CPU=%u CPULK=%u\n",
+            (unsigned long)rst,
+            (unsigned)((rst & SYS_RSTSTS_PORF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_PINRF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_WDTRF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_LVRF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_BODRF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_SYSRF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_CPURF_Msk) != 0u),
+            (unsigned)((rst & SYS_RSTSTS_CPULKRF_Msk) != 0u));
+
+  SYS_CLEAR_RST_SOURCE(rst);
+}
+
 static void RL_InitDrivers(void)
 {
   /* Time base */
@@ -343,6 +457,7 @@ static void RL_InitDrivers(void)
 
   /* Debug/printf UART (retarget uses UART0) */
   UART_Open(UART0, 115200);
+  RL_LogResetSource();
 
   /* Sensors */
   Gsensor_Init(GSENSOR_I2C_BUS_HZ, FSR_2G);
@@ -367,6 +482,11 @@ static void RL_InitApplication(void)
   Sys_Init();
   BleAtRepl_Init();
   Game_Init();
+
+#if USE_MOLE_GAME
+  MoleGame_Init();
+  DBG_PRINT("[Main] Mole game firmware profile enabled\n");
+#endif
 
 #if USE_GSENSOR_JUMP_DETECT
   JumpDetect_Init();
@@ -403,6 +523,7 @@ int main()
      initializing drivers or starting the game. In charge mode we keep
      the power-lock low .
      This prevents the game from starting while on USB power. */
+#if !(USE_MOLE_GAME && MOLE_DISABLE_USB_CHARGE_LOOP)
   if (g_usb_charge_mode)
   {
     DBG_PRINT("[Main] USB charge detected at boot, entering charge mode\n");
@@ -411,6 +532,12 @@ int main()
     /* This will block here until USB is removed and charge loop exits */
     PowerMgmt_RunChargeLoop();
   }
+#else
+  if (g_usb_charge_mode)
+  {
+    DBG_PRINT("[Main] USB charge detected; Mole profile skips charge-mode loop\n");
+  }
+#endif
 
   RL_InitDrivers();
   RL_StartupBeep();
@@ -463,12 +590,30 @@ int main()
     /* Low battery LED must show even in REPL mode */
     RL_UpdateLedState(s_low_batt);
 
-    /* ---- REPL mode: only run BLE message processing, skip game/idle/LED ---- */
+    /* ---- REPL mode handling ----
+       In MOLE profile, keep raw BLE packet path alive even if REPL/LED override
+       is set, otherwise BLE binary frames can be received on UART1 but never
+       parsed/applied to WS2812 output. */
     if (Sys_GetReplMode() || Sys_GetLedOverride())
     {
       CheckBleRecvMsg();
+#if USE_MOLE_GAME
+      MoleGame_Process(now);
+#endif
       continue;
     }
+
+#if USE_MOLE_GAME
+    if (Sys_GetKeyAFlag())
+    {
+      Sys_SetKeyAFlag(0);
+      MoleGame_OnButtonEvent(now);
+    }
+
+    RL_HandleBleAndGameState();
+    RL_HandleMoleLowBatteryShutdown(s_low_batt);
+    continue;
+#endif
 
 #if USE_GSENSOR_JUMP_DETECT
     JumpDetect_TryAutoCalibration(now);

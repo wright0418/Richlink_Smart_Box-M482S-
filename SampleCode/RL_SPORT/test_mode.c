@@ -12,10 +12,6 @@
 #include "board/gpio.h"
 #include "board/usb_hid/usb_hid_mouse.h"
 #include "ble.h"
-<<<<<<< HEAD
-#include "drivers/i2c.h"
-=======
->>>>>>> 增加-6-axis-sensor-SC7U22
 #include "system_status.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;
@@ -192,9 +188,11 @@ static void Test_ADC(void)
     printf("[Test] VDDA (band-gap)\n");
     Adc_UpdateVdda();
     float vdda = Adc_GetVdda();
-    printf("[Test] vdda=%.3fV (low<%.2fV) %s\n",
-           (double)vdda,
-           (double)ADC_VDDA_LOW_V,
+    uint32_t vdda_mv = (uint32_t)(vdda * 1000.0f);
+    uint32_t low_mv = (uint32_t)(ADC_VDDA_LOW_V * 100.0f);
+    printf("[Test] vdda=%lu.%03luV (low<%lu.%02luV) %s\n",
+           (unsigned long)(vdda_mv / 1000u), (unsigned long)(vdda_mv % 1000u),
+           (unsigned long)(low_mv / 100u), (unsigned long)(low_mv % 100u),
            Adc_IsVddaLow() ? "LOW" : "OK");
 }
 
@@ -621,8 +619,12 @@ static uint8_t AT_GsensorCal(void)
     s_gsensor_cal_scale = 1.0f / avg_mag;
     s_gsensor_cal_valid = 1u;
 
-    printf("+TEST:GSENSOR,PASS,CAL,SAMPLES=%lu,G_AVG=%.3f,SCALE=%.6f\r\n",
-           (unsigned long)TEST_GSENSOR_CAL_SAMPLES, avg_mag, s_gsensor_cal_scale);
+    uint32_t avg_mag_i = (uint32_t)(avg_mag * 1000.0f);
+    uint32_t scale_i = (uint32_t)(s_gsensor_cal_scale * 1000000.0f);
+    printf("+TEST:GSENSOR,PASS,CAL,SAMPLES=%lu,G_AVG=%lu.%03lu,SCALE=%lu.%06lu\r\n",
+           (unsigned long)TEST_GSENSOR_CAL_SAMPLES,
+           (unsigned long)(avg_mag_i / 1000u), (unsigned long)(avg_mag_i % 1000u),
+           (unsigned long)(scale_i / 1000000u), (unsigned long)(scale_i % 1000000u));
     return 1u;
 }
 
@@ -686,14 +688,28 @@ static uint8_t AT_Gsensor(const char *param)
 
     if (mag_eval_g >= mag_min_g && mag_eval_g <= mag_max_g)
     {
-        printf("+TEST:GSENSOR,PASS,X=%d,Y=%d,Z=%d,G_RAW=%.3f,G_CAL=%.3f,G_USE=%.3f,SRC=%s,CAL=%u\r\n",
-               axis[0], axis[1], axis[2], mag_raw_g, mag_cal_g, mag_eval_g,
+        uint32_t raw_i = (uint32_t)(mag_raw_g * 1000.0f);
+        uint32_t cal_i = (uint32_t)(mag_cal_g * 1000.0f);
+        uint32_t use_i = (uint32_t)(mag_eval_g * 1000.0f);
+        printf("+TEST:GSENSOR,PASS,X=%d,Y=%d,Z=%d,G_RAW=%lu.%03lu,G_CAL=%lu.%03lu,G_USE=%lu.%03lu,SRC=%s,CAL=%u\r\n",
+               axis[0], axis[1], axis[2],
+               (unsigned long)(raw_i / 1000u), (unsigned long)(raw_i % 1000u),
+               (unsigned long)(cal_i / 1000u), (unsigned long)(cal_i % 1000u),
+               (unsigned long)(use_i / 1000u), (unsigned long)(use_i % 1000u),
                use_cal ? "CAL" : "RAW", (unsigned)s_gsensor_cal_valid);
         return 1u;
     }
-    printf("+TEST:GSENSOR,FAIL,G_RAW=%.3f,G_CAL=%.3f,G_USE=%.3f,SRC=%s,CAL=%u,X=%d,Y=%d,Z=%d\r\n",
-           mag_raw_g, mag_cal_g, mag_eval_g, use_cal ? "CAL" : "RAW",
-           (unsigned)s_gsensor_cal_valid, axis[0], axis[1], axis[2]);
+    {
+        uint32_t raw_i = (uint32_t)(mag_raw_g * 1000.0f);
+        uint32_t cal_i = (uint32_t)(mag_cal_g * 1000.0f);
+        uint32_t use_i = (uint32_t)(mag_eval_g * 1000.0f);
+        printf("+TEST:GSENSOR,FAIL,G_RAW=%lu.%03lu,G_CAL=%lu.%03lu,G_USE=%lu.%03lu,SRC=%s,CAL=%u,X=%d,Y=%d,Z=%d\r\n",
+               (unsigned long)(raw_i / 1000u), (unsigned long)(raw_i % 1000u),
+               (unsigned long)(cal_i / 1000u), (unsigned long)(cal_i % 1000u),
+               (unsigned long)(use_i / 1000u), (unsigned long)(use_i % 1000u),
+               use_cal ? "CAL" : "RAW",
+               (unsigned)s_gsensor_cal_valid, axis[0], axis[1], axis[2]);
+    }
     return 0u;
 }
 
@@ -738,12 +754,16 @@ static uint8_t AT_I2c(const char *param)
     /* If magnitude is in a reasonable range the sensor is alive. */
     if ((addr != 0u) && (mag_g >= TEST_I2C_MAG_MIN_G) && (mag_g <= TEST_I2C_MAG_MAX_G))
     {
+        uint32_t mag_i = (uint32_t)(mag_g * 1000.0f);
         printf("+TEST:I2C,FOUND,ADDR=0x%02X,CHIP=%s\r\n", addr, chip);
-        printf("+TEST:I2C,INFO,G=%.3f\r\n", mag_g);
+        printf("+TEST:I2C,INFO,G=%lu.%03lu\r\n", (unsigned long)(mag_i / 1000u), (unsigned long)(mag_i % 1000u));
         printf("+TEST:I2C,PASS,COUNT=1\r\n");
         return 1u;
     }
-    printf("+TEST:I2C,INFO,G=%.3f,ADDR=0x%02X,CHIP=%s\r\n", mag_g, addr, chip);
+    {
+        uint32_t mag_i = (uint32_t)(mag_g * 1000.0f);
+        printf("+TEST:I2C,INFO,G=%lu.%03lu,ADDR=0x%02X,CHIP=%s\r\n", (unsigned long)(mag_i / 1000u), (unsigned long)(mag_i % 1000u), addr, chip);
+    }
     printf("+TEST:I2C,FAIL,NO_DEVICE\r\n");
     return 0u;
 }

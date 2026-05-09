@@ -61,6 +61,12 @@ static void Board_ConfigUartPins(void)
 
     SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA8MFP_Msk | SYS_GPA_MFPH_PA9MFP_Msk);
     SYS->GPA_MFPH |= (SYS_GPA_MFPH_PA8MFP_UART1_RXD | SYS_GPA_MFPH_PA9MFP_UART1_TXD);
+
+    /* Explicit UART1 electrical direction helps reduce board-dependent
+       reception issues (same strategy as UART0 pins). */
+    GPIO_SetMode(PA, BIT8, GPIO_MODE_INPUT);  /* UART1_RXD */
+    GPIO_SetMode(PA, BIT9, GPIO_MODE_OUTPUT); /* UART1_TXD */
+    PA->SMTEN |= GPIO_SMTEN_SMTEN8_Msk;
 }
 
 static void Board_ConfigPowerPins(void)
@@ -69,12 +75,28 @@ static void Board_ConfigPowerPins(void)
     GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
 }
 
+void Board_ConfigWs2812SpiPin(void)
+{
+    SYS->GPF_MFPL = (SYS->GPF_MFPL & ~SYS_GPF_MFPL_PF6MFP_Msk) | SYS_GPF_MFPL_PF6MFP_SPI0_MOSI;
+    PF->SLEWCTL = (PF->SLEWCTL & ~GPIO_SLEWCTL_HSREN6_Msk) | (0x2ul << GPIO_SLEWCTL_HSREN6_Pos);
+}
+
+void Board_SetWs2812DataPinSafe(void)
+{
+    SYS->GPF_MFPL = (SYS->GPF_MFPL & ~SYS_GPF_MFPL_PF6MFP_Msk) | SYS_GPF_MFPL_PF6MFP_GPIO;
+    GPIO_SetMode(PF, BIT6, GPIO_MODE_OUTPUT);
+    PF->DOUT &= ~BIT6;
+}
+
 void Board_ConfigMultiFuncPins(void)
 {
     /* Configure I2C, UART, and power-related GPIO MFPs */
     Board_ConfigI2C0Pins();
     Board_ConfigUartPins();
     Board_ConfigPowerPins();
+#if USE_MOLE_GAME
+    Board_ConfigWs2812SpiPin();
+#endif
 }
 
 void Board_ReleaseIOPD(void)

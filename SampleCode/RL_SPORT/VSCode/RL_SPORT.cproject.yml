@@ -16,7 +16,7 @@ project:
           -O0,
           -gdwarf-4,
         ]
-      ASM: [ -D__MICROLIB ]
+      ASM: [-D__MICROLIB]
       Link:
         [
           --library_type=microlib,
@@ -34,7 +34,7 @@ project:
 
   setups:
     - output:
-        type: [ "elf", "bin" ]
+        type: ["elf", "bin"]
     - define:
         - ARM_MATH_CM4
         - __FPU_PRESENT
@@ -57,6 +57,8 @@ project:
         - file: ../../../Library/StdDriver/src/clk.c
         - file: ../../../Library/StdDriver/src/gpio.c
         - file: ../../../Library/StdDriver/src/i2c.c
+        - file: ../../../Library/StdDriver/src/spi.c
+        - file: ../../../Library/StdDriver/src/pdma.c
         - file: ../../../Library/StdDriver/src/eadc.c
         - file: ../../../Library/StdDriver/src/timer.c
         - file: ../../../Library/StdDriver/src/usbd.c
@@ -71,8 +73,12 @@ project:
         - file: ../app/game_logic.c
         - file: ../ble.c
         - file: ../protocol/ble_parser.c
+        - file: ../protocol/mole_packet.c
         - file: ../ble_at_repl.c
         - file: ../drivers/led.c
+        - file: ../drivers/ws2812b.c
+        - file: ../drivers/ws2812b_templates.c
+        - file: ../drivers/ws2812b_patterns.c
         - file: ../drivers/buzzer.c
         - file: ../board/gpio.c
         - file: ../drivers/adc.c
@@ -80,6 +86,8 @@ project:
         - file: ../board/usb_hid/usb_hid_mouse.c
         - file: ../board/usb_hid/usb_hid_mouse_desc.c
         - file: ../drivers/gsensor.c
+        - file: ../app/mole_game.c
+        - file: ../app/algorithms/mole_hit_detect.c
         - file: ../app/algorithms/gsensor_jump_detect.c
         - file: ../app/algorithms/hall_anticheat.c
         - file: ../drivers/i2c.c

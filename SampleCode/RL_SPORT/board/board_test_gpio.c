@@ -107,7 +107,8 @@ static uint8_t test_battery_adc(void)
     Adc_Init();
     Adc_UpdateVdda();
     float vdda = Adc_GetVdda();
-    printf("[BT] VDDA=%.3fV\n", (double)vdda);
+    uint32_t vdda_mv = (uint32_t)(vdda * 1000.0f);
+    printf("[BT] VDDA=%lu.%03luV\n", (unsigned long)(vdda_mv / 1000u), (unsigned long)(vdda_mv % 1000u));
 
     /* Basic hardware sanity window to catch power rail issues quickly. */
     if (vdda < 2.0f || vdda > 4.0f)

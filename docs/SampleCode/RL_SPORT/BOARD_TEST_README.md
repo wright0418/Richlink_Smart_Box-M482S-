@@ -50,7 +50,7 @@
      - 輸出範例：`[Test] USB auto test done`。
 
   9) BLE AT CMD name check
-     - 行為：切換 BLE 模組到 CMD 模式，查詢名稱並判斷回傳是否包含預期字首 (如 `ROPR_` 或 `ROPE_`)。
+     - 行為：切換 BLE 模組到 CMD 模式，查詢名稱並判斷回傳是否包含預期字首 `MOLE_`。
      - 成功回傳範例：`[Test] BLE_AT_CMD PASS`。失敗會列出失敗原因。
 
   0) Exit

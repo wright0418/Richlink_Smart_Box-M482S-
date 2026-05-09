@@ -1,0 +1,2659 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>創意打地鼠</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --panel-color: #16213e;
+            --accent-color: #0f3460;
+            --text-color: #e94560;
+            --led-off: #222;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        h1 {
+            color: var(--text-color);
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+            margin-bottom: 10px;
+        }
+
+        /* 大型分數/時間顯示在最上方 */
+        .top-stats {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            align-items: center;
+            margin-bottom: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: linear-gradient(180deg, rgba(26, 26, 46, 0.95), rgba(26, 26, 46, 0.85));
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        /* 目標預覽（放大顯示） */
+        .target-preview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 160px;
+        }
+
+        .target-preview canvas {
+            width: 160px;
+            height: 160px;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6) inset, 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .tp-label {
+            font-size: 0.85rem;
+            color: #ddd;
+        }
+
+        .top-stats .stat-value {
+            font-size: 6rem;
+            font-weight: 900;
+            color: #ffd700;
+        }
+
+        .top-stats .stat-label {
+            font-size: 0.95rem;
+            color: #ddd;
+            text-align: center;
+        }
+
+        .mission-panel {
+            background-color: #000;
+            border: 2px solid #ffd700;
+            color: #ffd700;
+            padding: 10px 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+            display: none;
+        }
+
+        .controls {
+            background-color: var(--panel-color);
+            padding: 8px 12px;
+            border-radius: 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .stat-box {
+            text-align: center;
+            min-width: 80px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4cc9f0;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        button {
+            background-color: var(--text-color);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #555;
+        }
+
+        .sound-btn {
+            background-color: #333;
+            border: 1px solid #555;
+        }
+
+        .sound-btn.active {
+            background-color: #4cc9f0;
+            color: #000;
+            border-color: #4cc9f0;
+            font-weight: bold;
+        }
+
+        select.level-select {
+            background-color: #0f3460;
+            color: white;
+            border: 1px solid #4cc9f0;
+            padding: 6px 8px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            outline: none;
+            max-width: 250px;
+        }
+
+        .divider {
+            border-left: 1px solid #444;
+            height: 40px;
+            margin: 0 5px;
+        }
+
+        /* 裝置改為一列顯示（縮小） */
+        .game-area {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 12px;
+            align-items: center;
+            /* 垂直置中 */
+            justify-content: center;
+            /* 水平置中整列 */
+            max-width: 100%;
+            width: 100%;
+            overflow-x: auto;
+            padding: 6px 4px;
+            box-sizing: border-box;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 在小螢幕上仍允許水平捲動顯示 */
+        @media (max-width: 768px) {
+            .game-area {
+                gap: 8px;
+            }
+        }
+
+        .device-container {
+            background-color: var(--panel-color);
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative;
+            flex: 0 0 140px;
+            /* 固定寬度，避免撐開一列 */
+            min-width: 120px;
+            max-width: 160px;
+        }
+
+        .device-container:active {
+            border-color: white;
+        }
+
+        .device-container.connecting {
+            border-color: #ffd700;
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.18);
+        }
+
+        /* modal for user-initiated scan */
+        .scan-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .scan-modal {
+            /* 更顯眼的底色與邊框，讓掃描設定更容易被注意到 */
+            background: linear-gradient(180deg, rgba(15, 52, 96, 0.95), rgba(15, 20, 48, 0.98));
+            color: #fff;
+            border: 1px solid #ffd700;
+            box-shadow: 0 8px 24px rgba(15, 52, 96, 0.6), 0 2px 8px rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 8px;
+            width: 340px;
+            text-align: center;
+        }
+
+        .scan-modal button {
+            margin: 8px;
+            background: linear-gradient(180deg, #ffd700, #e0a800);
+            color: #0b1220;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .device-header {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #aaa;
+            text-align: center;
+            width: 100%;
+        }
+
+        .led-matrix {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 2px;
+            width: 120px;
+            height: 120px;
+            background-color: #000;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .led {
+            background-color: var(--led-off);
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.8);
+            transition: background-color 0.1s;
+        }
+
+        .led.color-red {
+            background-color: #ff0000;
+            box-shadow: 0 0 5px #ff0000;
+        }
+
+        .led.color-green {
+            background-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        .led.color-blue {
+            background-color: #0088ff;
+            box-shadow: 0 0 5px #0088ff;
+        }
+
+        .led.color-yellow {
+            background-color: #ffaa00;
+            box-shadow: 0 0 5px #ffaa00;
+        }
+
+        .led.color-purple {
+            background-color: #d000ff;
+            box-shadow: 0 0 5px #d000ff;
+        }
+
+        .led.color-white {
+            background-color: #ffffff;
+            box-shadow: 0 0 5px #ffffff;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #555;
+        }
+
+        /* 暫時隱藏 Log 與工程模式（由使用者要求） */
+        #logArea,
+        #engToggleBtn,
+        #engPanel {
+            display: none !important;
+        }
+
+        .status-badge.connected {
+            background-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        #logArea {
+            margin-top: 20px;
+            width: 80%;
+            height: 150px;
+            background: #000;
+            color: #0f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            padding: 10px;
+            overflow-y: scroll;
+            border: 1px solid #333;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .log-tx {
+            color: #ffff00;
+        }
+
+        .log-rx {
+            color: #00ffff;
+        }
+
+        .log-sys {
+            color: #888;
+        }
+
+        .hex-header {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+
+        .hex-tag {
+            color: #ffaa00;
+            font-weight: bold;
+            border-bottom: 1px solid #ffaa00;
+        }
+
+        .hex-footer {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+
+        .hex-chk {
+            color: #00ff00;
+            font-weight: bold;
+            border-bottom: 1px dashed #00ff00;
+        }
+
+        /* ================= 工程模式 UI ================= */
+        .eng-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #333;
+            color: #888;
+            border: 1px solid #555;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s;
+        }
+
+        .eng-toggle-btn:hover {
+            background-color: #555;
+            color: #fff;
+        }
+
+        .eng-toggle-btn.active {
+            background-color: #e94560;
+            color: #fff;
+            border-color: #e94560;
+            transform: rotate(90deg);
+        }
+
+        .engineering-panel {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 320px;
+            background-color: rgba(22, 33, 62, 0.95);
+            border: 2px solid #e94560;
+            border-radius: 10px;
+            padding: 15px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+            z-index: 99;
+            backdrop-filter: blur(5px);
+        }
+
+        .eng-header {
+            font-weight: bold;
+            color: #e94560;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+
+        .eng-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 5px;
+        }
+
+        .eng-label {
+            font-size: 0.8rem;
+            color: #aaa;
+            width: 60px;
+        }
+
+        .eng-input {
+            background: #000;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .dev-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            background: #111;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .dev-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: #ddd;
+        }
+
+        .dev-checkbox-label input {
+            accent-color: #e94560;
+        }
+
+        .eng-btn {
+            background-color: #0f3460;
+            color: #fff;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border: 1px solid #4cc9f0;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .eng-btn:hover {
+            background-color: #4cc9f0;
+            color: #000;
+        }
+
+        .eng-btn.danger {
+            border-color: #ff4444;
+            color: #ff9999;
+        }
+
+        .eng-btn.danger:hover {
+            background-color: #ff4444;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 置頂大型分數/時間顯示 -->
+    <div class="top-stats">
+        <div class="stat-box">
+            <div class="stat-value" id="scoreDisplay">0</div>
+            <div class="stat-label">分數</div>
+        </div>
+        <div class="target-preview" id="targetPreviewContainer" title="目前目標">
+            <canvas id="targetPreview" width="160" height="160"></canvas>
+            <div class="tp-label">目標</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="timeDisplay">0</div>
+            <div class="stat-label">時間</div>
+        </div>
+    </div>
+
+    <div class="mission-panel" id="missionPanel">任務: 等待開始...</div>
+
+    <div class="controls">
+        <div class="divider"></div>
+        <select id="levelSelect" class="level-select"></select>
+        <div style="display:flex; align-items:center; gap:8px; margin-left:6px;">
+            <label style="color:#ddd; font-size:0.85rem;">遊戲時間(s):</label>
+            <input id="customDuration" type="number" min="10" max="600" step="5" placeholder="預設" class="level-select"
+                style="width:110px;">
+        </div>
+        <div class="divider"></div>
+        <button id="soundBtn" class="sound-btn active">🔊 音效: 開</button>
+        <div class="divider"></div>
+        <label style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#ddd; font-size:0.85rem;">裝置數量:</span>
+            <select id="deviceCountSelect" class="level-select" style="max-width:120px;">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
+        </label>
+        <!-- 永遠使用快速連線，UI 選項移除 -->
+        <button id="btnStartConnect">開始連接裝置</button>
+        <button id="startBtn" disabled>開始遊戲</button>
+    </div>
+
+    <!-- Single-device quick test panel -->
+    <div class="controls" style="margin-top:12px;">
+        <label style="color:#ddd; font-size:0.95rem; margin-right:8px;">單一裝置測試：</label>
+        <button id="btnSingleConnect">連接單一裝置</button>
+        <label style="color:#ddd; margin-left:12px;">Pattern:</label>
+        <select id="singlePatternSelect" class="level-select" style="max-width:180px;">
+            <option value="MOLE">Mole</option>
+            <option value="CIRCLE">Circle</option>
+            <option value="SQUARE">Square</option>
+            <option value="CROSS">Cross</option>
+            <option value="CHECK">Check</option>
+            <option value="CLEAR">Clear</option>
+            <option value="NUM_0">0</option>
+            <option value="NUM_1">1</option>
+            <option value="NUM_5">5</option>
+            <option value="NUM_9">9</option>
+        </select>
+        <label style="color:#ddd; margin-left:8px;">Color:</label>
+        <select id="singleColorSelect" class="level-select" style="max-width:120px;">
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="yellow" selected>Yellow</option>
+            <option value="purple">Purple</option>
+            <option value="white">White</option>
+            <option value="off">Off</option>
+        </select>
+        <label style="color:#ddd; margin-left:8px;">Tag:</label>
+        <input type="checkbox" id="singleIsTarget" style="transform:scale(1.2); margin-left:6px;" />
+        <button id="btnSingleSend" disabled style="margin-left:12px;">Send</button>
+    </div>
+
+    <!-- Events from M482 -->
+    <div style="width:80%; margin-top:10px;">
+        <div style="color:#ddd; margin-bottom:6px;">接收事件 (M482 → Web):</div>
+        <div id="eventArea"
+            style="background:#000; color:#7fffd4; padding:8px; min-height:48px; border:1px solid #222; font-family:monospace; font-size:0.9rem;">
+        </div>
+    </div>
+
+    <!-- 遊戲區域 -->
+    <div class="game-area" id="gameArea"></div>
+
+    <!-- Log 區域 -->
+    <div id="logArea">請選擇關卡並點擊「模擬連接」開始...<br></div>
+
+    <!-- 工程模式切換按鈕 -->
+    <button id="engToggleBtn" class="eng-toggle-btn" title="切換工程模式">🛠️</button>
+
+    <!-- 工程模式面板 -->
+    <div id="engPanel" class="engineering-panel">
+        <div class="eng-header">工程模式 (Engineering Mode)</div>
+
+        <div class="eng-label" style="width:100%">目標裝置 (Select Devices):</div>
+        <div class="dev-checkboxes" id="engDevList"></div>
+        <div class="eng-row" style="align-items:center; gap:8px;">
+            <label class="eng-label">RX->Hit:</label>
+            <label style="display:flex; align-items:center; gap:5px; color:#ddd;">
+                <input type="checkbox" id="engRxToPress" checked> 將接收通知視為按下事件
+            </label>
+        </div>
+        <button class="eng-btn" id="engConnectBtn">測試連接選定裝置 (Connect)</button>
+        <!-- 連接真實裝置功能已移除 -->
+
+        <div style="border-top: 1px dashed #444; margin: 10px 0;"></div>
+
+        <div class="eng-label" style="width:100%">傳送測試 (Send Packet):</div>
+
+        <div class="eng-row">
+            <label class="eng-label">Pattern:</label>
+            <select id="engPatternSelect" class="eng-input">
+                <option value="MOLE">Mole (地鼠)</option>
+                <option value="CIRCLE">Circle (圓圈)</option>
+                <option value="SQUARE">Square (方形)</option>
+                <option value="CROSS">Cross (叉叉)</option>
+                <option value="CHECK">Check (勾勾)</option>
+                <option value="CLEAR">Clear (全滅)</option>
+                <option value="NUM_0">Number 0</option>
+                <option value="NUM_1">Number 1</option>
+                <option value="NUM_5">Number 5</option>
+                <option value="NUM_9">Number 9</option>
+            </select>
+        </div>
+
+        <div class="eng-row">
+            <label class="eng-label">Color:</label>
+            <select id="engColorSelect" class="eng-input">
+                <option value="red">Red</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+                <option value="yellow" selected>Yellow</option>
+                <option value="purple">Purple</option>
+                <option value="white">White</option>
+                <option value="off">Off (黑)</option>
+            </select>
+        </div>
+
+        <div class="eng-row">
+            <label class="eng-label">Tag:</label>
+            <label style="display:flex; align-items:center; gap:5px; color:#fff; font-size:0.9rem;">
+                <input type="checkbox" id="engIsTarget"> Is Target (是目標?)
+            </label>
+        </div>
+
+        <button class="eng-btn" id="engSendBtn">發送數據 (Send)</button>
+        <button class="eng-btn danger" id="engClearLogBtn">清除 Log</button>
+    </div>
+
+    <script>
+        // ==========================================
+        // 0. 資料轉換工具 (Protocol Tools v3)
+        // ==========================================
+        const PROTOCOL = {
+            HEADER: 0xAA, FOOTER: 0x55,
+            COLORS: { 'off': 0x00, 'red': 0x01, 'green': 0x02, 'blue': 0x03, 'yellow': 0x04, 'purple': 0x05, 'white': 0x06 },
+            packBrightnessCmd: (percent = 20) => {
+                const p = Math.max(0, Math.min(100, Number(percent) || 0));
+                const buffer = new Uint8Array(5);
+                buffer[0] = PROTOCOL.HEADER;
+                buffer[1] = 0xC0;
+                buffer[2] = p;
+                buffer[3] = buffer[1] ^ buffer[2];
+                buffer[4] = PROTOCOL.FOOTER;
+                return buffer;
+            },
+            pack: (bitmapArray, colorName, isTarget) => {
+                const buffer = new Uint8Array(13);
+                buffer[0] = PROTOCOL.HEADER;
+                // 避免未定義或 'off' 導致發送黑色(0x00)，預設為 yellow
+                buffer[1] = (PROTOCOL.COLORS[colorName] !== undefined) ? PROTOCOL.COLORS[colorName] : PROTOCOL.COLORS['yellow'];
+                buffer[2] = isTarget ? 0x01 : 0x00;
+                for (let row = 0; row < 8; row++) {
+                    let byte = 0;
+                    for (let col = 0; col < 8; col++) {
+                        if (bitmapArray[row * 8 + col] === 1) byte |= (1 << (7 - col));
+                    }
+                    buffer[row + 3] = byte;
+                }
+                let checksum = 0;
+                for (let i = 1; i <= 10; i++) checksum ^= buffer[i];
+                buffer[11] = checksum;
+                buffer[12] = PROTOCOL.FOOTER;
+                return buffer;
+            },
+            toHexFormatted: (uint8Arr) => {
+                const hex = Array.from(uint8Arr).map(b => b.toString(16).padStart(2, '0').toUpperCase());
+                const header = `<span class="hex-header">${hex[0]}</span>`;
+                const tag = `<span class="hex-tag" title="Target Tag">${hex[2]}</span>`;
+                const body = hex.slice(3, 11).join(' ');
+                const chk = `<span class="hex-chk" title="Checksum">${hex[11]}</span>`;
+                const footer = `<span class="hex-footer">${hex[12]}</span>`;
+                return `${header} ${hex[1]} ${tag} ${body} ${chk} ${footer}`;
+            }
+        };
+
+        // ==========================================
+        // 2.1 中文語音提示 (使用 Web Speech API)
+        // ==========================================
+        const TTSManager = {
+            speak(text) {
+                return new Promise((resolve) => {
+                    try {
+                        // 若音效被關閉或瀏覽器不支援語音，立即 resolve
+                        if (!SoundManager.enabled || !('speechSynthesis' in window)) {
+                            if (!('speechSynthesis' in window)) log('[TTS] 不支援語音合成', 'log-sys');
+                            return resolve();
+                        }
+                        const u = new SpeechSynthesisUtterance(text);
+                        u.lang = 'zh-TW';
+                        const voices = window.speechSynthesis.getVoices();
+                        if (voices && voices.length > 0) {
+                            const zh = voices.find(v => /zh|taiwan|mandarin/i.test(v.lang) || /zh|taiwan|mandarin/i.test(v.name));
+                            if (zh) u.voice = zh;
+                        }
+                        // cancel any previous utterance and play this one
+                        window.speechSynthesis.cancel();
+                        u.onend = () => resolve();
+                        u.onerror = () => resolve();
+                        window.speechSynthesis.speak(u);
+                    } catch (e) {
+                        log(`[TTS] 播放錯誤: ${e.message || e}`, 'log-sys');
+                        return resolve();
+                    }
+                });
+            }
+        };
+
+        // ==========================================
+        // 1. 字型與圖形庫
+        // ==========================================
+        const s = str => str.replace(/\s/g, '').split('').map(Number);
+        const BITMAPS = {
+            CLEAR: new Array(64).fill(0),
+            MOLE: s(`0011110001111110110110111111111111011011101111010100001000111100`),
+            CIRCLE: s(`0011110001000010100000011000000110000001100000010100001000111100`),
+            SQUARE: s(`0000000001111110010000100100001001000010010000100111111000000000`),
+            CROSS: s(`1000000101000010001001000001100000011000001001000100001010000001`),
+            CHECK: s(`0000000000000001000000100000010010001000010100000010000000000000`),
+            NUM_0: s("0011110001100110110000111100001111000011110000110110011000111100"),
+            NUM_1: s("0001100000111000000110000001100000011000000110000001100001111110"),
+            NUM_2: s("0011110001100110000001100000110000011000001100000110000011111111"),
+            NUM_3: s("0011110001100110000001100001110000000110000001100110011000111100"),
+            NUM_4: s("0000110000011100001011000100110010001100111111100000110000001100"),
+            NUM_5: s("1111111011000000110000001111110000000110000001101100011001111100"),
+            NUM_6: s("0011110001100000110000001111110011000110110001101100011000111100"),
+            NUM_7: s("1111111100000011000001100000110000011000001100000011000000110000"),
+            NUM_8: s("0011110001100110011001100011110001100110011001100110011000111100"),
+            NUM_9: s("0011110001100110011001100011111000000011000000110000011000111000"),
+        };
+        const NUMBERS = [BITMAPS.NUM_0, BITMAPS.NUM_1, BITMAPS.NUM_2, BITMAPS.NUM_3, BITMAPS.NUM_4, BITMAPS.NUM_5, BITMAPS.NUM_6, BITMAPS.NUM_7, BITMAPS.NUM_8, BITMAPS.NUM_9];
+        const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const LETTER_PATTERNS = {
+            A: [
+                '00011000',
+                '00100100',
+                '01000010',
+                '01000010',
+                '01111110',
+                '01000010',
+                '01000010',
+                '01000010'
+            ],
+            B: [
+                '01111100',
+                '01000010',
+                '01000010',
+                '01111100',
+                '01000010',
+                '01000010',
+                '01111100',
+                '00000000'
+            ],
+            C: [
+                '00111100',
+                '01000010',
+                '01000000',
+                '01000000',
+                '01000000',
+                '01000010',
+                '00111100',
+                '00000000'
+            ],
+            D: [
+                '01111100',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01111100',
+                '00000000'
+            ],
+            E: [
+                '01111110',
+                '01000000',
+                '01000000',
+                '01111100',
+                '01000000',
+                '01000000',
+                '01111110',
+                '00000000'
+            ],
+            F: [
+                '01111110',
+                '01000000',
+                '01000000',
+                '01111100',
+                '01000000',
+                '01000000',
+                '01000000',
+                '00000000'
+            ],
+            G: [
+                '00111100',
+                '01000010',
+                '01000000',
+                '01001110',
+                '01000010',
+                '01000010',
+                '00111100',
+                '00000000'
+            ],
+            H: [
+                '01000010',
+                '01000010',
+                '01000010',
+                '01111110',
+                '01000010',
+                '01000010',
+                '01000010',
+                '00000000'
+            ],
+            I: [
+                '00111100',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00111100',
+                '00000000'
+            ],
+            J: [
+                '00011110',
+                '00000100',
+                '00000100',
+                '00000100',
+                '01000100',
+                '01000100',
+                '00111000',
+                '00000000'
+            ],
+            K: [
+                '01000010',
+                '01000100',
+                '01001000',
+                '01110000',
+                '01001000',
+                '01000100',
+                '01000010',
+                '00000000'
+            ],
+            L: [
+                '01000000',
+                '01000000',
+                '01000000',
+                '01000000',
+                '01000000',
+                '01000000',
+                '01111110',
+                '00000000'
+            ],
+            M: [
+                '10000010',
+                '11000110',
+                '10101010',
+                '10010010',
+                '10000010',
+                '10000010',
+                '10000010',
+                '00000000'
+            ],
+            N: [
+                '01000010',
+                '01100010',
+                '01010010',
+                '01001010',
+                '01000110',
+                '01000010',
+                '01000010',
+                '00000000'
+            ],
+            O: [
+                '00111100',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '00111100',
+                '00000000'
+            ],
+            P: [
+                '01111100',
+                '01000010',
+                '01000010',
+                '01111100',
+                '01000000',
+                '01000000',
+                '01000000',
+                '00000000'
+            ],
+            Q: [
+                '00111100',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01001010',
+                '01000100',
+                '00111010',
+                '00000000'
+            ],
+            R: [
+                '01111100',
+                '01000010',
+                '01000010',
+                '01111100',
+                '01001000',
+                '01000100',
+                '01000010',
+                '00000000'
+            ],
+            S: [
+                '00111100',
+                '01000010',
+                '01000000',
+                '00111100',
+                '00000010',
+                '01000010',
+                '00111100',
+                '00000000'
+            ],
+            T: [
+                '01111110',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00000000'
+            ],
+            U: [
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '00111100',
+                '00000000'
+            ],
+            V: [
+                '01000010',
+                '01000010',
+                '01000010',
+                '01000010',
+                '00100100',
+                '00100100',
+                '00011000',
+                '00000000'
+            ],
+            W: [
+                '10000010',
+                '10000010',
+                '10000010',
+                '10010010',
+                '10101010',
+                '11000110',
+                '10000010',
+                '00000000'
+            ],
+            X: [
+                '10000010',
+                '01000100',
+                '00101000',
+                '00010000',
+                '00101000',
+                '01000100',
+                '10000010',
+                '00000000'
+            ],
+            Y: [
+                '10000010',
+                '01000100',
+                '00101000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00010000',
+                '00000000'
+            ],
+            Z: [
+                '01111110',
+                '00000100',
+                '00001000',
+                '00010000',
+                '00100000',
+                '01000000',
+                '01111110',
+                '00000000'
+            ]
+        };
+        const LETTER_BITMAPS = Object.fromEntries(
+            Object.entries(LETTER_PATTERNS).map(([letter, rows]) => [
+                letter,
+                rows.join('').split('').map(Number)
+            ])
+        );
+        function getLetterBitmap(letter) {
+            if (!letter || typeof letter !== 'string') return BITMAPS.CIRCLE;
+            const upper = letter.toUpperCase();
+            return LETTER_BITMAPS[upper] || BITMAPS.CIRCLE;
+        }
+
+        // 顏色對應 HEX（用於預覽 canvas）
+        const COLOR_HEX = { 'red': '#ff0000', 'green': '#00ff00', 'blue': '#0088ff', 'yellow': '#ffaa00', 'purple': '#d000ff', 'white': '#ffffff' };
+        const COLOR_LABELS = { 'red': '紅色', 'green': '綠色', 'blue': '藍色', 'yellow': '黃色', 'purple': '紫色', 'white': '白色' };
+        const COLOR_POOL = Object.keys(COLOR_HEX);
+
+        // 將 8x8 bitmap 繪製到 top-stats 的預覽 canvas（自適應 canvas 大小）
+        function updateTargetPreview(bitmap, colorName) {
+            try {
+                const canvas = document.getElementById('targetPreview');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                // 使用 canvas 的實際解析度來決定每個 cell 大小
+                const cell = Math.floor(canvas.width / 8);
+                // 背景
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const fill = COLOR_HEX[colorName] || '#ffaa00';
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const v = bitmap[r * 8 + c];
+                        if (v === 1) {
+                            ctx.fillStyle = fill;
+                            // small padding between cells
+                            ctx.fillRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4);
+                        }
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function clearTargetPreview() {
+            const canvas = document.getElementById('targetPreview');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // draw dark background
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // ==========================================
+        // 2. 音效管理
+        // ==========================================
+        const SoundManager = {
+            ctx: null, enabled: true,
+            init() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            toggle() {
+                this.enabled = !this.enabled;
+                if (this.enabled) this.init();
+                return this.enabled;
+            },
+            play(type, freq, dur) {
+                if (!this.enabled) return;
+                this.init();
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.type = type; o.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                g.gain.setValueAtTime(0.3, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                o.connect(g); g.connect(this.ctx.destination);
+                o.start(); o.stop(this.ctx.currentTime + dur);
+            },
+            sfx: {
+                start: () => { [440, 554, 659, 880].forEach((f, i) => setTimeout(() => SoundManager.play('square', f, 0.1), i * 100)) },
+                spawn: () => SoundManager.play('sine', 500, 0.1),
+                hit: () => { SoundManager.play('sine', 880, 0.1); setTimeout(() => SoundManager.play('sine', 1760, 0.1), 50) },
+                bad: () => SoundManager.play('sawtooth', 150, 0.3),
+                win: () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => SoundManager.play('triangle', f, 0.1), i * 100)) },
+            }
+        };
+
+        // ==========================================
+        // 3. 虛擬裝置 (模擬連線)
+        // ==========================================
+        class VirtualBLEDevice {
+            constructor(id, containerId) {
+                this.id = id;
+                this.container = document.getElementById(containerId);
+                this.leds = [];
+                // 紀錄上一次發送的原始 Byte 資料，用於比對 (Smart Filter)
+                this.lastPayload = null;
+                this.initUI();
+            }
+
+            initUI() {
+                const matrix = document.createElement('div');
+                matrix.className = 'led-matrix';
+                for (let i = 0; i < 64; i++) {
+                    const led = document.createElement('div');
+                    led.className = 'led';
+                    matrix.appendChild(led);
+                    this.leds.push(led);
+                }
+                const header = document.createElement('div');
+                header.className = 'device-header';
+                header.innerHTML = `ID: ${this.id} <span class="status-badge" id="badge-${this.id}"></span>`;
+                // 顯示已連線裝置名稱
+                const nameDiv = document.createElement('div');
+                nameDiv.id = `name-${this.id}`;
+                nameDiv.style.cssText = 'margin-top:6px;font-size:0.85rem;color:#ccc;min-height:18px;';
+                header.appendChild(nameDiv);
+                this.container.appendChild(header);
+                this.container.appendChild(matrix);
+
+                this.container.addEventListener('mousedown', () => {
+                    log(`[RX] Dev ${this.id} Button Pressed`, 'log-rx');
+                    handleDeviceInput(this.id);
+                });
+            }
+
+            async connect() {
+                // 模擬連線延遲（支援快速連接模式以縮短 UI 等待）
+                return new Promise(resolve => {
+                    const delay = (typeof FAST_CONNECT !== 'undefined' && FAST_CONNECT) ? 80 : 300;
+                    const hold = (typeof FAST_CONNECT !== 'undefined' && FAST_CONNECT) ? 250 : 800;
+                    setTimeout(() => {
+                        document.getElementById(`badge-${this.id}`).classList.add('connected');
+                        // 連線後第一次顯示打勾提示
+                        try {
+                            this.showResult(true);
+                            // 保持一段時間後清除顯示
+                            setTimeout(() => { this.clear(); }, hold);
+                        } catch (e) { /* ignore */ }
+                        resolve();
+                    }, delay);
+                });
+            }
+
+            // 核心修改：Smart Filter
+            update(bitmap, colorName = 'yellow', isTarget = false) {
+                // 1. 產生這次預計要發送的封包
+                // 若 bitmap 為 CLEAR，允許傳送 'off'（以便真實裝置能全滅）
+                const isClearBitmap = bitmap.every(b => b === 0);
+                if (!colorName) colorName = 'yellow';
+                if ((colorName === 'off' || colorName === 'black') && !isClearBitmap) {
+                    // 在非 clear 情況下，避免傳送黑色；改為預設顏色
+                    colorName = 'yellow';
+                }
+                const newPayload = PROTOCOL.pack(bitmap, colorName, isTarget);
+
+                // 2. 比對：如果跟上次一樣，直接忽略 (Return)
+                if (this.isPayloadSame(newPayload, this.lastPayload)) {
+                    return; // 攔截！不發送，不更新 UI，不寫 Log
+                }
+
+                // 3. 更新狀態紀錄
+                this.lastPayload = newPayload;
+
+                // 4. 執行 UI 更新 (視覺模擬)
+                this.leds.forEach((led, i) => {
+                    led.className = 'led';
+                    if (bitmap[i] === 1) led.classList.add(`color-${colorName}`);
+                });
+                // 5. 若綁定真實裝置則寫入，否則顯示模擬 Log
+                const hexString = PROTOCOL.toHexFormatted(newPayload);
+                if (RealBLEAdapter.hasConnection(this.id)) {
+                    // send to real device (no need to await callers)
+                    RealBLEAdapter.write(this.id, newPayload).catch(() => { /* 已在 adapter 內記錄錯誤 */ });
+                } else {
+                    // 顯示模擬 TX Log
+                    log(`[TX] Dev ${this.id}: ${hexString}`, 'log-tx');
+                }
+            }
+
+            clear() {
+                this.update(BITMAPS.CLEAR, 'off', false);
+            }
+
+            showResult(isHit) {
+                this.update(isHit ? BITMAPS.CHECK : BITMAPS.CROSS, isHit ? 'green' : 'red', false);
+            }
+
+            // 輔助：比對兩個 Uint8Array 是否相同
+            isPayloadSame(arr1, arr2) {
+                if (!arr1 || !arr2) return false;
+                if (arr1.length !== arr2.length) return false;
+                for (let i = 0; i < arr1.length; i++) {
+                    if (arr1[i] !== arr2[i]) return false;
+                }
+                return true;
+            }
+        }
+
+        // ==========================================
+        // Real BLE Adapter (使用 README 裡的 UUID)
+        // ==========================================
+        const BLE_SERVICE_UUID = '524cacc0-3c17-d293-8e48-14fe2e4da212';
+        const BLE_TX_UUID = '0000d002-0000-1000-8000-00805f9b34fb'; // write (M482: D002 送出)
+        const BLE_RX_UUID = '0000d001-0000-1000-8000-00805f9b34fb'; // notify (M482: D001 接收)
+
+        const RealBLEAdapter = {
+            connections: new Map(), // slotId -> { device, server, txChar, txCandidates, rxChar }
+            writeQueues: new Map(),
+            rxSubscribers: new Map(), // slotId -> Set<Function>
+            // lastNames removed (auto-bind disabled)
+
+            isAvailable() {
+                return !!(navigator && navigator.bluetooth);
+            },
+
+            normalizeUuid(uuid) {
+                return String(uuid || '').toLowerCase();
+            },
+
+            canWrite(ch) {
+                return !!(ch && ch.properties && (ch.properties.write || ch.properties.writeWithoutResponse));
+            },
+
+            canNotify(ch) {
+                return !!(ch && ch.properties && (ch.properties.notify || ch.properties.indicate));
+            },
+
+            async requestAndConnect(slotId, opts = {}) {
+                if (!this.isAvailable()) {
+                    log('[BLE] Web Bluetooth API 不支援於此瀏覽器', 'log-sys');
+                    return false;
+                }
+
+                try {
+                    log(`[BLE] 請選擇裝置以綁定到 Slot ${slotId}`, 'log-sys');
+                    // allow caller to override scanning options via opts
+                    // 如果 opts.serviceOnly === true，則只顯示擁有指定 service UUID 的裝置
+                    let requestOptions;
+                    if (opts && opts.name) {
+                        // 嘗試以精確名稱過濾（此會在瀏覽器裝置選單中只顯示匹配名稱的裝置）
+                        requestOptions = { filters: [{ name: opts.name }], optionalServices: [BLE_SERVICE_UUID] };
+                    } else if (opts && opts.serviceOnly) {
+                        // 某些 M482 BLE 模組不會在廣播包帶完整 service UUID，
+                        // 若用 services filter 可能在裝置清單直接看不到。
+                        // 因此仍使用 acceptAllDevices，連上後再做 service/char 驗證。
+                        requestOptions = { acceptAllDevices: true, optionalServices: [BLE_SERVICE_UUID] };
+                    } else if (opts && opts.acceptAllDevices) {
+                        requestOptions = { acceptAllDevices: true, optionalServices: [BLE_SERVICE_UUID] };
+                    } else {
+                        // 不再預設以 namePrefix 篩選，改為允許使用者從所有裝置中選擇，但仍要求 optional service
+                        requestOptions = { acceptAllDevices: true, optionalServices: [BLE_SERVICE_UUID] };
+                    }
+                    const device = await navigator.bluetooth.requestDevice(requestOptions);
+
+                    device.addEventListener('gattserverdisconnected', () => {
+                        log(`[BLE] Device disconnected: ${device.name || device.id}`, 'log-sys');
+                        const badge = document.getElementById(`badge-${slotId}`);
+                        if (badge) badge.classList.remove('connected');
+                        const nameEl = document.getElementById(`name-${slotId}`);
+                        if (nameEl) nameEl.innerText = '';
+                        this.connections.delete(slotId);
+                        this.writeQueues.delete(slotId);
+                        this.rxSubscribers.delete(slotId);
+                    });
+
+                    const server = await device.gatt.connect();
+
+                    let service = null;
+                    try {
+                        service = await server.getPrimaryService(BLE_SERVICE_UUID);
+                    } catch (e) {
+                        // fallback: 掃描所有 primary services，挑出有 d001/d002 的 service
+                        try {
+                            const allServices = await server.getPrimaryServices();
+                            for (const s of allServices) {
+                                try {
+                                    const c1 = await s.getCharacteristic('0000d001-0000-1000-8000-00805f9b34fb');
+                                    const c2 = await s.getCharacteristic('0000d002-0000-1000-8000-00805f9b34fb');
+                                    if (c1 || c2) {
+                                        service = s;
+                                        break;
+                                    }
+                                } catch (innerErr) {
+                                    // keep scanning
+                                }
+                            }
+                        } catch (scanErr) {
+                            // keep service as null
+                        }
+                    }
+
+                    if (!service) {
+                        throw new Error('找不到可用的 BLE service（含 d001/d002）');
+                    }
+
+                    let allChars = [];
+                    try {
+                        allChars = await service.getCharacteristics();
+                    } catch (e) {
+                        allChars = [];
+                    }
+
+                    const txUuidNorm = this.normalizeUuid(BLE_TX_UUID);
+                    const rxUuidNorm = this.normalizeUuid(BLE_RX_UUID);
+
+                    const byUuid = (uuidNorm) => allChars.find(ch => this.normalizeUuid(ch.uuid) === uuidNorm) || null;
+                    const writableChars = allChars.filter(ch => this.canWrite(ch));
+                    const notifiableChars = allChars.filter(ch => this.canNotify(ch));
+
+                    let txChar = byUuid(txUuidNorm);
+                    let rxChar = byUuid(rxUuidNorm);
+
+                    // 自動判斷可寫/可通知特徵（若固定 UUID 不可用則 fallback）
+                    if (!this.canWrite(txChar)) {
+                        txChar = writableChars[0] || null;
+                    }
+                    if (!this.canNotify(rxChar)) {
+                        rxChar = notifiableChars[0] || null;
+                    }
+
+                    // 若 UUID 反向配置，嘗試自動交換
+                    if ((!txChar || !this.canWrite(txChar)) && rxChar && this.canWrite(rxChar)) {
+                        const swapCandidate = txChar;
+                        txChar = rxChar;
+                        rxChar = (swapCandidate && this.canNotify(swapCandidate)) ? swapCandidate : (notifiableChars.find(ch => ch !== txChar) || null);
+                        log('[BLE] 偵測到 TX/RX 可能反向，已自動交換使用的 characteristic', 'log-sys');
+                    }
+
+                    if (!txChar || !this.canWrite(txChar)) {
+                        throw new Error('找不到可寫入 characteristic');
+                    }
+
+                    // 單一主通道 + 後備通道（寫入失敗才退而求其次）
+                    const txCandidates = [];
+                    const pushUniqueTx = (ch) => {
+                        if (!ch || !this.canWrite(ch)) return;
+                        if (!txCandidates.some((x) => this.normalizeUuid(x.uuid) === this.normalizeUuid(ch.uuid))) {
+                            txCandidates.push(ch);
+                        }
+                    };
+                    pushUniqueTx(txChar);
+                    writableChars.forEach(pushUniqueTx);
+
+                    log(`[BLE] Slot ${slotId} characteristics: all=${allChars.length}, writable=${writableChars.length}, notifiable=${notifiableChars.length}`, 'log-sys');
+                    log(`[BLE] Slot ${slotId} TX=${txChar.uuid}; RX=${rxChar ? rxChar.uuid : 'N/A'}`, 'log-sys');
+
+                    // start notifications if available on rxChar
+                    if (rxChar) {
+                        try {
+                            await rxChar.startNotifications();
+                            rxChar.addEventListener('characteristicvaluechanged', (ev) => {
+                                const val = new Uint8Array(ev.target.value.buffer);
+                                log(`[BLE RX] Slot ${slotId}: ${Array.from(val).map(b => b.toString(16).padStart(2, '0')).join(' ')}`, 'log-rx');
+                                const listeners = this.rxSubscribers.get(slotId);
+                                if (listeners && listeners.size > 0) {
+                                    listeners.forEach((fn) => {
+                                        try {
+                                            fn(val, slotId);
+                                        } catch (subErr) {
+                                            log(`[BLE] RX subscriber error: ${subErr.message || subErr}`, 'log-sys');
+                                        }
+                                    });
+                                }
+                                try {
+                                    // 若工程面板勾選，嘗試把通知視為按鍵輸入事件
+                                    const rxToPress = document.getElementById('engRxToPress');
+                                    const treatAsPress = rxToPress ? rxToPress.checked : false;
+                                    if (treatAsPress) {
+                                        // If device sends explicit 0x01/0x00 as first byte, use that value
+                                        if (val.length >= 1 && (val[0] === 0x01 || val[0] === 0x00)) {
+                                            if (val[0] === 0x01) {
+                                                log(`[BLE RX] Slot ${slotId} -> 資料表示按鍵值 1`, 'log-rx');
+                                                handleDeviceInput(slotId, 0x01);
+                                            } else {
+                                                // explicit 0x00: ignore as press, log once
+                                                log(`[BLE RX] Slot ${slotId} -> 資料表示按鍵值 0 (ignored)`, 'log-rx');
+                                            }
+                                        } else {
+                                            // fallback heuristic: small non-frame payloads or short non-zero payloads
+                                            let isPress = false;
+                                            if (val.length === 1 && val[0] === 0x01) isPress = true;
+                                            else if (val.length <= 2 && val.some(b => b !== 0)) isPress = true;
+                                            if (!isPress) {
+                                                if (!(val.length >= 13 && val[0] === PROTOCOL.HEADER && val[val.length - 1] === PROTOCOL.FOOTER)) {
+                                                    if (val.length < 13) isPress = true;
+                                                }
+                                            }
+                                            if (isPress) {
+                                                log(`[BLE RX] Slot ${slotId} -> 觸發按下事件 (heuristic)`, 'log-rx');
+                                                handleDeviceInput(slotId);
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    log(`[BLE] RX handler error: ${e.message || e}`, 'log-sys');
+                                }
+                            });
+                        } catch (e) {
+                            log(`[BLE] 無法啟用通知（可先只測試發送）: ${e.message || e}`, 'log-sys');
+                        }
+                    }
+
+                    this.connections.set(slotId, { device, server, txChar: txChar, txCandidates: txCandidates, rxChar: rxChar });
+                    // 記錄上次配對名稱
+                    // do not record lastNames (auto-bind removed)
+                    const badge = document.getElementById(`badge-${slotId}`);
+                    if (badge) badge.classList.add('connected');
+                    const nameEl = document.getElementById(`name-${slotId}`);
+                    if (nameEl) nameEl.innerText = device.name || device.id;
+                    log(`[BLE] 已連接 ${device.name || device.id} -> Slot ${slotId}`, 'log-sys');
+                    // 連線完成後不再自動送測試圖樣，避免與 UI 連線提示封包互相干擾
+                    return true;
+                } catch (err) {
+                    log(`[BLE] 連接失敗: ${err.message || err}`, 'log-sys');
+                    return false;
+                }
+            },
+
+            // 嘗試使用已授權的裝置列表 (navigator.bluetooth.getDevices) 以名稱直接連線，若支援可避免 requestDevice prompt
+            // connectKnownDeviceByName removed (auto-bind disabled)
+
+            // 掃描附近可連線裝置的名稱（嘗試使用 getDevices 與 requestLEScan）
+            // scanForNearbyNames removed (auto-bind disabled)
+
+            async disconnectAll() {
+                try {
+                    for (const [slot, conn] of this.connections.entries()) {
+                        try {
+                            if (conn && conn.device && conn.device.gatt && conn.device.gatt.connected) {
+                                conn.device.gatt.disconnect();
+                            }
+                        } catch (e) { /* ignore */ }
+                        const badge = document.getElementById(`badge-${slot}`);
+                        if (badge) badge.classList.remove('connected');
+                        const nameEl = document.getElementById(`name-${slot}`);
+                        if (nameEl) nameEl.innerText = '';
+                    }
+                } catch (e) { /* ignore */ }
+                this.connections.clear();
+                this.writeQueues.clear();
+                this.rxSubscribers.clear();
+                log('[BLE] 已斷開所有裝置', 'log-sys');
+                return true;
+            },
+
+            async write(slotId, uint8arr) {
+                const conn = this.connections.get(slotId);
+                if (!conn) return false;
+                const data = (uint8arr instanceof Uint8Array) ? uint8arr : new Uint8Array(uint8arr);
+                const queue = this.writeQueues.get(slotId) || Promise.resolve(true);
+                const writePromise = queue.then(async () => {
+                    const currentConn = this.connections.get(slotId);
+                    if (!currentConn || !currentConn.txCandidates || currentConn.txCandidates.length === 0) {
+                        throw new Error('No writable characteristic');
+                    }
+
+                    let lastErr = null;
+                    for (const tx of currentConn.txCandidates) {
+                        try {
+                            if (tx.writeValue && tx.properties && tx.properties.write) {
+                                await tx.writeValue(data.buffer || data);
+                            } else if (tx.writeValueWithoutResponse && tx.properties && tx.properties.writeWithoutResponse) {
+                                await tx.writeValueWithoutResponse(data.buffer || data);
+                            } else {
+                                continue;
+                            }
+
+                            // 成功寫入後，將該 characteristic 提升為主通道（下一次優先）
+                            if (!currentConn.txChar || this.normalizeUuid(currentConn.txChar.uuid) !== this.normalizeUuid(tx.uuid)) {
+                                currentConn.txChar = tx;
+                                currentConn.txCandidates = [tx, ...currentConn.txCandidates.filter(c => this.normalizeUuid(c.uuid) !== this.normalizeUuid(tx.uuid))];
+                                log(`[BLE] Slot ${slotId} 切換主寫入通道 -> ${tx.uuid}`, 'log-sys');
+                            }
+
+                            log(`[BLE TX] Slot ${slotId}: ${PROTOCOL.toHexFormatted(data)}`, 'log-tx');
+                            return true;
+                        } catch (err) {
+                            lastErr = err;
+                        }
+                    }
+
+                    throw (lastErr || new Error('All writable characteristics failed'));
+                }).catch(err => {
+                    log(`[BLE] Write error: ${err.message || err}`, 'log-sys');
+                    return false;
+                });
+                this.writeQueues.set(slotId, writePromise);
+                return writePromise;
+            },
+
+            hasConnection(slotId) {
+                return this.connections.has(slotId);
+            },
+
+            subscribeRx(slotId, callback) {
+                if (typeof callback !== 'function') return;
+                const set = this.rxSubscribers.get(slotId) || new Set();
+                set.add(callback);
+                this.rxSubscribers.set(slotId, set);
+            },
+
+            unsubscribeRx(slotId, callback) {
+                const set = this.rxSubscribers.get(slotId);
+                if (!set) return;
+                set.delete(callback);
+                if (set.size === 0) {
+                    this.rxSubscribers.delete(slotId);
+                }
+            }
+        };
+
+        // ==========================================
+        // 4. 遊戲與系統變數
+        // ==========================================
+        const CONFIG = {
+            TOTAL_DEVICES: 6,
+            LEVELS: [
+                { id: 'L1', name: "L1: 經典暖身", desc: "看到亮燈就打！", duration: 30, interval: 1000, mode: 'CLASSIC' },
+                { id: 'L2', name: "L2: 炸彈拆除", desc: "打O，避開X！", duration: 30, interval: 1200, mode: 'BOMB' },
+                { id: 'L3', name: "L3: 數字獵人", desc: "找出指定的數字！", duration: 40, interval: 1500, mode: 'NUMBER_HUNT' },
+                { id: 'L4', name: "L4: 色彩大戰", desc: "根據指令打顏色！", duration: 30, interval: 1000, mode: 'COLOR_RUSH' },
+                { id: 'L5', name: "L5: 邏輯混戰", desc: "只打「紅色的英文字母」！", duration: 45, interval: 1200, mode: 'LOGIC_CHAOS' },
+                { id: 'L6', name: "L6: 連鎖電光", desc: "依序擊中閃爍的數字 1→2→3", duration: 35, interval: 1100, mode: 'SEQUENCE_STRIKE' },
+                { id: 'L7', name: "L7: 雙子共鳴", desc: "同時敲下兩個耀眼的圈圈", duration: 40, interval: 1400, mode: 'PAIR_SYNC' },
+                { id: 'L8', name: "L8: 閃爍追擊", desc: "追上快速跳躍的光點", duration: 35, interval: 1100, mode: 'CHASE_BEACON' },
+                { id: 'L9', name: "L9: 彩碼密令", desc: "按下顏色與數字同時匹配的裝置", duration: 45, interval: 1500, mode: 'CODE_SWAPPER' },
+                { id: 'L10', name: "L10: 數學快算", desc: "快速心算：3秒內打出正確答案", duration: 45, interval: 900, mode: 'MATH_QUICK' }
+            ]
+        };
+
+        let gameState = {
+            score: 0, isPlaying: false, devices: [], activeTargets: new Map(),
+            level: null, timer: null, spawnTimer: null,
+            activeCount: null,
+            sequenceQueue: [], sequenceNextIndex: 0, sequenceDevs: [],
+            pairTimer: null, pairPending: new Set(), pairDevs: [],
+            chaseHopTimer: null, chaseSequence: [], chaseActiveId: null, chaseHopCount: 0, chaseMaxHops: 0,
+            codeTarget: null,
+            mathTimer: null, mathTarget: null,
+            ttsPromise: null
+        };
+
+        // 簡單等待工具
+        const wait = (ms) => new Promise(res => setTimeout(res, ms));
+
+        function queueSpawnAfterDelay(delay = 300) {
+            const schedule = () => {
+                clearTimeout(gameState.spawnTimer);
+                gameState.spawnTimer = setTimeout(spawnCycle, delay);
+            };
+            if (gameState.ttsPromise) {
+                gameState.ttsPromise.finally(schedule);
+            } else {
+                schedule();
+            }
+        }
+
+        function speakAndLock(text) {
+            const promise = TTSManager.speak(text);
+            gameState.ttsPromise = promise;
+            promise.finally(() => {
+                if (gameState.ttsPromise === promise) {
+                    gameState.ttsPromise = null;
+                }
+            });
+            return promise;
+        }
+
+        // 發送測試圖案到指定 slot（會同時更新模擬 UI 並寫入真實裝置）
+        async function sendTestPatterns(slotId) {
+            const dev = gameState.devices.find(d => d.id === slotId);
+            if (!dev) return log(`[BLE TEST] 找不到 Slot ${slotId}`, 'log-sys');
+
+            log(`[BLE TEST] 發送綠色打勾到 Slot ${slotId}`, 'log-sys');
+            dev.update(BITMAPS.CHECK, 'green', false);
+        }
+
+        // 設定要使用的裝置數量，並在 UI 上隱藏多出的模擬裝置
+        function setActiveDeviceCount(count) {
+            gameState.activeCount = count;
+            for (let i = 0; i < gameState.devices.length; i++) {
+                const dev = gameState.devices[i];
+                const container = document.getElementById(`dev-${dev.id}`);
+                if (!container) continue;
+                if (dev.id <= count) container.style.display = 'flex';
+                else container.style.display = 'none';
+            }
+        }
+
+        // 標示某個 slot 為正在掃描/連接狀態
+        function setConnectingSlot(slot, isConnecting) {
+            const container = document.getElementById(`dev-${slot}`);
+            if (!container) return;
+            if (isConnecting) container.classList.add('connecting');
+            else container.classList.remove('connecting');
+        }
+
+        function setDeviceNameOnTile(slot, name) {
+            const el = document.getElementById(`name-${slot}`);
+            if (!el) return;
+            el.innerText = name || '';
+        }
+
+        // 顯示一個 modal 要求使用者按下「掃描並綁定」以觸發 requestDevice (必須來自 user gesture)
+        function promptUserScan(slot) {
+            return new Promise((resolve) => {
+                const backdrop = document.createElement('div');
+                backdrop.className = 'scan-modal-backdrop';
+                const modal = document.createElement('div');
+                modal.className = 'scan-modal';
+                modal.innerHTML = `<div style="font-weight:bold;margin-bottom:8px;">Slot ${slot}：請選擇裝置並按下掃描</div>
+                    <div style="font-size:0.9rem;color:#ccc;margin-bottom:12px;">請在裝置選單中選擇要綁定到此 Slot 的裝置。</div>`;
+
+                const scanBtn = document.createElement('button');
+                scanBtn.innerText = '掃描並綁定';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.innerText = '取消';
+
+                scanBtn.addEventListener('click', async () => {
+                    scanBtn.disabled = true; cancelBtn.disabled = true;
+                    scanBtn.innerText = '掃描中...';
+                    try {
+                        const ok = await RealBLEAdapter.requestAndConnect(slot, { serviceOnly: true });
+                        document.body.removeChild(backdrop);
+                        resolve(!!ok);
+                    } catch (e) {
+                        document.body.removeChild(backdrop);
+                        resolve(false);
+                    }
+                });
+
+                cancelBtn.addEventListener('click', () => {
+                    document.body.removeChild(backdrop);
+                    resolve(false);
+                });
+
+                modal.appendChild(scanBtn);
+                modal.appendChild(cancelBtn);
+                backdrop.appendChild(modal);
+                document.body.appendChild(backdrop);
+                // focus the scan button for keyboard accessibility
+                scanBtn.focus();
+            });
+        }
+
+        // ==========================================
+        // 5. 初始化與遊戲流程
+        // ==========================================
+        const ui = {
+            score: document.getElementById('scoreDisplay'),
+            time: document.getElementById('timeDisplay'),
+            mission: document.getElementById('missionPanel'),
+            log: document.getElementById('logArea'),
+            gameArea: document.getElementById('gameArea'),
+            levelSelect: document.getElementById('levelSelect'),
+            customDuration: document.getElementById('customDuration'),
+
+            btnStart: document.getElementById('startBtn'),
+            deviceCountSelect: document.getElementById('deviceCountSelect'),
+            btnStartConnect: document.getElementById('btnStartConnect')
+        };
+
+        // 全域快速連接旗標（永遠啟用）
+        let FAST_CONNECT = true;
+
+        function init() {
+            ui.gameArea.innerHTML = '';
+            gameState.devices = [];
+            for (let i = 1; i <= CONFIG.TOTAL_DEVICES; i++) {
+                const div = document.createElement('div');
+                div.id = `dev-${i}`;
+                div.className = 'device-container';
+                ui.gameArea.appendChild(div);
+                gameState.devices.push(new VirtualBLEDevice(i, `dev-${i}`));
+            }
+
+            // 預設使用全部裝置，之後使用者可於連線時選擇較少數量
+            setActiveDeviceCount(CONFIG.TOTAL_DEVICES);
+
+            ui.levelSelect.innerHTML = '';
+            CONFIG.LEVELS.forEach((lvl, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.innerText = lvl.name;
+                ui.levelSelect.appendChild(opt);
+            });
+            ui.levelSelect.addEventListener('change', updateLevelInfo);
+            if (ui.customDuration) ui.customDuration.addEventListener('input', updateLevelInfo);
+            updateLevelInfo();
+
+            // 永遠使用快速連線，UI 選項移除
+
+            initEngineeringUI();
+            initSingleBleUI();
+        }
+
+        function updateLevelInfo() {
+            const lvl = CONFIG.LEVELS[ui.levelSelect.value];
+            // 若使用者輸入了自訂時間，優先顯示自訂值
+            const cust = ui.customDuration && parseInt(ui.customDuration.value);
+            ui.time.innerText = (cust && cust > 0) ? cust : lvl.duration;
+            ui.mission.innerText = `模式: ${lvl.desc}`;
+            ui.mission.style.display = 'block';
+            // 若為 L3 或 L4，額外播放中文語音提示
+            if (lvl.id === 'L3') {
+                TTSManager.speak(`${lvl.desc}`);
+                TTSManager.speak(`${lvl.desc}`);
+            }
+        }
+
+        function log(msg, type = 'log-sys') {
+            ui.log.innerHTML = `<span class="${type}">[${new Date().toLocaleTimeString().split(' ')[0]}] ${msg}</span><br>` + ui.log.innerHTML;
+        }
+
+        // 逐一綁定實體裝置並於全部連接後自動開始遊戲
+        async function connectDevicesSequential(count) {
+            SoundManager.init();
+            ui.btnStartConnect.disabled = true;
+            // 設定並顯示要使用的裝置數量
+            setActiveDeviceCount(count);
+            log(`[BLE] 開始逐一連接 ${count} 台裝置...`, 'log-sys');
+            for (let slot = 1; slot <= count; slot++) {
+                // 標示目前要連接的 slot
+                setConnectingSlot(slot, true);
+                setDeviceNameOnTile(slot, '掃描中...');
+                let ok = false;
+                while (!ok) {
+                    log(`[BLE] 請掃描並選擇要綁定到 Slot ${slot} 的裝置...`, 'log-sys');
+                    // 等待使用者按下 modal 裡的掃描按鈕（該按鈕的 click handler 會呼叫 requestDevice）
+                    ok = await promptUserScan(slot);
+                    if (!ok) {
+                        const retry = confirm(`Slot ${slot} 連接失敗或取消。是否重試連接此 slot? 按確定重試，按取消終止整個連線流程`);
+                        if (!retry) {
+                            log('[BLE] 使用者中止連線流程', 'log-sys');
+                            setConnectingSlot(slot, false);
+                            setDeviceNameOnTile(slot, '');
+                            ui.btnStartConnect.disabled = false;
+                            return false;
+                        }
+                    }
+                }
+                // 連線成功，從 adapter 取得裝置名稱並顯示
+                try {
+                    const conn = RealBLEAdapter.connections.get(slot);
+                    if (conn && conn.device) setDeviceNameOnTile(slot, conn.device.name || conn.device.id);
+                } catch (e) { /* ignore */ }
+                // 顯示首次連線打勾（模擬或真實裝置綁定成功皆適用）
+                // 注意：不在此處立即 clear，保留提示直到遊戲回合開始時統一清畫面。
+                try {
+                    const dev = gameState.devices.find(d => d.id === slot);
+                    if (dev) {
+                        if (RealBLEAdapter.hasConnection(slot)) {
+                            try {
+                                await RealBLEAdapter.write(slot, PROTOCOL.packBrightnessCmd(80));
+                            } catch (e) { /* ignore */ }
+                        }
+                        dev.update(BITMAPS.CHECK, 'white', false);
+                    }
+                } catch (e) { /* ignore */ }
+                setConnectingSlot(slot, false);
+            }
+            log('[BLE] 所有裝置已連接', 'log-sys');
+            // 5 秒倒數後開始遊戲（固定為 5 秒）
+            for (let i = 5; i >= 1; i--) {
+                ui.mission.innerText = `所有裝置已連接，遊戲將於 ${i} 秒後開始`;
+                await wait(1000);
+            }
+            ui.mission.innerText = '遊戲開始！';
+            ui.btnStartConnect.disabled = false;
+            startGame();
+            return true;
+        }
+
+        // (connectRealBtn 已移除)
+
+        ui.btnStartConnect.addEventListener('click', async () => {
+            const cnt = parseInt(ui.deviceCountSelect.value) || 4;
+            if (cnt < 2 || cnt > CONFIG.TOTAL_DEVICES) return log('[BLE] 請選擇 2 到 6 台裝置', 'log-sys');
+            // 若目前顯示為重新連接（已連過一次），先斷開再進行新一輪配對
+            const isReconnect = ui.btnStartConnect.innerText && ui.btnStartConnect.innerText.trim() === '重新連接';
+            if (isReconnect) {
+                log('[BLE] 使用者要求重新連接：先斷開所有裝置', 'log-sys');
+                await RealBLEAdapter.disconnectAll();
+                // 清除 UI 上的裝置名稱顯示
+                for (let i = 1; i <= CONFIG.TOTAL_DEVICES; i++) setDeviceNameOnTile(i, '');
+                ui.btnStartConnect.innerText = '開始連接裝置';
+                // 再啟動連線流程
+                await connectDevicesSequential(cnt);
+                return;
+            }
+            const ok = await connectDevicesSequential(cnt);
+            if (ok) {
+                // 成功連接所有裝置後，切換按鈕為重新連接
+                ui.btnStartConnect.innerText = '重新連接';
+            }
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', (e) => {
+            const on = SoundManager.toggle();
+            e.target.innerText = on ? "🔊 音效: 開" : "🔈 音效: 關";
+            e.target.classList.toggle('active', on);
+        });
+
+        ui.btnStart.addEventListener('click', startGame);
+
+        function startGame() {
+            if (gameState.isPlaying) return;
+            const lvlIdx = ui.levelSelect.value;
+            gameState.level = CONFIG.LEVELS[lvlIdx];
+            gameState.score = 0;
+            gameState.isPlaying = true;
+            gameState.activeTargets.clear();
+            resetModeState();
+
+            ui.score.innerText = 0;
+            // 使用自訂時間（若填寫）或關卡預設時間
+            const cust = ui.customDuration && parseInt(ui.customDuration.value);
+            const startTime = (cust && cust > 0) ? cust : gameState.level.duration;
+            ui.time.innerText = startTime;
+            ui.btnStart.disabled = true;
+            ui.levelSelect.disabled = true;
+            ui.mission.innerText = gameState.level.desc;
+            ui.mission.style.borderColor = '#ffd700';
+
+            SoundManager.sfx.start();
+            log(`開始關卡: ${gameState.level.name}`, 'log-sys');
+
+            let timeLeft = startTime;
+            gameState.timer = setInterval(() => {
+                timeLeft--;
+                ui.time.innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+
+            spawnCycle();
+        }
+
+        function endGame() {
+            gameState.isPlaying = false;
+            clearInterval(gameState.timer);
+            clearTimeout(gameState.spawnTimer);
+            resetModeState();
+            gameState.devices.forEach(d => d.clear());
+            clearTargetPreview();
+
+            ui.btnStart.disabled = false;
+            ui.btnStart.innerText = "再玩一次";
+            ui.levelSelect.disabled = false;
+            ui.mission.innerText = "遊戲結束";
+            SoundManager.sfx.win();
+            log(`遊戲結束，最終分數: ${gameState.score}`, 'log-sys');
+        }
+
+        async function spawnCycle() {
+            if (!gameState.isPlaying) return;
+
+            // Smart Filter 會過濾掉不必要的 clear 封包
+            gameState.devices.forEach(d => d.clear());
+            gameState.activeTargets.clear();
+            // 清除上次目標預覽
+            clearTargetPreview();
+
+            const mode = gameState.level.mode;
+            const active = gameState.activeCount || CONFIG.TOTAL_DEVICES;
+            const devs = [...gameState.devices.slice(0, active)].sort(() => 0.5 - Math.random());
+
+            if (mode === 'CLASSIC') {
+                const t = devs[0]; t.update(BITMAPS.MOLE, 'yellow', true);
+                gameState.activeTargets.set(t.id, { type: 'valid' });
+                updateTargetPreview(BITMAPS.MOLE, 'yellow');
+            }
+            else if (mode === 'BOMB') {
+                devs[0].update(BITMAPS.CIRCLE, 'green', true); gameState.activeTargets.set(devs[0].id, { type: 'valid' });
+                devs[1].update(BITMAPS.CROSS, 'red', false); gameState.activeTargets.set(devs[1].id, { type: 'bomb' });
+                updateTargetPreview(BITMAPS.CIRCLE, 'green');
+            }
+            else if (mode === 'NUMBER_HUNT') {
+                const target = Math.floor(Math.random() * 10);
+                ui.mission.innerText = `找出 [ ${target} ]`;
+                // 選一個隨機的裝置當目標，並讓所有啟用裝置都顯示數字與隨機顏色
+                const COLORS_AVAILABLE = ['red', 'green', 'blue', 'yellow', 'purple', 'white'];
+                const targetIndex = Math.floor(Math.random() * devs.length);
+                let targetColor = null;
+                for (let i = 0; i < devs.length; i++) {
+                    const dev = devs[i];
+                    // 隨機顏色
+                    const color = COLORS_AVAILABLE[Math.floor(Math.random() * COLORS_AVAILABLE.length)];
+                    if (i === targetIndex) {
+                        // 目標裝置顯示目標數字，但顏色也隨機（不一定是藍色）
+                        dev.update(NUMBERS[target], color, true);
+                        gameState.activeTargets.set(dev.id, { type: 'valid' });
+                        targetColor = color;
+                    } else {
+                        // 隨機選個數字，避免與目標相同
+                        let randNum = Math.floor(Math.random() * 10);
+                        if (randNum === target) randNum = (randNum + 1) % 10;
+                        dev.update(NUMBERS[randNum], color, false);
+                        gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                    }
+                }
+
+                // 顯示目標預覽
+                updateTargetPreview(NUMBERS[target], targetColor || 'yellow');
+
+                // 標記為正在等待玩家按下
+                gameState.awaitingPress = true;
+                // 開始語音並等待結束
+                await speakAndLock(`數字 ${target}`);
+                // 若在語音結束前玩家已按下(有效命中)，handleDeviceInput 會把 awaitingPress 設為 false 並排程下一輪
+                if (gameState.awaitingPress) {
+                    // 若仍未按下，清除等待狀態並在 interval 後繼續
+                    gameState.awaitingPress = false;
+                    gameState.spawnTimer = setTimeout(spawnCycle, gameState.level.interval);
+                }
+                return; // 已排程或由按下事件排程，結束本次 spawnCycle
+            }
+            else if (mode === 'COLOR_RUSH') {
+                const cs = ['red', 'green', 'blue']; const cn = { 'red': '紅', 'green': '綠', 'blue': '藍' };
+                const t = cs[Math.floor(Math.random() * 3)];
+                ui.mission.innerText = `打${cn[t]}色O`; ui.mission.style.borderColor = t;
+                // 設定裝置顏色與目標標記
+                for (let i = 0; i < 3 && i < devs.length; i++) {
+                    let color;
+                    if (i === 0) {
+                        color = t;
+                    } else {
+                        const otherColors = cs.filter(color => color !== t);
+                        color = otherColors[Math.floor(Math.random() * otherColors.length)];
+                    }
+                    const isT = (i === 0);
+                    devs[i].update(BITMAPS.CIRCLE, color, isT);
+                    gameState.activeTargets.set(devs[i].id, { type: isT ? 'valid' : 'invalid' });
+                }
+                for (let i = 3; i < devs.length; i++) {
+                    const dev = devs[i];
+                    const otherColors = cs.filter(color => color !== t);
+                    const color = otherColors[Math.floor(Math.random() * otherColors.length)];
+                    dev.update(BITMAPS.CIRCLE, color, false);
+                    gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                }
+                // 顯示目標預覽（以目標顏色）
+                updateTargetPreview(BITMAPS.CIRCLE, t);
+
+                // 等待語音結束或玩家按下後再進入下一輪
+                gameState.awaitingPress = true;
+                await speakAndLock(`打${cn[t]}色O`);
+                if (gameState.awaitingPress) {
+                    gameState.awaitingPress = false;
+                    gameState.spawnTimer = setTimeout(spawnCycle, gameState.level.interval);
+                }
+                return;
+            }
+            else if (mode === 'LOGIC_CHAOS') {
+                const targetLetter = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+                const decoyLetters = ALPHABET.filter(l => l !== targetLetter);
+                ui.mission.innerText = `找到紅色的英文字母 [ ${targetLetter} ]`;
+                for (let i = 0; i < devs.length; i++) {
+                    const dev = devs[i];
+                    if (i === 0) {
+                        dev.update(getLetterBitmap(targetLetter), 'red', true);
+                        gameState.activeTargets.set(dev.id, { type: 'valid' });
+                    } else if (i === 1) {
+                        const letter = decoyLetters[Math.floor(Math.random() * decoyLetters.length)];
+                        dev.update(getLetterBitmap(letter), 'green', false);
+                        gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                    } else if (i === 2) {
+                        const letter = decoyLetters[Math.floor(Math.random() * decoyLetters.length)];
+                        dev.update(getLetterBitmap(letter), 'yellow', false);
+                        gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                    } else {
+                        if (Math.random() < 0.5) {
+                            const shape = Math.random() > 0.5 ? BITMAPS.CIRCLE : BITMAPS.SQUARE;
+                            const colors = ['blue', 'purple', 'white'];
+                            const color = colors[Math.floor(Math.random() * colors.length)];
+                            dev.update(shape, color, false);
+                        } else {
+                            const letter = decoyLetters[Math.floor(Math.random() * decoyLetters.length)];
+                            const colors = ['green', 'blue', 'purple', 'white'];
+                            const color = colors[Math.floor(Math.random() * colors.length)];
+                            dev.update(getLetterBitmap(letter), color, false);
+                        }
+                        gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                    }
+                }
+                updateTargetPreview(getLetterBitmap(targetLetter), 'red');
+
+                gameState.awaitingPress = true;
+                await speakAndLock(`紅色字母${targetLetter}`);
+                if (gameState.awaitingPress) {
+                    // 維持等待，等待使用者自行按下目標
+                }
+                return;
+            }
+            else if (mode === 'SEQUENCE_STRIKE') {
+                startSequenceRound(devs);
+                return;
+            }
+            else if (mode === 'PAIR_SYNC') {
+                startPairRound(devs);
+                return;
+            }
+            else if (mode === 'CHASE_BEACON') {
+                startChaseRound(devs);
+                return;
+            }
+            else if (mode === 'CODE_SWAPPER') {
+                startCodeRound(devs);
+                return;
+            }
+            else if (mode === 'FRENZY_RUSH') {
+                startFrenzyRound(devs);
+                return;
+            }
+            else if (mode === 'MATH_QUICK') {
+                await startMathQuickRound(devs);
+                return;
+            }
+
+            SoundManager.sfx.spawn();
+            gameState.spawnTimer = setTimeout(spawnCycle, gameState.level.interval);
+        }
+
+        function restartSequenceRound(reason) {
+            if (!gameState.isPlaying || !gameState.level || gameState.level.mode !== 'SEQUENCE_STRIKE') return;
+            if (reason) log(`[Sequence] ${reason}，重新開始`, 'log-sys');
+            clearTimeout(gameState.spawnTimer);
+            gameState.spawnTimer = null;
+            gameState.sequenceQueue = [];
+            gameState.sequenceNextIndex = 0;
+            gameState.activeTargets.clear();
+            const attemptDevs = (gameState.sequenceDevs && gameState.sequenceDevs.length) ? gameState.sequenceDevs : gameState.devices.slice(0, Math.min(3, gameState.activeCount || CONFIG.TOTAL_DEVICES));
+            startSequenceRound(attemptDevs);
+        }
+
+        function startPairRound(devs) {
+            if (devs.length < 2) {
+                gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                return;
+            }
+            SoundManager.sfx.spawn();
+            const colors = pickDistinctColors(2);
+            const selected = devs.slice(0, 2);
+            const decoys = devs.slice(2);
+            gameState.activeTargets.clear();
+            gameState.pairPending = new Set(selected.map(dev => dev.id));
+            gameState.pairDevs = selected;
+            selected.forEach((dev, idx) => {
+                const color = colors[idx];
+                dev.update(BITMAPS.CIRCLE, color, true);
+                gameState.activeTargets.set(dev.id, { type: 'pair', color, completed: false });
+            });
+            decoys.forEach(dev => {
+                const randomShape = Math.random() > 0.5 ? BITMAPS.CROSS : BITMAPS.SQUARE;
+                const randomColor = COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
+                dev.update(randomShape, randomColor, false);
+                gameState.activeTargets.set(dev.id, { type: 'invalid' });
+            });
+            ui.mission.innerText = `同時擊中 ${COLOR_LABELS[colors[0]]} & ${COLOR_LABELS[colors[1]]} 的圈圈，其他請勿碰`;
+            updateTargetPreview(BITMAPS.CIRCLE, colors[0]);
+            clearTimeout(gameState.pairTimer);
+            gameState.pairTimer = setTimeout(() => restartPairRound('超時'), Math.max(1200, gameState.level.interval));
+        }
+
+        function restartPairRound(reason) {
+            if (!gameState.isPlaying || !gameState.level || gameState.level.mode !== 'PAIR_SYNC') return;
+            if (reason) log(`[Pair] ${reason}，重新開始`, 'log-sys');
+            clearTimeout(gameState.pairTimer);
+            gameState.pairTimer = null;
+            gameState.activeTargets.clear();
+            gameState.pairPending.clear();
+            const redoDevs = (gameState.pairDevs && gameState.pairDevs.length) ? gameState.pairDevs : gameState.devices.slice(0, 2);
+            startPairRound(redoDevs);
+        }
+
+        function startChaseRound(devs) {
+            const candidates = devs.slice(0, Math.min(devs.length, 4));
+            if (candidates.length === 0) {
+                gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                return;
+            }
+            SoundManager.sfx.spawn();
+            gameState.chaseSequence = candidates;
+            gameState.chaseHopCount = 0;
+            gameState.chaseMaxHops = Math.max(6, candidates.length * 3);
+            ui.mission.innerText = '追上快速跳躍的光點！';
+            advanceChaseHop();
+        }
+
+        function advanceChaseHop() {
+            if (!gameState.isPlaying || gameState.level.mode !== 'CHASE_BEACON') return;
+            const nextDev = gameState.chaseSequence[Math.floor(Math.random() * gameState.chaseSequence.length)];
+            if (!nextDev) return;
+            gameState.activeTargets.clear();
+            gameState.chaseActiveId = nextDev.id;
+            nextDev.update(BITMAPS.CIRCLE, 'green', true);
+            gameState.activeTargets.set(nextDev.id, { type: 'chase', color: 'green' });
+            updateTargetPreview(BITMAPS.CIRCLE, 'green');
+            gameState.chaseHopCount += 1;
+            if (gameState.chaseHopTimer) clearTimeout(gameState.chaseHopTimer);
+            gameState.chaseHopTimer = setTimeout(() => {
+                nextDev.clear();
+                if (gameState.chaseHopCount >= gameState.chaseMaxHops) {
+                    gameState.activeTargets.clear();
+                    gameState.chaseActiveId = null;
+                    gameState.chaseHopTimer = null;
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                } else {
+                    advanceChaseHop();
+                }
+            }, 500 + Math.random() * 200);
+        }
+
+        function startCodeRound(devs) {
+            if (devs.length === 0) {
+                gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                return;
+            }
+            SoundManager.sfx.spawn();
+            const targetColor = COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
+            const targetDigit = Math.floor(Math.random() * 10);
+            const targetDev = devs[Math.floor(Math.random() * devs.length)];
+            devs.forEach(dev => {
+                if (dev.id === targetDev.id) {
+                    dev.update(NUMBERS[targetDigit], targetColor, true);
+                    gameState.activeTargets.set(dev.id, { type: 'code', color: targetColor, digit: targetDigit });
+                } else {
+                    const randDigit = Math.floor(Math.random() * 10);
+                    const randColor = COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
+                    dev.update(NUMBERS[randDigit], randColor, false);
+                    gameState.activeTargets.set(dev.id, { type: 'invalid' });
+                }
+            });
+            gameState.codeTarget = { devId: targetDev.id, color: targetColor, digit: targetDigit };
+            ui.mission.innerText = `按下 ${COLOR_LABELS[targetColor]} 的 ${targetDigit}`;
+            updateTargetPreview(NUMBERS[targetDigit], targetColor);
+            clearTimeout(gameState.spawnTimer);
+            gameState.spawnTimer = setTimeout(spawnCycle, gameState.level.interval);
+        }
+
+        function startFrenzyRound(devs) {
+            if (devs.length === 0) {
+                gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                return;
+            }
+            SoundManager.sfx.spawn();
+            const maxTargets = Math.min(3, devs.length);
+            for (let i = 0; i < maxTargets; i++) {
+                const dev = devs[i];
+                const color = COLOR_POOL[i % COLOR_POOL.length];
+                dev.update(BITMAPS.CIRCLE, color, true);
+                gameState.activeTargets.set(dev.id, { type: 'frenzy', color });
+            }
+            ui.mission.innerText = '多重霓虹狂潮，盡快連擊！';
+            updateTargetPreview(BITMAPS.CIRCLE, 'white');
+            clearTimeout(gameState.spawnTimer);
+            gameState.spawnTimer = setTimeout(spawnCycle, gameState.level.interval);
+        }
+
+        async function startMathQuickRound(devs) {
+            if (devs.length === 0) {
+                gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                return;
+            }
+            // 使用前六個裝置顯示選項 (ID 1-6)
+            const candidates = devs.slice(0, Math.min(6, devs.length));
+            SoundManager.sfx.spawn();
+            // 產生答案 s 在 1..9
+            const s = Math.floor(Math.random() * 8) + 2;
+            const a = Math.floor(Math.random() * (s - 1)) + 1;
+            const b = s - a;
+            // 準備選項：包含正確答案 s 與不正確答案（0-9，但不等於 s）
+            const options = [];
+            options.push(s);
+            while (options.length < candidates.length) {
+                const v = Math.floor(Math.random() * 10);
+                if (v === s) continue;
+                options.push(v);
+            }
+            // 打亂選項
+            for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+            }
+
+            gameState.activeTargets.clear();
+            // 指派選項給裝置
+            candidates.forEach((dev, idx) => {
+                const val = options[idx];
+                dev.update(NUMBERS[val], 'white', val === s);
+                gameState.activeTargets.set(dev.id, { type: 'math', correct: val === s, value: val });
+            });
+
+            ui.mission.innerText = `${a} + ${b} = ?`;
+            // 語音提示
+            clearTimeout(gameState.mathTimer);
+            gameState.mathTarget = s;
+            await speakAndLock(`${a} 加 ${b}`);
+            // 設定 3 秒倒數
+            gameState.mathTimer = setTimeout(() => {
+                log(`[MATH] 時間到，答案 ${s} 未被擊中`, 'log-sys');
+                SoundManager.sfx.bad();
+                gameState.activeTargets.clear();
+                clearTargetPreview();
+                clearTimeout(gameState.spawnTimer);
+                gameState.spawnTimer = setTimeout(spawnCycle, 200);
+                gameState.mathTimer = null;
+                gameState.mathTarget = null;
+            }, 3000);
+        }
+
+        function pickDistinctColors(count) {
+            const pool = [...COLOR_POOL];
+            const picked = [];
+            while (picked.length < count && pool.length) {
+                const idx = Math.floor(Math.random() * pool.length);
+                picked.push(pool.splice(idx, 1)[0]);
+            }
+            return picked;
+        }
+
+        function resetModeState() {
+            gameState.sequenceQueue = [];
+            gameState.sequenceNextIndex = 0;
+            gameState.sequenceDevs = [];
+            if (gameState.pairTimer) {
+                clearTimeout(gameState.pairTimer);
+                gameState.pairTimer = null;
+            }
+            gameState.pairPending.clear();
+            gameState.pairDevs = [];
+            if (gameState.chaseHopTimer) {
+                clearTimeout(gameState.chaseHopTimer);
+                gameState.chaseHopTimer = null;
+            }
+            gameState.chaseSequence = [];
+            gameState.chaseActiveId = null;
+            gameState.chaseHopCount = 0;
+            gameState.chaseMaxHops = 0;
+            gameState.codeTarget = null;
+        }
+
+        // devId: slot id; inputValue: optional numeric payload from device (0x00 or 0x01)
+        function handleDeviceInput(devId, inputValue) {
+            const engPanel = document.getElementById('engPanel');
+            if (engPanel.style.display === 'flex') {
+                log(`[Engineering] RX: Device ${devId} Hit!`, 'log-rx');
+                return;
+            }
+
+            const fromDevice = (typeof inputValue === 'number');
+            if (fromDevice && inputValue === 0) {
+                gameState.score = Math.max(0, gameState.score - 2);
+                log(`[RX] Dev ${devId} -> 0x00 未命中 (-2)`, 'log-rx');
+                SoundManager.sfx.bad();
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (!gameState.isPlaying) return;
+            const info = gameState.activeTargets.get(devId);
+            const dev = gameState.devices.find(d => d.id === devId);
+
+            if (!info) {
+                if (gameState.level && gameState.level.mode === 'PAIR_SYNC' && gameState.pairPending.size > 0) {
+                    const penalty = 5;
+                    gameState.score = Math.max(0, gameState.score - penalty);
+                    log(`[RX] Dev ${devId} -> 雙子錯誤 (-${penalty})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    ui.score.innerText = gameState.score;
+                    restartPairRound('錯誤按鍵');
+                    return;
+                }
+                if (gameState.level && gameState.level.mode === 'SEQUENCE_STRIKE') {
+                    const penalty = 8;
+                    gameState.score = Math.max(0, gameState.score - penalty);
+                    log(`[RX] Dev ${devId} -> 順序分心 (-${penalty})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    ui.score.innerText = gameState.score;
+                    restartSequenceRound('誤觸雜訊');
+                    return;
+                }
+                // If device reported a press and there's no active target here, penalize
+                gameState.score -= 2;
+                log(`[RX] Dev ${devId} -> 無目標 (-2)`, 'log-rx');
+                SoundManager.sfx.bad();
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'sequence') {
+                if (info.completed) return;
+                if (gameState.sequenceNextIndex !== info.order) {
+                    const penalty = 10;
+                    gameState.score = Math.max(0, gameState.score - penalty);
+                    log(`[RX] Dev ${devId} -> 順序錯誤 (-${penalty})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    dev.showResult(false);
+                    ui.score.innerText = gameState.score;
+                    restartSequenceRound('順序錯誤');
+                    return;
+                }
+                const pts = 15;
+                gameState.score += pts;
+                info.completed = true;
+                log(`[RX] Dev ${devId} -> 連鎖命中 (+${pts})`, 'log-rx');
+                SoundManager.sfx.hit();
+                dev.showResult(true);
+                gameState.sequenceNextIndex += 1;
+                if (gameState.sequenceNextIndex >= gameState.sequenceQueue.length) {
+                    gameState.sequenceQueue = [];
+                    gameState.sequenceNextIndex = 0;
+                    gameState.activeTargets.clear();
+                    clearTargetPreview();
+                    gameState.sequenceDevs = [];
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 700);
+                } else {
+                    const next = gameState.sequenceQueue[gameState.sequenceNextIndex];
+                    const nextDev = gameState.devices.find(d => d.id === next.devId);
+                    if (nextDev) nextDev.update(NUMBERS[next.digit], next.color, true);
+                    updateTargetPreview(NUMBERS[next.digit], next.color);
+                }
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'pair') {
+                if (info.completed) return;
+                info.completed = true;
+                gameState.pairPending.delete(devId);
+                const pts = 15;
+                gameState.score += pts;
+                log(`[RX] Dev ${devId} -> 雙子命中 (+${pts})`, 'log-rx');
+                SoundManager.sfx.hit();
+                dev.showResult(true);
+                if (gameState.pairPending.size === 0) {
+                    clearTimeout(gameState.pairTimer);
+                    gameState.pairTimer = null;
+                    gameState.activeTargets.clear();
+                    gameState.pairPending.clear();
+                    clearTargetPreview();
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 400);
+                    gameState.pairDevs = [];
+                }
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'chase') {
+                if (gameState.chaseActiveId !== devId) {
+                    const pen = 5;
+                    gameState.score = Math.max(0, gameState.score - pen);
+                    log(`[RX] Dev ${devId} -> 追擊失焦 (-${pen})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    dev.showResult(false);
+                    ui.score.innerText = gameState.score;
+                    return;
+                }
+                const pts = 20;
+                gameState.score += pts;
+                log(`[RX] Dev ${devId} -> 追擊成功 (+${pts})`, 'log-rx');
+                SoundManager.sfx.hit();
+                dev.showResult(true);
+                clearTimeout(gameState.chaseHopTimer);
+                gameState.chaseHopTimer = null;
+                gameState.chaseActiveId = null;
+                gameState.activeTargets.clear();
+                clearTargetPreview();
+                clearTimeout(gameState.spawnTimer);
+                setTimeout(spawnCycle, 400);
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'code') {
+                const target = gameState.codeTarget;
+                if (target && devId === target.devId) {
+                    const pts = 20;
+                    gameState.score += pts;
+                    log(`[RX] Dev ${devId} -> 彩碼命中 (+${pts})`, 'log-rx');
+                    SoundManager.sfx.hit();
+                    dev.showResult(true);
+                    clearTargetPreview();
+                    gameState.activeTargets.clear();
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 500);
+                } else {
+                    const penalty = 10;
+                    gameState.score = Math.max(0, gameState.score - penalty);
+                    log(`[RX] Dev ${devId} -> 彩碼錯誤 (-${penalty})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    dev.showResult(false);
+                }
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'math') {
+                const isCorrect = info.correct;
+                if (isCorrect) {
+                    const pts = 15;
+                    gameState.score += pts;
+                    log(`[RX] Dev ${devId} -> 數學命中 (+${pts})`, 'log-rx');
+                    SoundManager.sfx.hit();
+                    dev.showResult(true);
+                    // 取消倒數並排下一題
+                    if (gameState.mathTimer) { clearTimeout(gameState.mathTimer); gameState.mathTimer = null; }
+                    gameState.activeTargets.clear();
+                    clearTargetPreview();
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 300);
+                } else {
+                    const pen = 5;
+                    gameState.score = Math.max(0, gameState.score - pen);
+                    log(`[RX] Dev ${devId} -> 數學錯誤 (-${pen})`, 'log-rx');
+                    SoundManager.sfx.bad();
+                    dev.showResult(false);
+                    // 不立即結束，讓玩家在剩餘時間內繼續嘗試
+                }
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'frenzy') {
+                const pts = 12;
+                gameState.score += pts;
+                log(`[RX] Dev ${devId} -> 霓虹命中 (+${pts})`, 'log-rx');
+                SoundManager.sfx.hit();
+                dev.showResult(true);
+                gameState.activeTargets.delete(devId);
+                if (gameState.activeTargets.size === 0) {
+                    clearTargetPreview();
+                    clearTimeout(gameState.spawnTimer);
+                    gameState.spawnTimer = setTimeout(spawnCycle, 300);
+                }
+                ui.score.innerText = gameState.score;
+                return;
+            }
+
+            if (info.type === 'valid') {
+                const pts = (gameState.level.mode === 'LOGIC_CHAOS' || gameState.level.mode === 'NUMBER_HUNT') ? 20 : 10;
+                gameState.score += pts;
+                log(`[RX] Dev ${devId} -> 命中! (+${pts})`, 'log-rx');
+                SoundManager.sfx.hit();
+                dev.showResult(true);
+                // 若正在等待按下，取消等待並立即排程下一輪
+                if (gameState.awaitingPress) {
+                    gameState.awaitingPress = false;
+                }
+                // 清除目前目標預覽（玩家已命中）
+                clearTargetPreview();
+                queueSpawnAfterDelay(300);
+                gameState.activeTargets.clear();
+            } else {
+                const pen = info.type === 'bomb' ? 30 : 10;
+                gameState.score = Math.max(0, gameState.score - pen);
+                log(`[RX] Dev ${devId} -> 失誤 (-${pen})`, 'log-rx');
+                SoundManager.sfx.bad();
+                dev.showResult(false);
+                if (gameState.level && gameState.level.mode === 'PAIR_SYNC') {
+                    restartPairRound('誤觸目標');
+                    return;
+                }
+                if (gameState.level && gameState.level.mode === 'SEQUENCE_STRIKE') {
+                    restartSequenceRound('誤觸目標');
+                    return;
+                }
+            }
+            ui.score.innerText = gameState.score;
+        }
+
+        // ==========================================
+        // 6. 工程模式邏輯
+        // ==========================================
+        function initEngineeringUI() {
+            const toggleBtn = document.getElementById('engToggleBtn');
+            const panel = document.getElementById('engPanel');
+            const devList = document.getElementById('engDevList');
+            const clearLogBtn = document.getElementById('engClearLogBtn');
+            const sendBtn = document.getElementById('engSendBtn');
+            const connectBtn = document.getElementById('engConnectBtn');
+
+            toggleBtn.addEventListener('click', () => {
+                const isShown = panel.style.display === 'flex';
+                panel.style.display = isShown ? 'none' : 'flex';
+                toggleBtn.classList.toggle('active', !isShown);
+                if (gameState.isPlaying && !isShown) {
+                    endGame();
+                    log("[System] 切換至工程模式，遊戲已停止。", 'log-sys');
+                }
+            });
+
+            devList.innerHTML = '';
+            const allLabel = document.createElement('label');
+            allLabel.className = 'dev-checkbox-label';
+            allLabel.innerHTML = `<input type="checkbox" id="engDevAll"> All`;
+            devList.appendChild(allLabel);
+
+            for (let i = 1; i <= CONFIG.TOTAL_DEVICES; i++) {
+                const label = document.createElement('label');
+                label.className = 'dev-checkbox-label';
+                label.innerHTML = `<input type="checkbox" class="eng-dev-chk" value="${i}"> Dev ${i}`;
+                devList.appendChild(label);
+            }
+
+            document.getElementById('engDevAll').addEventListener('change', (e) => {
+                const chks = document.querySelectorAll('.eng-dev-chk');
+                chks.forEach(chk => chk.checked = e.target.checked);
+            });
+
+            clearLogBtn.addEventListener('click', () => {
+                ui.log.innerHTML = '';
+                log("Log 已清除", 'log-sys');
+            });
+
+            connectBtn.addEventListener('click', async () => {
+                const selected = getSelectedDeviceIds();
+                if (selected.length === 0) return log("[Eng] 未選擇裝置", 'log-sys');
+                log(`[Eng] 嘗試連接: ${selected.join(', ')}`, 'log-sys');
+                for (let id of selected) {
+                    const dev = gameState.devices.find(d => d.id === id);
+                    if (dev) await dev.connect();
+                }
+            });
+
+            // engConnectRealBtn 已移除
+
+            sendBtn.addEventListener('click', () => {
+                const selected = getSelectedDeviceIds();
+                if (selected.length === 0) return log("[Eng] 未選擇目標裝置", 'log-sys');
+                const patternKey = document.getElementById('engPatternSelect').value;
+                const color = document.getElementById('engColorSelect').value;
+                const isTarget = document.getElementById('engIsTarget').checked;
+                const bitmap = BITMAPS[patternKey] || BITMAPS.CLEAR;
+                log(`[Eng] 發送: ${patternKey} (${color}), Tag=${isTarget}`, 'log-sys');
+                selected.forEach(id => {
+                    const dev = gameState.devices.find(d => d.id === id);
+                    if (dev) dev.update(bitmap, color, isTarget);
+                });
+            });
+        }
+
+        function getSelectedDeviceIds() {
+            const chks = document.querySelectorAll('.eng-dev-chk:checked');
+            return Array.from(chks).map(chk => parseInt(chk.value));
+        }
+
+        function initSingleBleUI() {
+            const btnSingleConnect = document.getElementById('btnSingleConnect');
+            const btnSingleSend = document.getElementById('btnSingleSend');
+            const singlePatternSelect = document.getElementById('singlePatternSelect');
+            const singleColorSelect = document.getElementById('singleColorSelect');
+            const singleIsTarget = document.getElementById('singleIsTarget');
+            const eventArea = document.getElementById('eventArea');
+            const slotId = 1;
+            const maxEventLines = 30;
+
+            if (!btnSingleConnect || !btnSingleSend || !singlePatternSelect || !singleColorSelect || !singleIsTarget || !eventArea) {
+                return;
+            }
+
+            const renderEvent = (value, fromSlotId) => {
+                const hex = Array.from(value).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                const nextLine = `[EVENT][Slot ${fromSlotId}] ${new Date().toLocaleTimeString()} ${hex}`;
+                const oldLines = eventArea.innerText ? eventArea.innerText.split('\n') : [];
+                const newLines = [nextLine, ...oldLines].slice(0, maxEventLines);
+                eventArea.innerText = newLines.join('\n');
+            };
+
+            RealBLEAdapter.subscribeRx(slotId, (value, fromSlotId) => {
+                renderEvent(value, fromSlotId);
+            });
+
+            btnSingleConnect.addEventListener('click', async () => {
+                btnSingleConnect.disabled = true;
+                log('[BLE] 嘗試與單一裝置連線...', 'log-sys');
+                setConnectingSlot(slotId, true);
+                setDeviceNameOnTile(slotId, '掃描中...');
+
+                const ok = await RealBLEAdapter.requestAndConnect(slotId, { serviceOnly: true });
+
+                setConnectingSlot(slotId, false);
+                btnSingleConnect.disabled = false;
+                if (ok) {
+                    btnSingleSend.disabled = false;
+                    log('[BLE] 單一裝置已連線 (Slot 1)', 'log-sys');
+                } else {
+                    log('[BLE] 單一裝置連線失敗', 'log-sys');
+                }
+            });
+
+            btnSingleSend.addEventListener('click', async () => {
+                if (!RealBLEAdapter.hasConnection(slotId)) {
+                    log('[BLE] 尚未連線到 Slot 1', 'log-sys');
+                    return;
+                }
+
+                const patternKey = singlePatternSelect.value;
+                const color = singleColorSelect.value;
+                const isTarget = singleIsTarget.checked;
+                const bitmap = BITMAPS[patternKey] || BITMAPS.CLEAR;
+                const payload = PROTOCOL.pack(bitmap, color, isTarget);
+
+                log(`[BLE TEST] Sending ${patternKey} color=${color} target=${isTarget}`, 'log-sys');
+                const ok = await RealBLEAdapter.write(slotId, payload);
+                if (ok) log('[BLE TX] send OK', 'log-tx');
+                else log('[BLE TX] send FAIL', 'log-sys');
+            });
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

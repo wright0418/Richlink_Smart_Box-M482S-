@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 0 /* Disable DBG_PRINT before committing; enable locally when debugging */
+#define DEBUG 0 /* Normal run: disable heavy UART debug noise */
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
@@ -17,7 +17,7 @@
 /* I2C failure diagnostics
    1: print concise I2C error snapshots via UART printf (recommended while bring-up)
    0: disable I2C diagnostics */
-#define I2C_DIAG_LOG_ENABLE 1
+#define I2C_DIAG_LOG_ENABLE 0
 
 /* Common boolean-like macros */
 #define ON 1
@@ -57,16 +57,46 @@
 #endif
 
 /* Firmware version and board identification */
-<<<<<<< HEAD
-#define FW_VERSION "1.4.1"
-=======
 #define FW_VERSION "1.5.0"
->>>>>>> 增加-6-axis-sensor-SC7U22
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
 
 /* General project flags */
+
+/* Cognitive training / Whac-A-Mole firmware profile
+   -------------------------------------------------
+   This mode keeps the BLE transport and board diagnostics, disables the
+   legacy rope-jump gameplay paths, and enables the BLE GATT UART LED matrix
+   protocol used by the cognitive training app. */
+#define USE_MOLE_GAME 1
+#define MOLE_TEST_TRACE_ENABLE 1 /* 1: print Mole protocol/hit trace on UART0 for COM3 verification */
+#define MOLE_BLE_NAME_PREFIX "MOLE_"
+#define MOLE_LED_COUNT 64u
+#define MOLE_LED_ROWS 8u
+#define MOLE_LED_COLS 8u
+#define MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT 20u
+#define MOLE_LED_MIN_HOLD_MS 30u /* consecutive LED frames: keep current frame visible for at least this duration */
+#define MOLE_WS2812_BOOT_SELF_TEST_BRIGHTNESS_PERCENT 40u
+#define MOLE_PACKET_RX_CACHE_SIZE 256u
+#define MOLE_HIT_BUTTON_ENABLE 1
+#define MOLE_HIT_GSENSOR_ENABLE 1
+#define MOLE_HIT_SAMPLE_INTERVAL_MS 20u
+#define MOLE_HIT_DEBOUNCE_MS 180u
+#define MOLE_HIT_MERGE_WINDOW_MS 120u
+#define MOLE_HIT_JERK_THRESHOLD_G 0.65f
+#define MOLE_HIT_MAG_DELTA_THRESHOLD_G 0.45f
+#define MOLE_DISABLE_IDLE_POWER_OFF 1
+#define MOLE_DISABLE_USB_CHARGE_LOOP 1
+/* ICE 調試期間常出現低壓誤判，暫時停用低電壓自動關機。 */
+#define MOLE_LOW_BATT_POWER_OFF 0
+#define MOLE_LOW_BATT_SHUTDOWN_CONFIRM_COUNT 3u
+#define MOLE_LOW_BATT_SHUTDOWN_GRACE_MS 100u
+#define MOLE_WS2812_BOOT_SELF_TEST 1
+#define MOLE_WS2812_BOOT_SELF_TEST_STEP_MS 250u
+#define MOLE_WS2812_DIAG_REPEAT 0
+#define MOLE_WS2812_DIAG_STEP_MS 1000u
+#define MOLE_WS2812_DIAG_GPIO_PROBE_MS 200u
 
 /* Movement-based idle detection configuration
     - When BLE is connected and device is stationary for NO_MOVEMENT_TIMEOUT_CONNECTED_MS,

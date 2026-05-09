@@ -2,45 +2,10 @@
 #include "gsensor.h"
 #include "i2c.h"
 #include "../project_config.h"
+
 #include <math.h>
+#include <stddef.h>
 
-<<<<<<< HEAD
-/* Store the configured full-scale range so power mode functions know which
-  register value to write when entering/exiting PD. */
-static Gsensor_FSR g_current_fsr = FSR_2G;
-static volatile uint8_t g_gsensor_ready = 0u;
-static volatile uint32_t g_gsensor_read_fail_count = 0u;
-
-static uint8_t Gsensor_Probe(void)
-{
-    uint8_t temp_reg = 0u;
-    uint32_t rx = RL_I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x09, &temp_reg, 1u);
-    return (rx == 1u) ? 1u : 0u;
-}
-
-/* Initialize I2C peripheral (I2C0) and any G-sensor related board settings
-   This consolidates I2C_Init into the G-sensor module per request. */
-void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr)
-{
-    /* Enable module clock for I2C0 should be done by SYS_Init in main; just open I2C here */
-    I2C_Open(I2C0, busHz);
-    g_current_fsr = fsr;
-
-    g_gsensor_ready = 0u;
-    g_gsensor_read_fail_count = 0u;
-
-    for (uint32_t retry = 0u; retry < GSENSOR_INIT_RETRY_COUNT; retry++)
-    {
-        MXC400_to_wakeup(g_current_fsr);
-        if (Gsensor_Probe())
-        {
-            g_gsensor_ready = 1u;
-            break;
-        }
-    }
-
-    if (!g_gsensor_ready)
-=======
 #ifndef GSENSOR_MXC400_I2C_ADDR
 #define GSENSOR_MXC400_I2C_ADDR 0x15u
 #endif
@@ -319,27 +284,22 @@ static uint8_t SC7U22_ReadSixAxisRaw(int16_t *acc_axis, int16_t *gyro_axis)
         {
             return 0u;
         }
-
         if ((status & SC7U22_DRDY_ACC_GYR_MASK) == SC7U22_DRDY_ACC_GYR_MASK)
         {
             break;
         }
-
         wait_count++;
         Gsensor_DelayMs(1u);
     }
-
     if (!Gsensor_ReadRegsAddr(g_sensor_addr, SC7U22_REG_RAW_DATA, raw_data, sizeof(raw_data)))
     {
         return 0u;
     }
-
     for (uint32_t i = 0u; i < 3u; i++)
     {
-        acc_axis[i] = (int16_t)((uint16_t)raw_data[(2u * i)] << 8 | raw_data[(2u * i) + 1u]);
-        gyro_axis[i] = (int16_t)((uint16_t)raw_data[(2u * (i + 3u))] << 8 | raw_data[(2u * (i + 3u)) + 1u]);
+        acc_axis[i] = (int16_t)(((uint16_t)raw_data[(2u * i)] << 8) | raw_data[(2u * i) + 1u]);
+        gyro_axis[i] = (int16_t)(((uint16_t)raw_data[(2u * (i + 3u))] << 8) | raw_data[(2u * (i + 3u)) + 1u]);
     }
-
     return 1u;
 }
 
@@ -365,17 +325,14 @@ static uint8_t MXC400_ReadAxisRaw(int16_t *axis)
     {
         return 0u;
     }
-
     if (RL_I2C_ReadMultiBytesOneReg(I2C0, g_sensor_addr, MXC400_REG_AXIS_BASE, data_reg, sizeof(data_reg)) != sizeof(data_reg))
     {
         return 0u;
     }
-
     for (uint32_t i = 0u; i < 3u; i++)
     {
         axis[i] = (int16_t)(((uint16_t)data_reg[(2u * i)] << 8) | data_reg[(2u * i) + 1u]) >> 4;
     }
-
     return 1u;
 }
 
@@ -385,8 +342,7 @@ static uint8_t Gsensor_GetSc7PreferredAddress(void)
     {
         return GSENSOR_SC7U22_I2C_ADDR;
     }
-
-    return 0x19u;
+    return 0x18u;
 }
 
 static uint8_t Gsensor_GetSc7AlternateAddress(uint8_t preferred)
@@ -407,7 +363,6 @@ static uint8_t Gsensor_AutoDetectAndConfigure(void)
             g_gsensor_ready = 1u;
             return 1u;
         }
-
         if ((sc7_alternate_addr != sc7_preferred_addr) &&
             SC7U22_ConfigureAtAddress(sc7_alternate_addr, g_current_fsr))
         {
@@ -481,7 +436,6 @@ void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr)
 {
     g_i2c_bus_hz = (busHz == 0u) ? GSENSOR_I2C_BUS_HZ : busHz;
     g_current_fsr = fsr;
-
     g_device_type = GSENSOR_DEVICE_NONE;
     g_sensor_addr = 0u;
     g_last_device_id = 0u;
@@ -491,27 +445,11 @@ void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr)
     I2C_Init(g_i2c_bus_hz);
 
     if (!Gsensor_AutoDetectAndConfigure())
->>>>>>> 增加-6-axis-sensor-SC7U22
     {
         DBG_PRINT("[GSENSOR] Init failed after retries\n");
     }
 }
 
-<<<<<<< HEAD
-/* Read 3-axis data from MXC400 (6 bytes starting at reg 0x03). Caller provides int16_t axis[3].
-   The original code stored 12-bit values left-aligned in 16-bit, so shift accordingly. */
-static void ReadGsensorAxis(int16_t *axis)
-{
-    uint8_t data_reg[6];
-    int i;
-    /* MXC400xXC Gsensor address
-        X_OUT_Low 0x03 ; X_OUT_High 0x04
-        Y_OUT_Low 0x05 ; Y_OUT_High 0x06
-        Z_OUT_Low 0x07 ; Z_OUT_High 0x08  */
-
-    uint32_t rx = RL_I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x03, data_reg, 6);
-    if (rx != 6u)
-=======
 void MXC400_to_PD(Gsensor_FSR fsr)
 {
     uint8_t target_addr = (g_device_type == GSENSOR_DEVICE_MXC400 && g_sensor_addr != 0u) ? g_sensor_addr : GSENSOR_MXC400_I2C_ADDR;
@@ -534,7 +472,6 @@ void GsensorPowerDown(void)
     {
         MXC400_to_PD(g_current_fsr);
     }
-
     g_gsensor_ready = 0u;
 }
 
@@ -551,13 +488,11 @@ void GsensorWakeup(void)
         MXC400_to_wakeup(g_current_fsr);
         wakeup_ok = MXC400_ProbeAtAddress(g_sensor_addr);
     }
-
     if (!wakeup_ok)
     {
         I2C_Init(g_i2c_bus_hz);
         wakeup_ok = Gsensor_AutoDetectAndConfigure();
     }
-
     g_gsensor_ready = wakeup_ok;
 }
 
@@ -592,102 +527,16 @@ void GsensorReadAxis(int16_t *axis)
         }
     }
     else
->>>>>>> 增加-6-axis-sensor-SC7U22
     {
         axis[0] = 0;
         axis[1] = 0;
         axis[2] = 0;
-<<<<<<< HEAD
-
-        g_gsensor_read_fail_count++;
-        g_gsensor_ready = 0u;
-
-        if ((g_gsensor_read_fail_count % GSENSOR_RECOVERY_RETRY_INTERVAL) == 0u)
-        {
-            MXC400_to_wakeup(g_current_fsr);
-        }
-=======
         Gsensor_RequestRecovery();
->>>>>>> 增加-6-axis-sensor-SC7U22
         return;
     }
 
     g_gsensor_ready = 1u;
     g_gsensor_read_fail_count = 0u;
-<<<<<<< HEAD
-
-    for (i = 0; i < 3; i++)
-    {
-        axis[i] = (int16_t)(data_reg[2 * i] << 8 | data_reg[2 * i + 1]) >> 4;
-    }
-}
-
-/* Read Temperature data from MXC400 (1 bytes starting at reg 0x09). */
-static void ReadGsensorTemp(int16_t *temp)
-{
-    uint8_t temp_reg;
-    /* MXC400xXC Gsensor address
-        TEMP_OUT 0x09 */
-    uint32_t rx = RL_I2C_ReadMultiBytesOneReg(I2C0, GSENSOR_ADDR, 0x09, &temp_reg, 1);
-    (void)rx;
-    *temp = (int16_t)temp_reg;
-}
-
-/* MXC400 Control register 0x0D
-  bit6:5 full-scale-range  0x00:2G 0x01:4G 0x10:8G
-  bit4 : Clksel always 0
-  bit1:0 : normal 0x00 , 0x01: power down */
-
-/* FSR enum -> control-register FSR bits lookup */
-static const uint8_t s_fsr_reg_bits[] = {0x00, 0x20, 0x40}; /* FSR_2G, FSR_4G, FSR_8G */
-
-static uint8_t fsr_to_ctrl_reg(Gsensor_FSR fsr, uint8_t pd_bit)
-{
-    uint8_t bits = (fsr <= FSR_8G) ? s_fsr_reg_bits[fsr] : 0x00;
-    return bits | pd_bit;
-}
-
-void MXC400_to_PD(Gsensor_FSR fsr)
-{
-    uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, fsr_to_ctrl_reg(fsr, 0x01));
-    (void)wr;
-}
-
-void MXC400_to_wakeup(Gsensor_FSR fsr)
-{
-    uint8_t wr = RL_I2C_WriteByteOneReg(I2C0, GSENSOR_ADDR, 0x0D, fsr_to_ctrl_reg(fsr, 0x00));
-    (void)wr;
-}
-
-void GsensorPowerDown()
-{
-    MXC400_to_PD(g_current_fsr);
-    g_gsensor_ready = 0u;
-}
-
-void GsensorWakeup()
-{
-    MXC400_to_wakeup(g_current_fsr);
-    g_gsensor_ready = Gsensor_Probe();
-}
-
-void GsensorReadAxis(int16_t *axis)
-{
-    ReadGsensorAxis(axis);
-}
-
-/* Counts-per-g lookup indexed by Gsensor_FSR.
-   MXC4005XC: 12-bit two's complement (-2048..+2047), so ±Ng maps to ±2048 counts.
-   FSR_2G: 2048/2 = 1024 counts/g, FSR_4G: 512, FSR_8G: 256. */
-static const float s_fsr_cpg[] = {1024.0f, 512.0f, 256.0f}; /* FSR_2G, FSR_4G, FSR_8G */
-
-float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
-{
-    float cpg = (g_current_fsr <= FSR_8G) ? s_fsr_cpg[g_current_fsr] : 1024.0f;
-    float xg = (float)axis[0] / cpg;
-    float yg = (float)axis[1] / cpg;
-    float zg = (float)axis[2] / cpg;
-=======
 }
 
 uint8_t GsensorReadSixAxis(int16_t *acc_axis, int16_t *gyro_axis)
@@ -724,7 +573,6 @@ uint8_t GsensorReadSixAxis(int16_t *acc_axis, int16_t *gyro_axis)
             Gsensor_RequestRecovery();
             return 0u;
         }
-
         gyro_axis[0] = 0;
         gyro_axis[1] = 0;
         gyro_axis[2] = 0;
@@ -752,7 +600,6 @@ uint8_t GsensorReadDeviceId(uint8_t *device_id)
     {
         return 0u;
     }
-
     if (g_device_type == GSENSOR_DEVICE_SC7U22)
     {
         if (!SC7U22_ReadWhoAmI(device_id))
@@ -760,17 +607,14 @@ uint8_t GsensorReadDeviceId(uint8_t *device_id)
             *device_id = g_last_device_id;
             return 0u;
         }
-
         return 1u;
     }
-
     if (g_device_type == GSENSOR_DEVICE_MXC400)
     {
         *device_id = 0u;
         g_last_device_id = 0u;
         return MXC400_ProbeAtAddress(g_sensor_addr);
     }
-
     *device_id = 0u;
     return 0u;
 }
@@ -782,29 +626,22 @@ float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
 {
     const float *cpg_table = s_mxc_cpg;
     float cpg = 1024.0f;
-    float xg;
-    float yg;
-    float zg;
 
     if (axis == NULL)
     {
         return 0.0f;
     }
-
     if (g_device_type == GSENSOR_DEVICE_SC7U22)
     {
         cpg_table = s_sc7u22_cpg;
     }
-
     if (g_current_fsr <= FSR_8G)
     {
         cpg = cpg_table[g_current_fsr];
     }
 
-    xg = (float)axis[0] / cpg;
-    yg = (float)axis[1] / cpg;
-    zg = (float)axis[2] / cpg;
->>>>>>> 增加-6-axis-sensor-SC7U22
-
+    float xg = (float)axis[0] / cpg;
+    float yg = (float)axis[1] / cpg;
+    float zg = (float)axis[2] / cpg;
     return sqrtf(xg * xg + yg * yg + zg * zg);
 }

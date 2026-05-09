@@ -120,6 +120,10 @@ static void test_extract_rope_suffix(void)
                 "rope suffix: reject non-hex");
     EXPECT_TRUE(BleParser_ExtractRopeSuffix4("DEVICE_NAME: ROPR_1234", out) == 0u,
                 "rope suffix: reject missing prefix");
+
+    EXPECT_TRUE(BleParser_ExtractNameSuffix4("DEVICE_NAME: MOLE_abcd", "MOLE_", out) == 1u,
+                "name suffix: parse mole prefix");
+    EXPECT_STR_EQ(out, "ABCD", "name suffix: mole uppercase");
 }
 
 static void test_echo_detection(void)

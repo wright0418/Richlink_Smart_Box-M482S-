@@ -23,6 +23,7 @@
 #define BLE_CMD_NAME_QUERY "AT+NAME=?\r\n"
 #define BLE_CMD_ADDR_QUERY "AT+ADDR=?\r\n"
 #define BLE_CMD_MODE_DATA "AT+MODE_DATA\r\n"
+#define BLE_CMD_EN_SYSMSG_ON "AT+EN_SYSMSG=1\r\n"
 #define BLE_CMD_REBOOT "AT+REBOOT\r\n"
 #define BLE_CMD_DISC "AT+DISC\r\n"
 #define BLE_CMD_ADVERT_ON "AT+ADVERT=1\r\n"
@@ -117,6 +118,26 @@ void Ble_Init(uint32_t baud);
 void BLESendData(const char *data);
 
 /**
+ * @brief Send raw bytes to the BLE module without printf formatting.
+ * @param data Byte buffer to send.
+ * @param len Number of bytes to send.
+ */
+void BLESendBytes(const uint8_t *data, uint32_t len);
+
+/**
+ * @brief Take pending raw UART bytes captured by the BLE RX ISR.
+ * @param dst Destination buffer.
+ * @param max_len Maximum bytes to copy.
+ * @return Number of bytes copied into dst.
+ */
+uint32_t Ble_TakeRawBytes(uint8_t *dst, uint32_t max_len);
+
+/**
+ * @brief Clear the BLE raw RX ring buffer.
+ */
+void Ble_RawRxReset(void);
+
+/**
  * @brief Set the BLE device name via AT command sequence.
  * @param name NUL-terminated string for new device name.
  */
@@ -129,7 +150,7 @@ void BLESendData(const char *data);
 void BLESetName(const char *name);
 
 /**
- * @brief Run BLE rename flow: query name/MAC and rename to ROPE_xxxx if needed.
+ * @brief Run BLE rename flow: query name/MAC and rename to MOLE_ + suffix if needed.
  * @param device_name Output buffer (at least 5 bytes) for device name suffix.
  * @param mac Output buffer (at least 5 bytes) for MAC suffix.
  */

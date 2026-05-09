@@ -35,6 +35,13 @@ $testTargets = @(
             (Join-Path $PSScriptRoot "test_ble_parser.c"),
             (Join-Path $PSScriptRoot "..\protocol\ble_parser.c")
         )
+    },
+    @{
+        Name    = "test_mole_packet"
+        Sources = @(
+            (Join-Path $PSScriptRoot "test_mole_packet.c"),
+            (Join-Path $PSScriptRoot "..\protocol\mole_packet.c")
+        )
     }
 )
 
