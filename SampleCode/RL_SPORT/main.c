@@ -475,7 +475,7 @@ static void RL_InitDrivers(void)
   Led_Init();
   Buzzer_Init();
   /* Default boot LED: every 3 seconds on for 0.3s (freq=1/3 Hz, duty=10%) */
-  SetGreenLedMode(1.0f/3.0f, 10);
+  SetGreenLedMode(1.0f / 3.0f, 10);
 }
 
 static void RL_InitApplication(void)
@@ -662,29 +662,28 @@ int main()
       }
       else
         /* Default idle LED behaviour after boot: every 3s on for 0.3s */
-        SetGreenLedMode(1.0f/3.0f, 10);
-        s_hall_edge_residual = 0u;
+        SetGreenLedMode(1.0f / 3.0f, 10);
+      s_hall_edge_residual = 0u;
 #if USE_HALL_ANTICHEAT
-        s_hall_raw_total = 0u;
+      s_hall_raw_total = 0u;
 #endif
-      }
-
-      uint16_t total = Sys_GetJumpTimes();
-      Sys_SetHallPb7IrqFlag(0);
-      DBG_PRINT("[HALL] PB7 edges=%u total=%u\n", (unsigned)edges, (unsigned)total);
-    }
-    /* Process button events */
-    if (Sys_GetKeyAFlag())
-    {
-      Sys_SetKeyAFlag(0);
-      ProcessKeyAEvent();
     }
 
-    RL_HandleBleAndGameState();
-    RL_HandleIdlePowerOff(&s_poweroff_done);
-    /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
-    RL_UpdateLedState(s_low_batt);
+    uint16_t total = Sys_GetJumpTimes();
+    Sys_SetHallPb7IrqFlag(0);
+    DBG_PRINT("[HALL] PB7 edges=%u total=%u\n", (unsigned)edges, (unsigned)total);
   }
+  /* Process button events */
+  if (Sys_GetKeyAFlag())
+  {
+    Sys_SetKeyAFlag(0);
+    ProcessKeyAEvent();
+  }
+
+  RL_HandleBleAndGameState();
+  RL_HandleIdlePowerOff(&s_poweroff_done);
+  /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
+  RL_UpdateLedState(s_low_batt);
 }
 
 /*** (C) COPYRIGHT 2016 Richlink Technology Corp. ***/
