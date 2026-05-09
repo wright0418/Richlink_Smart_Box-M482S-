@@ -170,9 +170,10 @@ void PowerMgmt_EnterSPD(PowerMode mode)
 
 uint8_t PowerMgmt_DetectUsbCharge(void)
 {
-    /* Hardware does not have USB charging circuit. Always report no USB charge. */
-    (void)0; /* keep function body non-empty for clarity */
-    return 0u;
+    /* Initialize USB detect pin and sample its state. PA12 is used as VBUS sense
+       on our board: PA12 high indicates USB VBUS present (charging). */
+    USBDetect_Init();
+    return USBDetect_IsHigh();
 }
 
 void PowerMgmt_ChargeModeInit(void)
@@ -184,12 +185,21 @@ void PowerMgmt_ChargeModeInit(void)
 
 uint8_t PowerMgmt_ChargeModeProcess(void)
 {
-    /* No USB charging hardware; no charge-mode processing required. */
-    return 0u;
+    /* Return 1 while USB VBUS is still present. Caller may poll this to
+       determine whether to remain in charge mode. */
+    return USBDetect_IsHigh() ? 1u : 0u;
 }
 
 void PowerMgmt_RunChargeLoop(void)
 {
-    /* USB charging not supported on this hardware; do nothing. */
-    (void)PowerMgmt_ChargeModeInit;
+    /* Block here while USB VBUS is present. This keeps the device in a
+       minimal charge-mode until the cable is removed. The caller should
+       have already called PowerMgmt_ChargeModeInit() to assert power-lock
+       behavior as needed. */
+    while (USBDetect_IsHigh())
+    {
+        /* Optionally, blink a charging LED or service low-power tasks here. */
+        delay_ms(500);
+    }
+    /* USB removed -> exit charge loop and allow normal boot to continue. */
 }
