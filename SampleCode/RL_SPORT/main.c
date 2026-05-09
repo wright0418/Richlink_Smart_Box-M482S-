@@ -49,6 +49,8 @@ static uint8_t s_ble_rename_started = 0u;
 static uint8_t s_ble_rename_done = 0u;
 static uint8_t s_charge_mode_initialized = 0u;
 static uint8_t s_hall_edge_residual = 0u;
+#define RL_IDLE_LED_FREQ_HZ (1.0f / 3.0f)
+#define RL_IDLE_LED_DUTY (0.1f)
 #if MOLE_TEST_TRACE_ENABLE
 #define MOLE_MAIN_TRACE(fmt, ...) printf("[MOLE_TEST] " fmt, ##__VA_ARGS__)
 #else
@@ -158,7 +160,7 @@ static void RL_UpdateLedState(uint8_t low_batt)
 
   if (Sys_GetBleState() == BLE_CONNECTED && Sys_GetGameState() == GAME_STOP)
   {
-    SetGreenLedMode(0.5f, 0.5f);
+    SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
     return;
   }
 
@@ -177,7 +179,7 @@ static void RL_UpdateLedState(uint8_t low_batt)
     SetGreenLedMode(GS_CAL_LED_UNCAL_FREQ_HZ, GS_CAL_LED_DUTY);
   }
 #else
-  SetGreenLedMode(0.5f, 0.5f);
+  SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
 #endif
 }
 
@@ -475,7 +477,7 @@ static void RL_InitDrivers(void)
   Led_Init();
   Buzzer_Init();
   /* Default boot LED: every 3 seconds on for 0.3s (freq=1/3 Hz, duty=10%) */
-  SetGreenLedMode(1.0f / 3.0f, 10);
+  SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
 }
 
 static void RL_InitApplication(void)
@@ -661,8 +663,9 @@ int main()
         }
       }
       else
-        /* Default idle LED behaviour after boot: every 3s on for 0.3s */
-        SetGreenLedMode(1.0f / 3.0f, 10);
+      {
+        /* keep only counter reset here; LED mode is managed centrally in RL_UpdateLedState */
+      }
       s_hall_edge_residual = 0u;
 #if USE_HALL_ANTICHEAT
       s_hall_raw_total = 0u;
