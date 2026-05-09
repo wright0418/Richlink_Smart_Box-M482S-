@@ -474,7 +474,8 @@ static void RL_InitDrivers(void)
   /* UI outputs */
   Led_Init();
   Buzzer_Init();
-  SetGreenLedMode(2, 50);
+  /* Default boot LED: every 3 seconds on for 0.3s (freq=1/3 Hz, duty=10%) */
+  SetGreenLedMode(1.0f/3.0f, 10);
 }
 
 static void RL_InitApplication(void)
@@ -660,7 +661,8 @@ int main()
         }
       }
       else
-      {
+        /* Default idle LED behaviour after boot: every 3s on for 0.3s */
+        SetGreenLedMode(1.0f/3.0f, 10);
         s_hall_edge_residual = 0u;
 #if USE_HALL_ANTICHEAT
         s_hall_raw_total = 0u;
