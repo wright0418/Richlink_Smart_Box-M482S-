@@ -1,4 +1,4 @@
 cbuild-set:
   generated-by: vscode-cmsis-csolution version 1.56.0
   contexts:
-    - context: RL_SPORT.debug+ARMCLANG
+    - context: RL_SPORT.release+ARMCLANG

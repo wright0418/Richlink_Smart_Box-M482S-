@@ -15,9 +15,9 @@ solution:
       target-set:
         - set:
           images:
-            - project-context: RL_SPORT.debug
+            - project-context: RL_SPORT.release
           debugger:
-            name: CMSIS-DAP@pyOCD
+            name: Nu-Link@pyOCD
             port: 3333
             protocol: swd
             clock: 10000000

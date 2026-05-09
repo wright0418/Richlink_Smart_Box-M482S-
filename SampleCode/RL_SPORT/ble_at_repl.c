@@ -220,8 +220,15 @@ static float repl_parse_float(const char *s)
     long frac_part = 0;
     long frac_div = 1;
     int neg = 0;
-    if (*s == '-') { neg = 1; s++; }
-    while (*s >= '0' && *s <= '9') { int_part = int_part * 10 + (*s++ - '0'); }
+    if (*s == '-')
+    {
+        neg = 1;
+        s++;
+    }
+    while (*s >= '0' && *s <= '9')
+    {
+        int_part = int_part * 10 + (*s++ - '0');
+    }
     if (*s == '.')
     {
         s++;
