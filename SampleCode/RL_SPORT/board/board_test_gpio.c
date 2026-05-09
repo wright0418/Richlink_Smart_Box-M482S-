@@ -123,7 +123,7 @@ static uint8_t test_gsensor_i2c(void)
     printf("[BT] Gsensor: read XYZ 3 samples.\n");
 
     /* Ensure sensor is configured and awake. */
-    Gsensor_Init(100000, FSR_2G);
+    Gsensor_Init(GSENSOR_I2C_BUS_HZ, FSR_2G);
     GsensorWakeup();
     CLK_SysTickDelay(50000u); /* 50 ms settle */
 

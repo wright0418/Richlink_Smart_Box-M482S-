@@ -170,8 +170,9 @@ void PowerMgmt_EnterSPD(PowerMode mode)
 
 uint8_t PowerMgmt_DetectUsbCharge(void)
 {
+    /* Initialize USB detect pin and sample its state. PA12 is used as VBUS sense
+       on our board: PA12 high indicates USB VBUS present (charging). */
     USBDetect_Init();
-    CLK_SysTickDelay(50000); /* 50 ms debounce */
     return USBDetect_IsHigh();
 }
 
@@ -184,36 +185,21 @@ void PowerMgmt_ChargeModeInit(void)
 
 uint8_t PowerMgmt_ChargeModeProcess(void)
 {
-    static uint32_t s_usb_low_start = 0u;
-
-    if (USBDetect_IsHigh())
-    {
-        s_usb_low_start = 0u;
-        __WFI();
-        return 1u;
-    }
-
-    if (s_usb_low_start == 0u)
-    {
-        s_usb_low_start = get_ticks_ms();
-        return 1u;
-    }
-
-    /* USB low stable for 100ms => exit charge mode */
-    if (!is_timeout(s_usb_low_start, 100u))
-    {
-        return 1u;
-    }
-
-    s_usb_low_start = 0u;
-    return 0u;
+    /* Return 1 while USB VBUS is still present. Caller may poll this to
+       determine whether to remain in charge mode. */
+    return USBDetect_IsHigh() ? 1u : 0u;
 }
 
 void PowerMgmt_RunChargeLoop(void)
 {
-    PowerMgmt_ChargeModeInit();
-    while (PowerMgmt_ChargeModeProcess())
+    /* Block here while USB VBUS is present. This keeps the device in a
+       minimal charge-mode until the cable is removed. The caller should
+       have already called PowerMgmt_ChargeModeInit() to assert power-lock
+       behavior as needed. */
+    while (USBDetect_IsHigh())
     {
-        /* USB charging auto-boot mode: no power lock, no game */
+        /* Optionally, blink a charging LED or service low-power tasks here. */
+        delay_ms(500);
     }
+    /* USB removed -> exit charge loop and allow normal boot to continue. */
 }

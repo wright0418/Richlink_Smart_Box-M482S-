@@ -2,5 +2,8 @@
     "debug.hideSlowPreLaunchWarning": true,
     "clangd.arguments": [
         "--compile-commands-dir=d:\\Nuvoton\\M480_SmartBox\\SampleCode\\Smart_Box\\VSCode\\out\\Smart_Box\\ARMCLANG\\debug"
+    ],
+    "python.analysis.extraPaths": [
+        "c:\\Users\\Wright\\.vcpkg\\artifacts\\2139c4c6\\debuggers.arm.armdbg\\6.6.1\\sw\\osgi\\plugins\\com.arm.debug.interpreter.jython.api_6.6.1.202508041948"
     ]
 }

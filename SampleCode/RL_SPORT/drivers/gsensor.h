@@ -1,33 +1,40 @@
 /**
  * @file gsensor.h
- * @brief G-sensor (accelerometer) public API
+ * @brief G-sensor public API (SC7U22 + MXC400 auto-detect)
  *
- * This header exposes a small, portable API for the on-board MXC400-series
- * accelerometer used by the RL_SPORT sample. The module provides:
+ * This module auto-detects supported sensors on I2C at runtime and exposes
+ * a unified API. Current supported devices:
+ *   - SC7U22 (6-axis, accel + gyro)
+ *   - MXC400  (3-axis accel)
+ *
+ * The API provides:
  *  - Initialization (I2C bus and sensor configuration)
  *  - Power management helpers (wake/power-down)
- *  - A simple axis read API returning signed axis values in raw sensor
- *    counts (12-bit left-aligned data; see notes below)
+ *  - 3-axis / 6-axis raw read
+ *  - Runtime information (active sensor type/name/address)
  *
  * Notes:
- *  - Caller must initialize the I2C peripheral and sensor via
- *    GsensorInit() before calling GsensorReadAxis(). GsensorInit() will
+ *  - Caller must initialize via Gsensor_Init() before GsensorReadAxis().
+ *  - Gsensor_Init() will auto-detect sensor backend and open/configure
  *    open/configure the I2C bus at the requested frequency and set the
- *    sensor FSR.
+ *    target full-scale range (FSR).
  *  - After entering power-down via GsensorPowerDown(), call GsensorWakeup()
  *    before attempting to read axis data.
  *  - The axis values returned by GsensorReadAxis() are raw sensor counts
- *    (12-bit data packed into a signed int16). Conversion to physical
- *    units (e.g., g) requires applying the chosen full-scale range (FSR)
- *    and the sensor's sensitivity; this header intentionally leaves unit
- *    conversion to the caller to keep the API simple.
+ *    and require sensor-specific scaling when converting to g.
  */
 #ifndef _GSENSOR_H_
 #define _GSENSOR_H_
 
+#include "../project_config.h"
 #include <stdint.h>
 
-#define GSENSOR_ADDR 0x15
+typedef enum
+{
+    GSENSOR_DEVICE_NONE = 0,
+    GSENSOR_DEVICE_SC7U22,
+    GSENSOR_DEVICE_MXC400
+} Gsensor_DeviceType;
 
 /* Full-scale range enum for MXC400 G-sensor
    Values correspond to the sensor control register's FSR selection bits. */
@@ -37,6 +44,24 @@ typedef enum
     FSR_4G,
     FSR_8G
 } Gsensor_FSR;
+
+/**
+ * @brief Get currently active sensor backend selected by auto-detection.
+ * @return Active sensor type enum.
+ */
+Gsensor_DeviceType GsensorGetDeviceType(void);
+
+/**
+ * @brief Get human-readable active sensor name.
+ * @return "SC7U22", "MXC400", or "NONE".
+ */
+const char *GsensorGetDeviceName(void);
+
+/**
+ * @brief Get active sensor I2C 7-bit address.
+ * @return I2C address, or 0 if no sensor is active.
+ */
+uint8_t GsensorGetI2CAddress(void);
 
 /**
  * @brief Put the G-sensor into low-power (power-down) mode.
@@ -66,6 +91,24 @@ void GsensorWakeup(void);
  *       for the configured FSR.
  */
 void GsensorReadAxis(int16_t *axis);
+
+/**
+ * @brief Read six-axis raw data from the selected sensor backend.
+ * @param acc_axis Pointer to int16_t[3] for accelerometer {X,Y,Z}.
+ * @param gyro_axis Pointer to int16_t[3] for gyroscope {X,Y,Z}.
+ * @return 1 on success, 0 on communication/configuration failure.
+ *
+ * For 3-axis-only sensors such as MXC400, the accelerometer values are
+ * returned normally and gyro values are filled with zero.
+ */
+uint8_t GsensorReadSixAxis(int16_t *acc_axis, int16_t *gyro_axis);
+
+/**
+ * @brief Read device-identification register or cached ID when available.
+ * @param device_id Pointer receiving the current device ID value.
+ * @return 1 if a valid ID was read, otherwise 0.
+ */
+uint8_t GsensorReadDeviceId(uint8_t *device_id);
 
 /**
  * @brief Compute acceleration magnitude in g from raw axis counts.
@@ -101,10 +144,9 @@ void MXC400_to_wakeup(Gsensor_FSR fsr);
  * @param busHz I2C bus frequency in Hz (e.g. 100000 for 100kHz).
  * @param fsr   Desired full-scale range (FSR_2G / FSR_4G / FSR_8G).
  *
- * This function initializes the I2C peripheral used to communicate with
- * the MXC400 accelerometer and programs the sensor's full-scale range.
- * The caller should ensure system clocks and module clocks are enabled
- * (typically done in SYS_Init()) before calling this function.
+ * This function initializes I2C, auto-detects SC7U22/MXC400, and configures
+ * the selected sensor backend. Caller should ensure system/module clocks are
+ * enabled (typically done in SYS_Init()) before calling this function.
  */
 void Gsensor_Init(uint32_t busHz, Gsensor_FSR fsr);
 

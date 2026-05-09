@@ -341,14 +341,17 @@ static void RL_InitDrivers(void)
   /* Time base */
   Timer_Init();
 
+  /* Debug/printf UART (retarget uses UART0) */
+  UART_Open(UART0, 115200);
+
   /* Sensors */
-  Gsensor_Init(100000, FSR_2G);
+  Gsensor_Init(GSENSOR_I2C_BUS_HZ, FSR_2G);
+  DBG_PRINT("[GSENSOR] backend=%s addr=0x%02X\n",
+            GsensorGetDeviceName(),
+            (unsigned)GsensorGetI2CAddress());
 
   /* Battery ADC */
   Adc_Init();
-
-  /* Debug/printf UART (retarget uses UART0) */
-  UART_Open(UART0, 115200);
 
   /* BLE transport (UART1) */
   Ble_Init(115200);

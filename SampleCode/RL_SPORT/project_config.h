@@ -14,6 +14,11 @@
 #define DBG_PRINT(fmt, ...)
 #endif
 
+/* I2C failure diagnostics
+   1: print concise I2C error snapshots via UART printf (recommended while bring-up)
+   0: disable I2C diagnostics */
+#define I2C_DIAG_LOG_ENABLE 1
+
 /* Common boolean-like macros */
 #define ON 1
 #define OFF 0
@@ -52,7 +57,11 @@
 #endif
 
 /* Firmware version and board identification */
+<<<<<<< HEAD
 #define FW_VERSION "1.4.1"
+=======
+#define FW_VERSION "1.5.0"
+>>>>>>> 增加-6-axis-sensor-SC7U22
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
@@ -103,9 +112,29 @@
 #define BOARD_TEST_AUTORUN 0
 
 /* I2C / G-sensor robustness */
+#define GSENSOR_I2C_BUS_HZ 400000u /* Fast-mode I2C (400 kHz) */
 #define I2C_XFER_RETRY_COUNT 3u
 #define GSENSOR_INIT_RETRY_COUNT 3u
 #define GSENSOR_RECOVERY_RETRY_INTERVAL 5u
+
+/* SC7U22 startup timing robustness
+   Some boards show delayed sensor ACK after MCU reset/program load.
+   These values let init wait for I2C address ACK before WHO_AM_I/config. */
+#define GSENSOR_SC7U22_ACK_WAIT_TIMEOUT_MS 300u
+#define GSENSOR_SC7U22_ACK_POLL_INTERVAL_MS 10u
+#define GSENSOR_SC7U22_INIT_RETRY_DELAY_MS 30u
+
+/* Sensor addresses (7-bit)
+   Runtime auto-detect probes SC7U22 first (preferred + alternate), then MXC400. */
+#define GSENSOR_MXC400_I2C_ADDR 0x15u
+
+/* SC7U22 I2C address is selected by SDO wiring:
+   SDO=Low/GND  -> 7-bit 0x18, bus bytes 0x30(W) / 0x31(R)
+   SDO=High/VDD -> 7-bit 0x19, bus bytes 0x32(W) / 0x33(R)
+   Nuvoton StdDriver APIs expect the 7-bit slave address.
+   This setting is the preferred SC7U22 address; driver will fallback to the
+   alternate address automatically when probing. */
+#define GSENSOR_SC7U22_I2C_ADDR 0x19u
 
 /* G-Sensor Jump Detection Configuration */
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */

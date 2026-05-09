@@ -44,9 +44,6 @@ typedef struct
 static const float32_t g_fir_coeffs[JUMP_FIR_ORDER] = {
     0.0385f, 0.1095f, 0.2020f, 0.2500f, 0.2020f, 0.1095f, 0.0385f};
 
-/* Sensor sensitivity: MXC4005XC at FSR_2G = 1024 counts/g */
-#define GSENSOR_COUNTS_PER_G 1024.0f
-
 /* Maximum samples for calibration buffers */
 #define MAX_CALIB_SAMPLES 150 /* 3 seconds at 50Hz */
 #define MAX_PEAK_SAMPLES 50   /* Store up to 50 peaks for stats */
@@ -97,16 +94,7 @@ static uint32_t g_calib_last_peak_time = 0;
  */
 static float32_t CalculateMagnitude(int16_t *axis)
 {
-    float32_t x_g = (float32_t)axis[0] / GSENSOR_COUNTS_PER_G;
-    float32_t y_g = (float32_t)axis[1] / GSENSOR_COUNTS_PER_G;
-    float32_t z_g = (float32_t)axis[2] / GSENSOR_COUNTS_PER_G;
-
-    /* Magnitude = sqrt(x^2 + y^2 + z^2) */
-    float32_t mag_squared = x_g * x_g + y_g * y_g + z_g * z_g;
-    float32_t magnitude;
-    arm_sqrt_f32(mag_squared, &magnitude);
-
-    return magnitude;
+    return (float32_t)Gsensor_CalcMagnitude_g_from_raw(axis);
 }
 
 /**
