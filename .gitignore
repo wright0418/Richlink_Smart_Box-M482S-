@@ -24,7 +24,8 @@ CMakeCache.txt
 cmake_install.cmake
 
 # Ignore IDE/editor specific
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 
 # Ignore VSCode build/temp outputs for sample code
