@@ -56,12 +56,8 @@
 #define STATIC_INLINE INLINE
 #endif
 
-/* Firmware version and board identification */
-<<<<<<< HEAD
-#define FW_VERSION "1.4.1"
-=======
+#/* Firmware version and board identification */
 #define FW_VERSION "1.5.0"
->>>>>>> 增加-6-axis-sensor-SC7U22
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
