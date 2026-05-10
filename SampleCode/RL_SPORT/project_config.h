@@ -62,7 +62,7 @@
      FW_VERSION_MAJOR.FW_VERSION_MINOR.FW_VERSION_PATCH
    The major digit is selected automatically from enabled LED feature
    flags so the version string encodes the capability tier. */
-#define FW_VERSION_MINOR 5
+#define FW_VERSION_MINOR 0
 #define FW_VERSION_PATCH 0
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
@@ -161,7 +161,7 @@
  * 3.x.y: 16x16 color chunk enabled
  */
 #if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
-#define FW_VERSION_MAJOR 3
+#define FW_VERSION_MAJOR 0
 #elif MOLE_ENABLE_RGB16X16
 #define FW_VERSION_MAJOR 2
 #else
