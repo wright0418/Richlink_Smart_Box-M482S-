@@ -1,7 +1,7 @@
 # BLE GATT UART Packet Quick Reference Guide
 
 **For Web Frontend Developers**  
-**Last Updated**: 2026-05-09
+**Last Updated**: 2026-05-10
 
 ---
 
@@ -104,6 +104,32 @@ packet[3] = checksum;
 ```
 
 No checksum, just a single byte. Receive this from device when user strikes.
+
+---
+
+### 5️⃣ 16×16 Mono Display Command (38 bytes, optional)
+```
+┌──────┬──────┬────────┬────────┬──────────────────────────┬──────────┬────────┐
+│ 0xAA │ 0xD0 │ Color  │ Target │ 16 Rows × 2 bytes        │ Checksum │ 0x55   │
+│ Head │ Type │ (0-8)  │ (0/1)  │ big-endian, bit15=col0   │ XOR[1:35]│ Footer │
+└──────┴──────┴────────┴────────┴──────────────────────────┴──────────┴────────┘
+```
+
+### 6️⃣ 16×16 Per-Pixel RGB Chunk (variable, optional)
+```
+┌──────┬──────┬────┬────────┬───────┬────────┬─────┬─────────┬──────────┬────────┐
+│ 0xAA │ 0xD1 │ Op │ Frame  │ Chunk │ Offset │ Len │ Payload │ Checksum │ 0x55   │
+│ Head │ Type │    │ ID     │ Index │ Hi/Lo  │     │ RGB...  │ XOR      │ Footer │
+└──────┴──────┴────┴────────┴───────┴────────┴─────┴─────────┴──────────┴────────┘
+```
+
+Ops: `0x01=START`, `0x02=DATA`, `0x03=COMMIT`, `0x04=CANCEL`. Send RGB data as row-major `R,G,B` bytes and commit only after all 768 bytes are sent.
+
+### 7️⃣ Capability Query (BLE AT REPL)
+```text
+AT+TEST,CAPABILITIES
++OK,CAPABILITIES,CAP=0x0000007F,LEGACY8=1,RGB16=1,RGB16_COLOR=1,ROWS=16,COLS=16,CHUNK=10
+```
 
 ---
 

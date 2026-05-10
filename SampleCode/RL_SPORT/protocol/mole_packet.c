@@ -160,6 +160,104 @@ static uint8_t MolePacket_BuildHitConfigPacket(const MolePacketParser *parser, M
     return 1u;
 }
 
+#if MOLE_ENABLE_RGB16X16
+static uint8_t MolePacket_BuildLed16MonoPacket(const MolePacketParser *parser, MolePacket *out_packet)
+{
+    uint8_t checksum = MolePacket_XorChecksum(parser->buf, 1u, (uint16_t)(MOLE_PACKET_LED16_MONO_LEN - 3u));
+    uint8_t footer = MolePacket_GetFooter(parser->variant);
+    uint16_t checksum_index = (uint16_t)(MOLE_PACKET_LED16_MONO_LEN - 2u);
+    uint16_t footer_index = (uint16_t)(MOLE_PACKET_LED16_MONO_LEN - 1u);
+
+    if ((parser->buf[checksum_index] != checksum) || (parser->buf[footer_index] != footer))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail LED16_MONO chk=0x%02X(exp=0x%02X) footer=0x%02X(exp=0x%02X)\r\n",
+                                (unsigned)parser->buf[checksum_index],
+                                (unsigned)checksum,
+                                (unsigned)parser->buf[footer_index],
+                                (unsigned)footer);
+        return 0u;
+    }
+
+    if (out_packet != NULL)
+    {
+        out_packet->type = MOLE_PACKET_LED16_MONO;
+        out_packet->variant = parser->variant;
+        out_packet->payload.led16_mono.color = parser->buf[2];
+        out_packet->payload.led16_mono.target_tag = parser->buf[3];
+        memcpy(out_packet->payload.led16_mono.rows, &parser->buf[4], MOLE_RGB16_ROWS * 2u);
+    }
+
+    return 1u;
+}
+
+static uint8_t MolePacket_BuildRgb16ChunkPacket(const MolePacketParser *parser, MolePacket *out_packet)
+{
+    uint16_t checksum_index = (uint16_t)(parser->expected_len - 2u);
+    uint16_t footer_index = (uint16_t)(parser->expected_len - 1u);
+    uint8_t checksum = MolePacket_XorChecksum(parser->buf, 1u, (uint16_t)(parser->expected_len - 3u));
+    uint8_t footer = MolePacket_GetFooter(parser->variant);
+    uint8_t op = parser->buf[2];
+    uint8_t payload_len = parser->buf[7];
+
+    if ((parser->buf[checksum_index] != checksum) || (parser->buf[footer_index] != footer))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK chk=0x%02X(exp=0x%02X) footer=0x%02X(exp=0x%02X)\r\n",
+                                (unsigned)parser->buf[checksum_index],
+                                (unsigned)checksum,
+                                (unsigned)parser->buf[footer_index],
+                                (unsigned)footer);
+        return 0u;
+    }
+
+    if ((op != MOLE_RGB16_CHUNK_OP_START) &&
+        (op != MOLE_RGB16_CHUNK_OP_DATA) &&
+        (op != MOLE_RGB16_CHUNK_OP_COMMIT) &&
+        (op != MOLE_RGB16_CHUNK_OP_CANCEL))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK op=0x%02X\r\n", (unsigned)op);
+        return 0u;
+    }
+
+    if ((payload_len > MOLE_RGB16_CHUNK_PAYLOAD_MAX) ||
+        (((uint32_t)((uint16_t)parser->buf[5] << 8u | parser->buf[6]) + payload_len) > MOLE_RGB16_COLOR_BYTES))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK offset/len offset=%u len=%u\r\n",
+                                (unsigned)((uint16_t)parser->buf[5] << 8u | parser->buf[6]),
+                                (unsigned)payload_len);
+        return 0u;
+    }
+
+    if ((op != MOLE_RGB16_CHUNK_OP_DATA) && (payload_len != 0u))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK control payload_len=%u\r\n", (unsigned)payload_len);
+        return 0u;
+    }
+
+    if ((op == MOLE_RGB16_CHUNK_OP_DATA) && (payload_len == 0u))
+    {
+        MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK empty data\r\n");
+        return 0u;
+    }
+
+    if (out_packet != NULL)
+    {
+        out_packet->type = MOLE_PACKET_RGB16_CHUNK;
+        out_packet->variant = parser->variant;
+        out_packet->payload.rgb16_chunk.op = op;
+        out_packet->payload.rgb16_chunk.frame_id = parser->buf[3];
+        out_packet->payload.rgb16_chunk.chunk_index = parser->buf[4];
+        out_packet->payload.rgb16_chunk.offset = (uint16_t)(((uint16_t)parser->buf[5] << 8u) | parser->buf[6]);
+        out_packet->payload.rgb16_chunk.payload_len = payload_len;
+        if (payload_len > 0u)
+        {
+            memcpy(out_packet->payload.rgb16_chunk.payload, &parser->buf[8], payload_len);
+        }
+    }
+
+    return 1u;
+}
+#endif
+
 void MolePacketParser_Init(MolePacketParser *parser)
 {
     MolePacketParser_Reset(parser);
@@ -240,11 +338,39 @@ uint8_t MolePacketParser_PushByte(MolePacketParser *parser, uint8_t byte, MolePa
         {
             parser->expected_len = MOLE_PACKET_BRIGHTNESS_LEN;
         }
+#if MOLE_ENABLE_RGB16X16
+        else if (type_byte == MOLE_PACKET_TYPE_LED16_MONO)
+        {
+            parser->expected_len = MOLE_PACKET_LED16_MONO_LEN;
+        }
+        else if (type_byte == MOLE_PACKET_TYPE_RGB16_CHUNK)
+        {
+            parser->expected_len = 0u;
+        }
+#endif
         else
         {
             parser->expected_len = MOLE_PACKET_LED_LEN;
         }
     }
+
+#if MOLE_ENABLE_RGB16X16
+    if ((parser->expected_len == 0u) &&
+        (parser->len == 8u) &&
+        (parser->buf[1] == MOLE_PACKET_TYPE_RGB16_CHUNK))
+    {
+        uint8_t payload_len = parser->buf[7];
+        if (payload_len > MOLE_RGB16_CHUNK_PAYLOAD_MAX)
+        {
+            MOLE_PACKET_TRACE_PRINT("BLE BIN PARSER fail RGB16_CHUNK payload_len=%u max=%u\r\n",
+                                    (unsigned)payload_len,
+                                    (unsigned)MOLE_RGB16_CHUNK_PAYLOAD_MAX);
+            MolePacketParser_Reset(parser);
+            return 0u;
+        }
+        parser->expected_len = (uint16_t)(MOLE_PACKET_RGB16_CHUNK_OVERHEAD_LEN + payload_len);
+    }
+#endif
 
     if ((parser->expected_len == 0u) || (parser->len < parser->expected_len))
     {
@@ -272,6 +398,16 @@ uint8_t MolePacketParser_PushByte(MolePacketParser *parser, uint8_t byte, MolePa
             ok = MolePacket_BuildHitConfigPacket(parser, out_packet);
         }
     }
+#if MOLE_ENABLE_RGB16X16
+    else if (type_byte == MOLE_PACKET_TYPE_LED16_MONO)
+    {
+        ok = MolePacket_BuildLed16MonoPacket(parser, out_packet);
+    }
+    else if (type_byte == MOLE_PACKET_TYPE_RGB16_CHUNK)
+    {
+        ok = MolePacket_BuildRgb16ChunkPacket(parser, out_packet);
+    }
+#endif
     else
     {
         ok = MolePacket_BuildLedPacket(parser, out_packet);
@@ -287,6 +423,19 @@ uint8_t MolePacketParser_PushByte(MolePacketParser *parser, uint8_t byte, MolePa
 
     MolePacketParser_Reset(parser);
     return ok;
+}
+
+uint8_t MolePacket_IsLed16PixelOn(const MoleLedFrame16Mono *frame, uint8_t row, uint8_t col)
+{
+    uint16_t row_bits;
+
+    if ((frame == NULL) || (row >= MOLE_RGB16_ROWS) || (col >= MOLE_RGB16_COLS))
+    {
+        return 0u;
+    }
+
+    row_bits = (uint16_t)(((uint16_t)frame->rows[row][0] << 8u) | frame->rows[row][1]);
+    return (row_bits & (uint16_t)(0x8000u >> col)) ? 1u : 0u;
 }
 
 uint8_t MolePacketParser_PushBytes(MolePacketParser *parser, const uint8_t *data, uint32_t len, MolePacket *out_packet)

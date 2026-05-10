@@ -1,8 +1,8 @@
 # Whac-A-Mole Game BLE UART Protocol Specification
 
-**Version**: 1.0  
-**Date**: 2026-05-09  
-**Target Device**: M487 MCU with WS2812B RGB LED Matrix (8×8 = 64 LEDs)  
+**Version**: 1.1  
+**Date**: 2026-05-10  
+**Target Device**: M487 MCU with WS2812B RGB LED Matrix (legacy 8×8, optional 16×16)  
 **Transport**: BLE GATT UART (115200 bps)
 
 ---
@@ -427,10 +427,10 @@ Final checksum: **0x03** (matches firmware parser logic: XOR bytes `[1..10]`).
 |--------|-------|-------|
 | Max brightness | 100% | Higher values clamped or rejected |
 | Min brightness | 0% | Turns off all LEDs |
-| LED count | 64 | Fixed 8×8 matrix |
-| Packet length (LED) | 13 bytes | Fixed format |
+| LED count | 64 legacy / optional 256 | 16×16 support is compile-time gated |
+| Packet length (LED) | 13 bytes legacy / 38 bytes 16×16 mono | Legacy format unchanged |
 | Packet length (control) | 5 bytes | Fixed format |
-| BLE MTU | 20 bytes (typical) | Packets fit easily; can burst multiple |
+| BLE MTU | 20 bytes (typical) | Legacy/control packets fit easily; RGB16 uses chunks |
 | Message frequency | No limit | Device processes as fast as BLE delivers |
 | Hit report frequency | 1 per button press | Can queue multiple if rapid-fire presses |
 
@@ -545,13 +545,68 @@ device.onData((buffer) => {
 
 ---
 
-## 12. Revision History
+## 12. Optional 16×16 RGB LED Extension
+
+The legacy 8×8 packet format remains unchanged for backward compatibility. 16×16 support is compile-time gated by `MOLE_ENABLE_RGB16X16`; per-pixel RGB chunk transfer is gated by `MOLE_ENABLE_RGB16X16_COLOR`.
+
+### 12.1 16×16 Mono Packet (`0xD0`, 38 bytes)
+
+```text
+[0]     Header              0xAA or 0xFD
+[1]     Type                0xD0
+[2]     Color Code          Same palette as legacy 8×8
+[3]     Target Tag          0x01 target, 0x00 decoy
+[4-35]  Rows                16 rows × 2 bytes, big-endian; bit15=col0, bit0=col15
+[36]    Checksum            XOR bytes [1..35]
+[37]    Footer              0x55 or 0xFE
+```
+
+### 12.2 16×16 Per-Pixel RGB Chunk Packet (`0xD1`, variable length)
+
+The full RGB frame is `256 × 3 = 768` bytes in row-major `R,G,B` byte order. Firmware stages chunks and refreshes the panel only after a valid `COMMIT`, so partial frames are never displayed.
+
+```text
+[0]          Header              0xAA or 0xFD
+[1]          Type                0xD1
+[2]          Op                  0x01 START, 0x02 DATA, 0x03 COMMIT, 0x04 CANCEL
+[3]          Frame ID            Host-selected frame sequence id
+[4]          Chunk Index         Sequential DATA index
+[5-6]        Offset              Big-endian byte offset in 768-byte RGB frame
+[7]          Payload Length      0..MOLE_RGB16_CHUNK_PAYLOAD_MAX
+[8..N]       Payload             RGB bytes for DATA only
+[N+1]        Checksum            XOR bytes [1..N]
+[N+2]        Footer              0x55 or 0xFE
+```
+
+Recommended sequence:
+
+```text
+START(frame_id, len=0)
+DATA(frame_id, chunk=0, offset=0, payload...)
+DATA(frame_id, chunk=1, offset+=previous_len, payload...)
+...
+COMMIT(frame_id, len=0)
+```
+
+### 12.3 Capability Query
+
+```text
+AT+TEST,CAPABILITIES
++OK,CAPABILITIES,CAP=0x0000007F,LEGACY8=1,RGB16=1,RGB16_COLOR=1,ROWS=16,COLS=16,CHUNK=10
+```
+
+`AT+TEST,VERSION` also returns `CAP=0x........` so host software can gate protocol features by firmware capability.
+
+---
+
+## 13. Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-05-10 | Added optional 16×16 mono and chunked RGB extension plus capability query |
 | 1.0 | 2026-05-09 | Initial specification (LED, Brightness, Hit Config, Hit Report) |
 
 ---
 
 **Document Status**: ✅ Ready for Web Frontend Integration  
-**Last Updated**: 2026-05-09
+**Last Updated**: 2026-05-10

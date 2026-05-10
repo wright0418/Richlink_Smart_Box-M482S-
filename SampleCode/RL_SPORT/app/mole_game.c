@@ -31,9 +31,17 @@ static MolePacketParser s_packet_parser;
 static MoleHitDetector s_hit_detector;
 static MoleLedFrame s_last_frame;
 static MoleLedFrame s_pending_frame;
+#if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
+static uint8_t s_rgb16_staging[MOLE_RGB16_COLOR_BYTES];
+static uint16_t s_rgb16_bytes_received = 0u;
+static uint8_t s_rgb16_frame_active = 0u;
+static uint8_t s_rgb16_frame_id = 0u;
+static uint8_t s_rgb16_next_chunk_index = 0u;
+#endif
 static uint32_t s_last_gsensor_sample_ms = 0u;
 static uint32_t s_last_led_apply_ms = 0u;
 static uint8_t s_has_frame = 0u;
+static uint8_t s_has_display = 0u;
 static uint8_t s_has_pending_frame = 0u;
 static MoleGameContext s_game_ctx = {
     .brightness_percent = MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT,
@@ -46,6 +54,10 @@ static const char *MoleGame_PacketTypeToString(MolePacketType type)
     {
     case MOLE_PACKET_LED:
         return "LED";
+    case MOLE_PACKET_LED16_MONO:
+        return "LED16_MONO";
+    case MOLE_PACKET_RGB16_CHUNK:
+        return "RGB16_CHUNK";
     case MOLE_PACKET_BRIGHTNESS:
         return "BRIGHTNESS";
     case MOLE_PACKET_BRIGHTNESS_CMD:
@@ -75,6 +87,7 @@ static void MoleGame_ApplyLedFrame(const MoleLedFrame *frame, const char *reason
 
     s_last_frame = *frame;
     s_has_frame = 1u;
+    s_has_display = 1u;
     s_last_led_apply_ms = now;
 
     MOLE_TRACE_PRINT("RX LED color=%u target=%u rows=%02X,%02X,%02X,%02X,%02X,%02X,%02X,%02X\r\n",
@@ -93,6 +106,123 @@ static void MoleGame_ApplyLedFrame(const MoleLedFrame *frame, const char *reason
     show_ok = WS2812B_ShowMoleFrame(&s_last_frame);
     MOLE_TRACE_PRINT("DISPLAY STEP2: WS2812B_ShowMoleFrame result=%s\r\n", show_ok ? "OK" : "FAIL");
 }
+
+#if MOLE_ENABLE_RGB16X16
+static void MoleGame_ApplyLed16MonoFrame(const MoleLedFrame16Mono *frame, const char *reason)
+{
+    uint8_t show_ok;
+    uint32_t now = get_ticks_ms();
+
+    if (frame == NULL)
+    {
+        return;
+    }
+
+    s_has_display = 1u;
+    s_last_led_apply_ms = now;
+
+    MOLE_TRACE_PRINT("RX LED16_MONO color=%u target=%u row0=%02X%02X row15=%02X%02X\r\n",
+                     (unsigned)frame->color,
+                     (unsigned)frame->target_tag,
+                     (unsigned)frame->rows[0][0],
+                     (unsigned)frame->rows[0][1],
+                     (unsigned)frame->rows[15][0],
+                     (unsigned)frame->rows[15][1]);
+    MOLE_TRACE_PRINT("DISPLAY STEP1: apply LED16 mono frame -> WS2812B_ShowMoleFrame16Mono (%s)\r\n",
+                     (reason != NULL) ? reason : "direct");
+    show_ok = WS2812B_ShowMoleFrame16Mono(frame);
+    MOLE_TRACE_PRINT("DISPLAY STEP2: WS2812B_ShowMoleFrame16Mono result=%s\r\n", show_ok ? "OK" : "FAIL");
+}
+#endif
+
+#if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
+static void MoleGame_ResetRgb16Staging(void)
+{
+    memset(s_rgb16_staging, 0, sizeof(s_rgb16_staging));
+    s_rgb16_bytes_received = 0u;
+    s_rgb16_frame_active = 0u;
+    s_rgb16_frame_id = 0u;
+    s_rgb16_next_chunk_index = 0u;
+}
+
+static void MoleGame_HandleRgb16Chunk(const MoleRgb16Chunk *chunk)
+{
+    if (chunk == NULL)
+    {
+        return;
+    }
+
+    switch (chunk->op)
+    {
+    case MOLE_RGB16_CHUNK_OP_START:
+        MoleGame_ResetRgb16Staging();
+        s_rgb16_frame_active = 1u;
+        s_rgb16_frame_id = chunk->frame_id;
+        MOLE_TRACE_PRINT("RGB16 START frame=%u\r\n", (unsigned)s_rgb16_frame_id);
+        break;
+
+    case MOLE_RGB16_CHUNK_OP_DATA:
+        if ((s_rgb16_frame_active == 0u) ||
+            (chunk->frame_id != s_rgb16_frame_id) ||
+            (chunk->chunk_index != s_rgb16_next_chunk_index) ||
+            (chunk->offset != s_rgb16_bytes_received) ||
+            (((uint32_t)chunk->offset + chunk->payload_len) > MOLE_RGB16_COLOR_BYTES))
+        {
+            MOLE_TRACE_PRINT("RGB16 DATA drop frame=%u chunk=%u offset=%u len=%u active=%u expected_frame=%u expected_chunk=%u expected_offset=%u\r\n",
+                             (unsigned)chunk->frame_id,
+                             (unsigned)chunk->chunk_index,
+                             (unsigned)chunk->offset,
+                             (unsigned)chunk->payload_len,
+                             (unsigned)s_rgb16_frame_active,
+                             (unsigned)s_rgb16_frame_id,
+                             (unsigned)s_rgb16_next_chunk_index,
+                             (unsigned)s_rgb16_bytes_received);
+            MoleGame_ResetRgb16Staging();
+            break;
+        }
+
+        memcpy(&s_rgb16_staging[chunk->offset], chunk->payload, chunk->payload_len);
+        s_rgb16_bytes_received = (uint16_t)(s_rgb16_bytes_received + chunk->payload_len);
+        s_rgb16_next_chunk_index++;
+        MOLE_TRACE_PRINT("RGB16 DATA frame=%u chunk=%u bytes=%u/%u\r\n",
+                         (unsigned)chunk->frame_id,
+                         (unsigned)chunk->chunk_index,
+                         (unsigned)s_rgb16_bytes_received,
+                         (unsigned)MOLE_RGB16_COLOR_BYTES);
+        break;
+
+    case MOLE_RGB16_CHUNK_OP_COMMIT:
+        if ((s_rgb16_frame_active == 0u) ||
+            (chunk->frame_id != s_rgb16_frame_id) ||
+            (s_rgb16_bytes_received != MOLE_RGB16_COLOR_BYTES))
+        {
+            MOLE_TRACE_PRINT("RGB16 COMMIT drop frame=%u active=%u expected_frame=%u bytes=%u/%u\r\n",
+                             (unsigned)chunk->frame_id,
+                             (unsigned)s_rgb16_frame_active,
+                             (unsigned)s_rgb16_frame_id,
+                             (unsigned)s_rgb16_bytes_received,
+                             (unsigned)MOLE_RGB16_COLOR_BYTES);
+            MoleGame_ResetRgb16Staging();
+            break;
+        }
+
+        MOLE_TRACE_PRINT("RGB16 COMMIT apply frame=%u bytes=%u\r\n",
+                         (unsigned)chunk->frame_id,
+                         (unsigned)s_rgb16_bytes_received);
+        s_has_display = 1u;
+        s_last_led_apply_ms = get_ticks_ms();
+        (void)WS2812B_ShowRgbBuffer16(s_rgb16_staging, MOLE_RGB16_COLOR_BYTES, 0u);
+        MoleGame_ResetRgb16Staging();
+        break;
+
+    case MOLE_RGB16_CHUNK_OP_CANCEL:
+    default:
+        MOLE_TRACE_PRINT("RGB16 CANCEL frame=%u\r\n", (unsigned)chunk->frame_id);
+        MoleGame_ResetRgb16Staging();
+        break;
+    }
+}
+#endif
 
 static void MoleGame_CommitPendingLedFrameIfDue(void)
 {
@@ -214,6 +344,20 @@ static void MoleGame_HandlePacket(const MolePacket *packet)
         break;
     }
 
+    #if MOLE_ENABLE_RGB16X16
+        case MOLE_PACKET_LED16_MONO:
+        MoleGame_ApplyLed16MonoFrame(&packet->payload.led16_mono, "direct");
+        break;
+
+        case MOLE_PACKET_RGB16_CHUNK:
+    #if MOLE_ENABLE_RGB16X16_COLOR
+        MoleGame_HandleRgb16Chunk(&packet->payload.rgb16_chunk);
+    #else
+        MOLE_TRACE_PRINT("RGB16_CHUNK ignored: color support disabled\r\n");
+    #endif
+        break;
+    #endif
+
     case MOLE_PACKET_BRIGHTNESS:
     {
         uint8_t refresh_ok;
@@ -221,11 +365,11 @@ static void MoleGame_HandlePacket(const MolePacket *packet)
         MOLE_TRACE_PRINT("RX BRIGHTNESS status=%u\r\n", (unsigned)packet->payload.brightness_percent);
         MOLE_TRACE_PRINT("DISPLAY STEP1: set brightness=%u\r\n", (unsigned)packet->payload.brightness_percent);
         WS2812B_SetBrightness(packet->payload.brightness_percent);
-        if (s_has_frame != 0u)
+        if (s_has_display != 0u)
         {
-            MOLE_TRACE_PRINT("DISPLAY STEP2: redraw last LED frame\r\n");
-            refresh_ok = WS2812B_ShowMoleFrame(&s_last_frame);
-            MOLE_TRACE_PRINT("DISPLAY STEP3: redraw result=%s\r\n", refresh_ok ? "OK" : "FAIL");
+            MOLE_TRACE_PRINT("DISPLAY STEP2: refresh current pixels with new brightness\r\n");
+            refresh_ok = WS2812B_Refresh();
+            MOLE_TRACE_PRINT("DISPLAY STEP3: refresh result=%s\r\n", refresh_ok ? "OK" : "FAIL");
         }
         else
         {
@@ -244,11 +388,11 @@ static void MoleGame_HandlePacket(const MolePacket *packet)
         WS2812B_SetBrightness(s_game_ctx.brightness_percent);
         DBG_PRINT("[MOLE] Brightness adjusted to %u%%\n", (unsigned)s_game_ctx.brightness_percent);
         /* Redraw current frame at new brightness */
-        if (s_has_frame != 0u)
+        if (s_has_display != 0u)
         {
-            MOLE_TRACE_PRINT("DISPLAY STEP2: redraw last LED frame\r\n");
-            refresh_ok = WS2812B_ShowMoleFrame(&s_last_frame);
-            MOLE_TRACE_PRINT("DISPLAY STEP3: redraw result=%s\r\n", refresh_ok ? "OK" : "FAIL");
+            MOLE_TRACE_PRINT("DISPLAY STEP2: refresh current pixels with new brightness\r\n");
+            refresh_ok = WS2812B_Refresh();
+            MOLE_TRACE_PRINT("DISPLAY STEP3: refresh result=%s\r\n", refresh_ok ? "OK" : "FAIL");
         }
         else
         {
@@ -333,6 +477,7 @@ void MoleGame_Init(void)
     memset(&s_last_frame, 0, sizeof(s_last_frame));
     memset(&s_pending_frame, 0, sizeof(s_pending_frame));
     s_has_frame = 0u;
+    s_has_display = 0u;
     s_has_pending_frame = 0u;
     s_last_gsensor_sample_ms = 0u;
     s_last_led_apply_ms = 0u;
@@ -342,6 +487,9 @@ void MoleGame_Init(void)
     s_game_ctx.hit_detection_method = MOLE_HIT_METHOD_BUTTON; /* Default: button only */
 
     MolePacketParser_Init(&s_packet_parser);
+#if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
+    MoleGame_ResetRgb16Staging();
+#endif
     MoleHitDetector_Init(&s_hit_detector);
     Ble_RawRxReset();
     DBG_PRINT("[MOLE] Parsers reset done\n");
@@ -388,6 +536,7 @@ void MoleGame_ResetFrameState(void)
     memset(&s_last_frame, 0, sizeof(s_last_frame));
     memset(&s_pending_frame, 0, sizeof(s_pending_frame));
     s_has_frame = 0u;
+    s_has_display = 0u;
     s_has_pending_frame = 0u;
     s_last_led_apply_ms = 0u;
     WS2812B_Clear();

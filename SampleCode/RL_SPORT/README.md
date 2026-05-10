@@ -56,9 +56,19 @@
 常用範例：
 - `AT+TEST,PING`
 - `AT+TEST,VERSION`
+- `AT+TEST,CAPABILITIES`
 - `AT+TEST,STATUS`
 - `AT+TEST,SENSOR_READ`
 - `AT+TEST,DFLASH_INFO`
+
+### 4. 16×16 RGB LED 擴充（可編譯開關）
+- 既有 8×8 單色 BLE 封包保持相容。
+- `project_config.h` 透過 `MOLE_ENABLE_RGB16X16` 控制 16×16 支援。
+- `MOLE_ENABLE_RGB16X16_COLOR` 控制 16×16 每點 RGB 分片傳輸；關閉可節省 RAM/code size。
+- 前端應先查 `AT+TEST,CAPABILITIES`，再決定使用 8×8、16×16 單色或 16×16 RGB chunk protocol。
+- 正式協議：`docs/BLE_PROTOCOL.md`
+- 快速參考：`docs/BLE_PACKET_QUICK_REFERENCE.md`
+- Feature flags：`../../docs/SampleCode/RL_SPORT/FEATURE_FLAGS_REFERENCE.md`
 
 ## 建議的最小回歸流程
 1. 先確認韌體可成功建置。

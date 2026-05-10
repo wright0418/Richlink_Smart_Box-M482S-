@@ -495,8 +495,23 @@ static void handle_ping(void)
 /* ===================== VERSION ===================== */
 static void handle_version(void)
 {
-    repl_send("+OK,VERSION,%s,%s,%s\r\n",
-              FW_VERSION, FW_BUILD_DATE, FW_BUILD_TIME);
+    repl_send("+OK,VERSION,%s,%s,%s,CAP=0x%08lX\r\n",
+              FW_VERSION,
+              FW_BUILD_DATE,
+              FW_BUILD_TIME,
+              (unsigned long)FW_CAPABILITY_MASK);
+}
+
+static void handle_capabilities(void)
+{
+    repl_send("+OK,CAPABILITIES,CAP=0x%08lX,LEGACY8=%u,RGB16=%u,RGB16_COLOR=%u,ROWS=%u,COLS=%u,CHUNK=%u\r\n",
+              (unsigned long)FW_CAPABILITY_MASK,
+              (unsigned)MOLE_LED_LEGACY8_SUPPORT,
+              (unsigned)MOLE_ENABLE_RGB16X16,
+              (unsigned)MOLE_ENABLE_RGB16X16_COLOR,
+              (unsigned)MOLE_RGB16_ROWS,
+              (unsigned)MOLE_RGB16_COLS,
+              (unsigned)MOLE_RGB16_CHUNK_PAYLOAD_MAX);
 }
 
 /* =================== Data Flash =================== */
@@ -695,6 +710,7 @@ static void handle_help(void)
        single-format calls which may be truncated in intermediate buffers. */
     repl_send_ok("HELP",
                  "PING|VERSION|REPL_START|REPL_STOP|REPL_STATE|"
+                 "CAPABILITIES|"
                  "STATUS|STATUS_VERBOSE|"
                  "LED_ON|LED_OFF|LED_BLINK|"
                  "BUZZER_ON|BUZZER_OFF|BUZZER_BEEP|"
@@ -828,6 +844,12 @@ uint8_t BleAtRepl_HandleMessage(const char *msg)
     if (strcmp(cmd, "VERSION") == 0)
     {
         handle_version();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "CAPABILITIES") == 0)
+    {
+        handle_capabilities();
         return 1u;
     }
 

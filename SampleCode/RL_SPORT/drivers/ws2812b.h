@@ -46,11 +46,23 @@ void WS2812B_ApplyBitmapRows(const uint8_t *rows,
                              uint8_t row_count,
                              WS2812B_Color on_color,
                              WS2812B_Color off_color);
+void WS2812B_ApplyBitmapRows16(const uint8_t rows[MOLE_RGB16_ROWS][2],
+                               WS2812B_Color on_color,
+                               WS2812B_Color off_color);
+void WS2812B_ApplyRgbBuffer16(const uint8_t *rgb,
+                              uint16_t rgb_len);
 uint8_t WS2812B_ShowBitmapRows(const uint8_t *rows,
                                uint8_t row_count,
                                WS2812B_Color on_color,
                                WS2812B_Color off_color,
                                uint8_t use_polling);
+uint8_t WS2812B_ShowBitmapRows16(const uint8_t rows[MOLE_RGB16_ROWS][2],
+                                 WS2812B_Color on_color,
+                                 WS2812B_Color off_color,
+                                 uint8_t use_polling);
+uint8_t WS2812B_ShowRgbBuffer16(const uint8_t *rgb,
+                                uint16_t rgb_len,
+                                uint8_t use_polling);
 uint8_t WS2812B_ShowTemplate(WS2812B_TemplateId template_id,
                              WS2812B_Color on_color,
                              WS2812B_Color off_color,
@@ -59,6 +71,7 @@ uint8_t WS2812B_Refresh(void);
 uint8_t WS2812B_RefreshPolling(void);
 void WS2812B_DiagnosticGpioProbe(uint8_t pulses, uint32_t half_period_ms);
 uint8_t WS2812B_ShowMoleFrame(const MoleLedFrame *frame);
+uint8_t WS2812B_ShowMoleFrame16Mono(const MoleLedFrame16Mono *frame);
 WS2812B_Color WS2812B_ColorMake(uint8_t r, uint8_t g, uint8_t b);
 WS2812B_Color WS2812B_ColorFromPalette(WS2812B_PaletteId palette_id);
 WS2812B_Color WS2812B_ColorFromProtocol(uint8_t color_code);

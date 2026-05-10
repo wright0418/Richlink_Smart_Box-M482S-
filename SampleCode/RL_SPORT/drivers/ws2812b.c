@@ -21,7 +21,10 @@
 #define WS2812B_SPI_ONE_CODE 0xF8u
 #define WS2812B_BYTES_PER_PIXEL 24u
 #define WS2812B_LATCH_BYTES 48u
-#define WS2812B_SPI_BUF_SIZE ((MOLE_LED_COUNT * WS2812B_BYTES_PER_PIXEL) + WS2812B_LATCH_BYTES)
+#ifndef MOLE_WS2812_LED_COUNT
+#define MOLE_WS2812_LED_COUNT MOLE_LED_COUNT
+#endif
+#define WS2812B_SPI_BUF_SIZE ((MOLE_WS2812_LED_COUNT * WS2812B_BYTES_PER_PIXEL) + WS2812B_LATCH_BYTES)
 #define WS2812B_PDMA_TIMEOUT_LOOPS 2000000u
 #define WS2812B_POLL_TIMEOUT_LOOPS 2000000u
 #define WS2812B_FRAME_FLUSH_DELAY_MS 4u
@@ -34,7 +37,7 @@ typedef struct
     uint8_t b;
 } WS2812B_GrbPixel;
 
-static WS2812B_GrbPixel s_pixels[MOLE_LED_COUNT];
+static WS2812B_GrbPixel s_pixels[MOLE_WS2812_LED_COUNT];
 static uint8_t s_spi_buf[WS2812B_SPI_BUF_SIZE] __attribute__((aligned(4)));
 static uint8_t s_brightness_percent = MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT;
 static uint8_t s_initialized = 0u;
@@ -61,7 +64,7 @@ static void WS2812B_BuildSpiBuffer(void)
 {
     uint32_t offset = 0u;
 
-    for (uint16_t i = 0u; i < MOLE_LED_COUNT; i++)
+    for (uint16_t i = 0u; i < MOLE_WS2812_LED_COUNT; i++)
     {
         WS2812B_EncodeByte(WS2812B_Scale(s_pixels[i].g), &s_spi_buf[offset]);
         offset += 8u;
@@ -206,7 +209,7 @@ void WS2812B_Init(void)
 
     DBG_PRINT("[WS2812] Init start clk=%luHz leds=%u\n",
               (unsigned long)WS2812B_SPI_CLOCK_HZ,
-              (unsigned)MOLE_LED_COUNT);
+              (unsigned)MOLE_WS2812_LED_COUNT);
 
     CLK_EnableModuleClock(PDMA_MODULE);
     CLK_EnableModuleClock(SPI0_MODULE);
@@ -252,7 +255,7 @@ void WS2812B_Clear(void)
 
 void WS2812B_SetPixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
 {
-    if (index >= MOLE_LED_COUNT)
+    if (index >= MOLE_WS2812_LED_COUNT)
     {
         return;
     }
@@ -264,7 +267,7 @@ void WS2812B_SetPixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b)
 
 void WS2812B_FillRgb(uint8_t r, uint8_t g, uint8_t b)
 {
-    for (uint16_t i = 0u; i < MOLE_LED_COUNT; i++)
+    for (uint16_t i = 0u; i < MOLE_WS2812_LED_COUNT; i++)
     {
         WS2812B_SetPixel(i, r, g, b);
     }
@@ -293,6 +296,8 @@ void WS2812B_ApplyBitmapRows(const uint8_t *rows,
         return;
     }
 
+    WS2812B_FillColor(off_color);
+
     for (uint8_t row = 0u; row < MOLE_LED_ROWS; row++)
     {
         uint8_t row_bits = (row < limited_rows) ? rows[row] : 0u;
@@ -306,6 +311,65 @@ void WS2812B_ApplyBitmapRows(const uint8_t *rows,
     }
 }
 
+void WS2812B_ApplyBitmapRows16(const uint8_t rows[MOLE_RGB16_ROWS][2],
+                               WS2812B_Color on_color,
+                               WS2812B_Color off_color)
+{
+#if MOLE_ENABLE_RGB16X16
+    WS2812B_FillColor(off_color);
+
+    if (rows == NULL)
+    {
+        return;
+    }
+
+    for (uint8_t row = 0u; row < MOLE_RGB16_ROWS; row++)
+    {
+        uint16_t row_bits = (uint16_t)(((uint16_t)rows[row][0] << 8u) | rows[row][1]);
+        for (uint8_t col = 0u; col < MOLE_RGB16_COLS; col++)
+        {
+            uint16_t index = (uint16_t)((uint16_t)row * MOLE_RGB16_COLS + col);
+            uint8_t active = (row_bits & (uint16_t)(0x8000u >> col)) ? 1u : 0u;
+            WS2812B_Color color = active ? on_color : off_color;
+            WS2812B_SetPixel(index, color.r, color.g, color.b);
+        }
+    }
+#else
+    (void)rows;
+    (void)on_color;
+    (void)off_color;
+#endif
+}
+
+void WS2812B_ApplyRgbBuffer16(const uint8_t *rgb, uint16_t rgb_len)
+{
+#if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
+    uint16_t pixel_count;
+
+    WS2812B_Clear();
+
+    if (rgb == NULL)
+    {
+        return;
+    }
+
+    if (rgb_len > MOLE_RGB16_COLOR_BYTES)
+    {
+        rgb_len = MOLE_RGB16_COLOR_BYTES;
+    }
+
+    pixel_count = (uint16_t)(rgb_len / 3u);
+    for (uint16_t i = 0u; i < pixel_count; i++)
+    {
+        uint16_t offset = (uint16_t)(i * 3u);
+        WS2812B_SetPixel(i, rgb[offset], rgb[offset + 1u], rgb[offset + 2u]);
+    }
+#else
+    (void)rgb;
+    (void)rgb_len;
+#endif
+}
+
 uint8_t WS2812B_ShowBitmapRows(const uint8_t *rows,
                                uint8_t row_count,
                                WS2812B_Color on_color,
@@ -313,6 +377,21 @@ uint8_t WS2812B_ShowBitmapRows(const uint8_t *rows,
                                uint8_t use_polling)
 {
     WS2812B_ApplyBitmapRows(rows, row_count, on_color, off_color);
+    return (use_polling != 0u) ? WS2812B_RefreshPolling() : WS2812B_Refresh();
+}
+
+uint8_t WS2812B_ShowBitmapRows16(const uint8_t rows[MOLE_RGB16_ROWS][2],
+                                 WS2812B_Color on_color,
+                                 WS2812B_Color off_color,
+                                 uint8_t use_polling)
+{
+    WS2812B_ApplyBitmapRows16(rows, on_color, off_color);
+    return (use_polling != 0u) ? WS2812B_RefreshPolling() : WS2812B_Refresh();
+}
+
+uint8_t WS2812B_ShowRgbBuffer16(const uint8_t *rgb, uint16_t rgb_len, uint8_t use_polling)
+{
+    WS2812B_ApplyRgbBuffer16(rgb, rgb_len);
     return (use_polling != 0u) ? WS2812B_RefreshPolling() : WS2812B_Refresh();
 }
 
@@ -451,4 +530,22 @@ uint8_t WS2812B_ShowMoleFrame(const MoleLedFrame *frame)
                                   WS2812B_ColorFromProtocol(frame->color),
                                   WS2812B_ColorFromPalette(WS2812B_PALETTE_OFF),
                                   0u);
+}
+
+uint8_t WS2812B_ShowMoleFrame16Mono(const MoleLedFrame16Mono *frame)
+{
+#if MOLE_ENABLE_RGB16X16
+    if (frame == NULL)
+    {
+        return 0u;
+    }
+
+    return WS2812B_ShowBitmapRows16(frame->rows,
+                                    WS2812B_ColorFromProtocol(frame->color),
+                                    WS2812B_ColorFromPalette(WS2812B_PALETTE_OFF),
+                                    0u);
+#else
+    (void)frame;
+    return 0u;
+#endif
 }
