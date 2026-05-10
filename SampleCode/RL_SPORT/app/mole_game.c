@@ -1,3 +1,10 @@
+/**
+ * @file app/mole_game.c
+ * @brief Mole game BLE protocol and WS2812 frame handling.
+ *
+ * This module implements the BLE-driven Mole game profile, including packet
+ * parsing, LED frame staging, RGB16 chunked transfer, and hit detection.
+ */
 #include "mole_game.h"
 
 #include "../ble.h"
@@ -344,19 +351,19 @@ static void MoleGame_HandlePacket(const MolePacket *packet)
         break;
     }
 
-    #if MOLE_ENABLE_RGB16X16
-        case MOLE_PACKET_LED16_MONO:
+#if MOLE_ENABLE_RGB16X16
+    case MOLE_PACKET_LED16_MONO:
         MoleGame_ApplyLed16MonoFrame(&packet->payload.led16_mono, "direct");
         break;
 
-        case MOLE_PACKET_RGB16_CHUNK:
-    #if MOLE_ENABLE_RGB16X16_COLOR
+    case MOLE_PACKET_RGB16_CHUNK:
+#if MOLE_ENABLE_RGB16X16_COLOR
         MoleGame_HandleRgb16Chunk(&packet->payload.rgb16_chunk);
-    #else
+#else
         MOLE_TRACE_PRINT("RGB16_CHUNK ignored: color support disabled\r\n");
-    #endif
+#endif
         break;
-    #endif
+#endif
 
     case MOLE_PACKET_BRIGHTNESS:
     {

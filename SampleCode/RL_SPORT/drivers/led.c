@@ -1,4 +1,11 @@
-/* led.c - Green LED control implementation (moved to drivers/) */
+/**
+ * @file drivers/led.c
+ * @brief Green LED driver for PWM-style blink control.
+ *
+ * Implements a simple software PWM blink engine driven by the 1ms system
+ * tick. The LED may be forced on/off directly or configured with a
+ * frequency/duty cycle for heartbeat and status indication patterns.
+ */
 #include "led.h"
 #if defined(__has_include)
 #if __has_include("NuMicro.h")
@@ -84,6 +91,13 @@ static volatile int8_t g_forceLedState = -1;
 static volatile uint32_t g_u32PeriodTicksTarget = 0;
 static volatile uint32_t g_u32OnTicks = 0;
 
+/**
+ * @brief Directly set the raw green LED GPIO state.
+ * @param state 1 to turn the LED on, 0 to turn it off.
+ *
+ * This helper bypasses the software blink engine and writes the pin state
+ * directly, leaving the blink engine counters unchanged.
+ */
 static void SetGreenLedRaw(uint8_t state)
 {
     if (state)
@@ -99,6 +113,13 @@ void SetGreenLed(uint8_t state)
     SetGreenLedRaw(state);
 }
 
+/**
+ * @brief Update the software PWM blink engine at each timer tick.
+ *
+ * This function is driven by the timer ISR and handles both forced on/off
+ * states and periodic PWM refresh based on the configured frequency and
+ * duty cycle.
+ */
 static void Led_Update(void)
 {
     if (g_forceLedState >= 0)

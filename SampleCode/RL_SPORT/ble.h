@@ -48,72 +48,39 @@ extern volatile uint8_t g_u8DataReady;          /**< Non-zero when a complete me
 
 /* Public BLE API used by main and other modules */
 /**
- * @brief Initialize BLE helper state and ensure module is in run mode.
+ * @brief Initialize BLE helper state and ensure the BLE transport is ready.
  *
- * Safe to call from main startup. May enable UART interrupts and
- * initialize internal buffers.
- */
-/**
- * @brief Initialize BLE helper state and ensure module is in run mode.
- *
- * Safe to call from main startup. This configures internal buffers and
- * may enable UART interrupts used by the BLE transport. Implementation
- * details (which UART instance, IRQ priorities) are platform-dependent.
+ * Safe to call during startup. This configures internal line buffers and
+ * may enable UART interrupts used by the BLE transport.
  */
 void BleSetup(void);
 
 /**
- * @brief Process pending BLE UART input and update state.
- *
- * Call from the main loop; this function parses complete lines and
- * updates `SystemStatus` accordingly.
- */
-/**
- * @brief Process pending BLE UART input and update state.
+ * @brief Process pending BLE UART input and update system status.
  *
  * Called from the main loop to parse buffered UART input. This function
- * identifies complete lines or messages, updates internal state and
- * may call system-level handlers (e.g. Sys_SetBleState) based on parsed
- * responses.
+ * identifies complete lines or messages, updates internal state, and may
+ * call system-level handlers such as Sys_SetBleState().
  */
 void CheckBleRecvMsg(void);
 
 /**
  * @brief Formatted send helper for BLE UART.
- * @param uart Opaque UART handle (SDK type). May be cast inside impl.
- * @param format printf-style format string.
- * @return Number of bytes written or negative on error.
- */
-/**
- * @brief Formatted send helper for BLE UART.
- * @param uart Opaque UART handle (SDK-specific type). The implementation
- *             may cast this to the platform UART type.
+ * @param uart Opaque UART handle (SDK-specific type).
  * @param format printf-style format string followed by arguments.
  * @return Number of bytes written on success, negative on error.
  */
 int BLE_UART_SEND(void *uart, const char *format, ...);
 
 /**
- * @brief Initialize BLE transport (UART1) and interrupts
- * @param baud Baud rate for UART1
- */
-/**
- * @brief Initialize BLE transport (UART) and related interrupts.
- * @param baud Baud rate for UART used to communicate with the BLE module.
- *
- * This function configures the UART peripheral used for the BLE link
- * (commonly UART1 on the board) and enables any required IRQs.
+ * @brief Initialize BLE transport and related UART interrupts.
+ * @param baud Baud rate for the BLE UART interface.
  */
 void Ble_Init(uint32_t baud);
 
 /**
  * @brief Send a NUL-terminated string to the BLE module.
  * @param data NUL-terminated C string to send.
- */
-/**
- * @brief Send a NUL-terminated string to the BLE module.
- * @param data NUL-terminated C string to send. The function may block
- *             briefly while queuing the data to the UART.
  */
 void BLESendData(const char *data);
 

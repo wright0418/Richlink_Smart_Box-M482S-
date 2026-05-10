@@ -1,6 +1,10 @@
 /**
  * @file drivers/timer.c
- * @brief Timer management module implementation (moved to drivers/)
+ * @brief Timer management module implementation for RL_SPORT.
+ *
+ * Provides a millisecond system tick counter, delay helper and timeout
+ * utilities. Timer0 is configured for a 1 kHz periodic interrupt used by
+ * the main application and LED timing engine.
  */
 #include "timer.h"
 #include "NuMicro.h"
@@ -9,7 +13,7 @@
 /* System tick counter (incremented by Timer0 ISR at 1kHz) */
 static volatile uint32_t g_system_ticks_ms = 0;
 
-/* Forward declaration for LED update callback */
+/* Forward declaration for LED update callback invoked from Timer ISR. */
 extern void Led_TimerCallback(void);
 
 /*
@@ -17,11 +21,22 @@ extern void Led_TimerCallback(void);
  * Provide a project-level SysTick handler so we don't fall back to
  * startup weak default stubs during bring-up/debug.
  */
+/**
+ * @brief Project-level SysTick handler stub.
+ *
+ * Some BSP or library code may reference a SysTick handler. Providing an
+ * empty implementation prevents falling back to weak stubs during startup.
+ */
 void SysTick_Handler(void)
 {
     /* Intentionally empty */
 }
 
+/**
+ * @brief Timer0 IRQ handler for 1ms system tick.
+ *
+ * Increments the millisecond counter and dispatches LED timing updates.
+ */
 void TMR0_IRQHandler(void)
 {
     if (TIMER_GetIntFlag(TIMER0) == 1)

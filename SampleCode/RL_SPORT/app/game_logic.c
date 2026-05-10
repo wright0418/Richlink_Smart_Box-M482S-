@@ -1,6 +1,9 @@
 /**
- * @file game_logic.c
- * @brief Game logic module implementation
+ * @file app/game_logic.c
+ * @brief Game state machine and movement/idle detection implementation.
+ *
+ * Implements the core gameplay state transitions, BLE transmission timer,
+ * and movement-based idle detection logic used by the main application.
  */
 #include "game_logic.h"
 #include "../system_status.h"
@@ -56,8 +59,14 @@ void Game_ResetMovementTimer(void)
         movement_window[i] = 0.0f;
 }
 
-/* Internal helper: check movement and update idle state
-    ble_connected: true when BLE is connected (use connected timeout), false otherwise */
+/**
+ * @brief Internal movement sampling and idle-state evaluation.
+ * @param ble_connected True when BLE is connected to use connected timeout.
+ *
+ * Samples the G-sensor at a fixed interval, computes mean/stddev of the
+ * motion window, and updates the idle state when motion has been absent
+ * for the configured timeout period.
+ */
 static void Game_CheckMovementAndUpdateIdle(uint8_t ble_connected)
 {
     uint32_t now = get_ticks_ms();

@@ -56,11 +56,20 @@
 #define STATIC_INLINE INLINE
 #endif
 
-/* Firmware version and board identification */
-#define FW_VERSION "1.5.0"
+/* Firmware version and board identification
+   ------------------------------------------------------------------
+   FW_VERSION is built from:
+     FW_VERSION_MAJOR.FW_VERSION_MINOR.FW_VERSION_PATCH
+   The major digit is selected automatically from enabled LED feature
+   flags so the version string encodes the capability tier. */
+#define FW_VERSION_MINOR 5
+#define FW_VERSION_PATCH 0
 #define BOARD_NAME "RL_SPORT_V3"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
+
+#define FW_STR_IMPL(x) #x
+#define FW_STR(x) FW_STR_IMPL(x)
 
 /* General project flags */
 
@@ -112,7 +121,25 @@
 #define MOLE_WS2812_DIAG_STEP_MS 1000u
 #define MOLE_WS2812_DIAG_GPIO_PROBE_MS 200u
 
-/* Firmware capability bits returned by diagnostic commands. */
+/*
+ * Auto version major-digit policy (feature-driven):
+ * 1.x.y: legacy 8x8 only
+ * 2.x.y: 16x16 mono enabled
+ * 3.x.y: 16x16 color chunk enabled
+ */
+#if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
+#define FW_VERSION_MAJOR 3
+#elif MOLE_ENABLE_RGB16X16
+#define FW_VERSION_MAJOR 2
+#else
+#define FW_VERSION_MAJOR 1
+#endif
+
+#define FW_VERSION FW_STR(FW_VERSION_MAJOR) "." FW_STR(FW_VERSION_MINOR) "." FW_STR(FW_VERSION_PATCH)
+
+/* Firmware capability bits returned by diagnostic commands.
+   FW_CAPABILITY_MASK is assembled from the enabled feature flags and
+   is exposed by AT+TEST,VERSION / AT+TEST,CAPABILITIES. */
 #define FW_CAP_LEGACY_8X8_MONO 0x00000001u
 #define FW_CAP_RGB16_MONO 0x00000002u
 #define FW_CAP_RGB16_COLOR_CHUNKED 0x00000004u
@@ -145,7 +172,7 @@
 #else
 #define FW_CAPABILITY_MASK_HIT_GSENSOR 0u
 #endif
-#define FW_CAPABILITY_MASK \
+#define FW_CAPABILITY_MASK                                                         \
    (FW_CAPABILITY_MASK_BASE | FW_CAPABILITY_MASK_RGB16 | FW_CAPABILITY_MASK_REPL | \
     FW_CAPABILITY_MASK_HIT_BUTTON | FW_CAPABILITY_MASK_HIT_GSENSOR)
 

@@ -20,6 +20,16 @@ This document lists compile-time feature flags that affect firmware behavior, me
 
 `FW_CAPABILITY_MASK` is compiled from the enabled features and is returned by `AT+TEST,VERSION` and `AT+TEST,CAPABILITIES`.
 
+### Firmware version first digit rule
+
+The first digit of `FW_VERSION` is selected automatically in `SampleCode/RL_SPORT/project_config.h` based on the enabled LED feature flags:
+
+- `1.x.y`: legacy 8×8 mono only (`MOLE_ENABLE_RGB16X16=0`)
+- `2.x.y`: 16×16 mono enabled (`MOLE_ENABLE_RGB16X16=1` and `MOLE_ENABLE_RGB16X16_COLOR=0`)
+- `3.x.y`: 16×16 RGB color chunk enabled (`MOLE_ENABLE_RGB16X16=1` and `MOLE_ENABLE_RGB16X16_COLOR=1`)
+
+`FW_VERSION` is assembled as `FW_VERSION_MAJOR.FW_VERSION_MINOR.FW_VERSION_PATCH`.
+
 | Bit Macro | Hex | Meaning |
 | --- | ---: | --- |
 | `FW_CAP_LEGACY_8X8_MONO` | `0x00000001` | Legacy 8×8 mono packet support. |

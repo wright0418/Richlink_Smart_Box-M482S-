@@ -1,4 +1,10 @@
-/* buzzer.c - Buzzer control implementation (moved to drivers/) */
+/**
+ * @file drivers/buzzer.c
+ * @brief Buzzer timing and PWM control implementation.
+ *
+ * Uses Timer1 ISR to toggle the buzzer drive output and supports both
+ * fixed-duration beeps and continuous tone output.
+ */
 #include "buzzer.h"
 #include "NuMicro.h"
 

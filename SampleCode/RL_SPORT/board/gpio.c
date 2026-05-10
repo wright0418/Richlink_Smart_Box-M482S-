@@ -1,4 +1,10 @@
-/* board/gpio.c - Button and G-sensor GPIO implementation */
+/**
+ * @file board/gpio.c
+ * @brief Board-level GPIO and wake-up pin configuration.
+ *
+ * Handles button input, hall sensor interrupts, I2C pin configuration,
+ * WS2812 pin setup, and power-lock/wake-up support required by the board.
+ */
 #include "gpio.h"
 #include "NuMicro.h"
 #include "../system_status.h"

@@ -1,3 +1,11 @@
+/**
+ * @file drivers/gsensor.c
+ * @brief Auto-detecting G-sensor driver for SC7U22/MXC400 on I2C.
+ *
+ * This module abstracts the supported accelerometer/gyro backends behind
+ * a unified API. It handles runtime detection, initialization, register
+ * programming and raw axis acquisition.
+ */
 #include "NuMicro.h"
 #include "gsensor.h"
 #include "i2c.h"

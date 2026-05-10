@@ -1,6 +1,11 @@
 /**
  * @file system_status.c
- * @brief System status module implementation
+ * @brief System-wide status and state management implementation.
+ *
+ * This module centralizes all application-level flags and runtime state.
+ * Accessor functions are provided so other modules do not manipulate the
+ * underlying global state directly. IRQ-safe state writes use __disable_irq()
+ * / __enable_irq() to avoid tearing in the shared `SystemStatus` structure.
  */
 #include "system_status.h"
 #include "NuMicro.h"
@@ -9,6 +14,13 @@
 /* Global system status instance kept private to this translation unit. */
 static SystemStatus g_sys;
 
+/**
+ * @brief Copy a string into a volatile destination buffer.
+ * @param dst Destination buffer.
+ * @param dst_size Size of the destination buffer including NUL.
+ * @param src Source string.
+ * @param len Number of characters to copy from src.
+ */
 static void Sys_SetString(volatile uint8_t *dst, uint32_t dst_size, const char *src, uint32_t len)
 {
     if (!dst || !src || dst_size == 0u || len >= dst_size)
@@ -29,6 +41,14 @@ static void Sys_SetString(volatile uint8_t *dst, uint32_t dst_size, const char *
     __enable_irq();
 }
 
+/**
+ * @brief Copy a volatile string into a normal char buffer safely.
+ * @param src Source volatile string buffer.
+ * @param src_size Size of the source buffer.
+ * @param dst Destination buffer.
+ * @param dst_size Capacity of the destination buffer, including NUL.
+ * @return Number of characters copied (excluding final NUL).
+ */
 static uint32_t Sys_CopyString(const volatile uint8_t *src, uint32_t src_size, char *dst, uint32_t dst_size)
 {
     uint32_t i = 0u;

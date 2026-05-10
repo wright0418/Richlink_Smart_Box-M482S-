@@ -341,9 +341,11 @@ static void RL_HandleMoleLowBatteryShutdown(uint8_t low_batt)
 /*---------------------------------------------------------------------------------------------------------*/
 
 /**
- * @brief Handle KeyA event and refresh the movement inactivity timer.
+ * @brief Handle user KeyA press events.
+ *
+ * The application uses this event to refresh the movement inactivity timer
+ * without starting sensor calibration or other game-specific flows.
  */
-
 void ProcessKeyAEvent(void)
 {
   /* Key press handling: do not trigger G-sensor calibration here. */
@@ -652,9 +654,10 @@ int main()
     }
 #endif
     /* Hall sensor IRQ print (main loop, not ISR) */
+    uint8_t edges = 0u;
     if (Sys_GetHallPb7IrqFlag())
     {
-      uint8_t edges = Sys_TakeHallPb7PendingEdges();
+      edges = Sys_TakeHallPb7PendingEdges();
 
       if (Sys_GetGameState() == GAME_START)
       {
@@ -687,18 +690,18 @@ int main()
     uint16_t total = Sys_GetJumpTimes();
     Sys_SetHallPb7IrqFlag(0);
     DBG_PRINT("[HALL] PB7 edges=%u total=%u\n", (unsigned)edges, (unsigned)total);
-  }
-  /* Process button events */
-  if (Sys_GetKeyAFlag())
-  {
-    Sys_SetKeyAFlag(0);
-    ProcessKeyAEvent();
-  }
+    /* Process button events */
+    if (Sys_GetKeyAFlag())
+    {
+      Sys_SetKeyAFlag(0);
+      ProcessKeyAEvent();
+    }
 
-  RL_HandleBleAndGameState();
-  RL_HandleIdlePowerOff(&s_poweroff_done);
-  /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
-  RL_UpdateLedState(s_low_batt);
+    RL_HandleBleAndGameState();
+    RL_HandleIdlePowerOff(&s_poweroff_done);
+    /* LED state (non-REPL path): low-batt already handled above, this covers game/BLE states */
+    RL_UpdateLedState(s_low_batt);
+  }
 }
 
 /*** (C) COPYRIGHT 2016 Richlink Technology Corp. ***/

@@ -1,3 +1,11 @@
+/**
+ * @file ble_at_repl.c
+ * @brief BLE AT+TEST REPL command implementation.
+ *
+ * Implements the BLE-side REPL command parser and response formatter used
+ * for remote diagnostics, sensor streaming, LED/buzzer control, and
+ * DataFlash read/write access.
+ */
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>

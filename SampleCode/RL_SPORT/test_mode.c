@@ -1,3 +1,10 @@
+/**
+ * @file test_mode.c
+ * @brief UART0-driven hardware test mode implementation.
+ *
+ * Supports both an interactive UART menu entered by typing "test" and
+ * the structured AT+TEST=<CMD> auto-test command interface.
+ */
 #include "test_mode.h"
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +27,11 @@ static volatile uint8_t g_uart_test_mode = 0u;
 /* UART0 helpers                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * @brief Read one character from UART0 without blocking.
+ * @param out Pointer to receive the character.
+ * @return 1 if a character was read, 0 if no data is available.
+ */
 static int UART0_ReadCharNonBlocking(char *out)
 {
     if (UART_IS_RX_READY(UART0))
@@ -30,6 +42,11 @@ static int UART0_ReadCharNonBlocking(char *out)
     return 0;
 }
 
+/**
+ * @brief Read a line from UART0, blocking until CR/LF.
+ * @param buf Destination buffer to store the line.
+ * @param buf_len Size of the destination buffer.
+ */
 static void UART0_ReadLineBlocking(char *buf, uint32_t buf_len)
 {
     uint32_t idx = 0;
@@ -79,6 +96,12 @@ static void AT_DispatchCommand(const char *line);
 static float s_gsensor_cal_scale = 1.0f;
 static uint8_t s_gsensor_cal_valid = 0u;
 
+/**
+ * @brief Poll UART0 for the test menu entry command or AT+TEST prefix.
+ *
+ * If the user types "test" on UART0, interactive test mode is entered.
+ * If an AT+TEST= command is received, it is dispatched immediately.
+ */
 void TestMode_PollEnter(void)
 {
     static char cmd_buf[CMD_BUF_SIZE];

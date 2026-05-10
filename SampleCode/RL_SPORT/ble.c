@@ -1,3 +1,11 @@
+/**
+ * @file ble.c
+ * @brief BLE UART transport, receive queue, and command processing.
+ *
+ * This module handles UART1 input from the BLE module, buffering complete
+ * lines in an ISR-safe queue and converting them into higher-level BLE
+ * command events for the main application.
+ */
 #include <stdarg.h>
 #if defined(__has_include)
 #if __has_include(<stdio.h>)
@@ -129,6 +137,12 @@ static void BLE_DebugDumpBytes(const char *tag, const uint8_t *data, uint32_t le
 #endif
 }
 
+/**
+ * @brief Push a received byte into the raw BLE UART ring buffer.
+ *
+ * Called from UART1 IRQ context, so it must not block and must keep the
+ * buffer in a consistent state even when overflow occurs.
+ */
 static void BLE_RawRxPush(uint8_t byte)
 {
   uint16_t next = (uint16_t)((s_raw_rx_head + 1u) % BLE_RAW_RX_BUF_SIZE);
@@ -143,6 +157,12 @@ static void BLE_RawRxPush(uint8_t byte)
   s_raw_rx_head = next;
 }
 
+/**
+ * @brief Enqueue a complete received line from ISR context.
+ *
+ * Drops the oldest queued line when the queue is full in order to keep the
+ * ISR fast and preserve the most recent input.
+ */
 static void BLE_LineQueuePushFromIsr(const uint8_t *line, uint32_t len)
 {
   if ((line == NULL) || (len == 0u))
@@ -285,6 +305,12 @@ void UART1_IRQHandler(void)
   }
 }
 
+/**
+ * @brief Dequeue the next complete BLE message line for main-loop processing.
+ * @param dst Destination buffer for the line.
+ * @param dst_size Size of destination buffer.
+ * @return 1 if a line was available, 0 otherwise.
+ */
 static uint8_t BLE_TakeMessageSnapshot(char *dst, size_t dst_size)
 {
   if (!dst || dst_size == 0u)
@@ -372,6 +398,12 @@ int BLE_UART_SEND(void *uart, const char *format, ...)
   return write_len;
 }
 
+/**
+ * @brief Process one pending BLE line from the receive queue.
+ *
+ * If a complete line is available, it is parsed and converted into the
+ * appropriate system state update or application event.
+ */
 void CheckBleRecvMsg(void)
 {
   char msg[RXBUFSIZE];

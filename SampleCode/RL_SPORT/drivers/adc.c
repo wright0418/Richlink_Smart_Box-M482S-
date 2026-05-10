@@ -1,8 +1,15 @@
+/**
+ * @file drivers/adc.c
+ * @brief VDDA monitoring using the internal band-gap reference.
+ *
+ * This module measures the MCU supply voltage via the internal band-gap
+ * reference to detect low battery or LDO dropout conditions.
+ */
 #include "NuMicro.h"
 #include "adc.h"
 #include "../project_config.h"
 
-/* Measured AVDD (V), updated by Adc_UpdateVdda(). Initialised to nominal 3.3V. */
+/* Measured AVDD (V), updated by Adc_UpdateVdda(). Initialized to nominal 3.3V. */
 static float s_vdda = 3.3f;
 
 void Adc_UpdateVdda(void)
