@@ -546,11 +546,11 @@ void GsensorWakeup(void)
     g_gsensor_ready = wakeup_ok;
 }
 
-void GsensorReadAxis(int16_t *axis)
+uint8_t GsensorReadAxisChecked(int16_t *axis)
 {
     if (axis == NULL)
     {
-        return;
+        return 0u;
     }
 
     if (g_device_type == GSENSOR_DEVICE_SC7U22)
@@ -562,7 +562,7 @@ void GsensorReadAxis(int16_t *axis)
             axis[1] = 0;
             axis[2] = 0;
             Gsensor_RequestRecovery();
-            return;
+            return 0u;
         }
     }
     else if (g_device_type == GSENSOR_DEVICE_MXC400)
@@ -573,7 +573,7 @@ void GsensorReadAxis(int16_t *axis)
             axis[1] = 0;
             axis[2] = 0;
             Gsensor_RequestRecovery();
-            return;
+            return 0u;
         }
     }
     else
@@ -582,11 +582,17 @@ void GsensorReadAxis(int16_t *axis)
         axis[1] = 0;
         axis[2] = 0;
         Gsensor_RequestRecovery();
-        return;
+        return 0u;
     }
 
     g_gsensor_ready = 1u;
     g_gsensor_read_fail_count = 0u;
+    return 1u;
+}
+
+void GsensorReadAxis(int16_t *axis)
+{
+    (void)GsensorReadAxisChecked(axis);
 }
 
 uint8_t GsensorReadSixAxis(int16_t *acc_axis, int16_t *gyro_axis)

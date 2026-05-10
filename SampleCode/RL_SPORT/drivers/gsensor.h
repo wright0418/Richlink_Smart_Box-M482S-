@@ -93,6 +93,17 @@ void GsensorWakeup(void);
 void GsensorReadAxis(int16_t *axis);
 
 /**
+ * @brief Read X/Y/Z axis values and return read status.
+ * @param axis Pointer to int16_t[3] receiving raw axis samples.
+ * @return 1 on successful sensor read; 0 if backend unavailable or I2C read failed.
+ *
+ * On failure, the output axis values are set to 0 and internal recovery is
+ * scheduled. This API is useful for upper-layer algorithms that need to skip
+ * invalid samples instead of consuming zero-filled fallback data.
+ */
+uint8_t GsensorReadAxisChecked(int16_t *axis);
+
+/**
  * @brief Read six-axis raw data from the selected sensor backend.
  * @param acc_axis Pointer to int16_t[3] for accelerometer {X,Y,Z}.
  * @param gyro_axis Pointer to int16_t[3] for gyroscope {X,Y,Z}.

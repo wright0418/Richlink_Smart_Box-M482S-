@@ -22,6 +22,22 @@ typedef struct
     SquatPhase remote_phase;
     uint8_t remote_progress;
 
+    uint32_t sample_interval_ms;
+    uint32_t last_sample_ms;
+    uint32_t display_interval_ms;
+    uint32_t last_display_ms;
+
+    uint8_t flash_active;
+    uint32_t flash_start_ms;
+    uint32_t flash_hold_ms;
+    WS2812B_Color flash_color;
+
+    uint8_t last_render_valid;
+    uint8_t last_render_flash;
+    uint16_t last_render_count;
+    SquatPhase last_render_phase;
+    uint8_t last_render_progress;
+
     int16_t last_axis[3];
     float last_mag_g;
 
@@ -32,6 +48,87 @@ typedef struct
 } SquatModeCtx;
 
 static SquatModeCtx s_mode;
+
+static uint32_t ms_from_hz(uint32_t hz)
+{
+    uint32_t interval;
+    if (hz == 0u)
+    {
+        return 20u;
+    }
+
+    interval = (1000u + (hz / 2u)) / hz;
+    return (interval == 0u) ? 1u : interval;
+}
+
+static void schedule_flash(WS2812B_Color color, uint32_t hold_ms, uint32_t now_ms)
+{
+    if (hold_ms == 0u)
+    {
+        s_mode.flash_active = 0u;
+        return;
+    }
+
+    s_mode.flash_color = color;
+    s_mode.flash_hold_ms = hold_ms;
+    s_mode.flash_start_ms = now_ms;
+    s_mode.flash_active = 1u;
+    s_mode.last_render_valid = 0u;
+}
+
+static void render_squat_display(uint32_t now_ms, uint16_t count, SquatPhase phase, uint8_t progress)
+{
+    uint8_t should_refresh = 0u;
+
+    if (s_mode.flash_active && is_timeout(s_mode.flash_start_ms, s_mode.flash_hold_ms))
+    {
+        s_mode.flash_active = 0u;
+        s_mode.last_render_valid = 0u;
+    }
+
+    if (!s_mode.last_render_valid)
+    {
+        should_refresh = 1u;
+    }
+    else if (!is_timeout(s_mode.last_display_ms, s_mode.display_interval_ms))
+    {
+        return;
+    }
+    else if (s_mode.flash_active)
+    {
+        should_refresh = (s_mode.last_render_flash == 0u) ? 1u : 0u;
+    }
+    else
+    {
+        should_refresh = (s_mode.last_render_flash != 0u) ||
+                         (count != s_mode.last_render_count) ||
+                         (phase != s_mode.last_render_phase) ||
+                         (progress != s_mode.last_render_progress);
+    }
+
+    if (!should_refresh)
+    {
+        return;
+    }
+
+    if (s_mode.flash_active)
+    {
+        WS2812B_FillColor(s_mode.flash_color);
+        (void)WS2812B_Refresh();
+        s_mode.last_render_flash = 1u;
+    }
+    else
+    {
+        WS2812B_ShowSquatScreen(count, phase, progress);
+        s_mode.last_render_flash = 0u;
+    }
+
+    s_mode.last_display_ms = now_ms;
+    s_mode.last_render_valid = 1u;
+    s_mode.last_render_count = count;
+    s_mode.last_render_phase = phase;
+    s_mode.last_render_progress = progress;
+}
 
 static const char *phase_name(SquatPhase p)
 {
@@ -53,10 +150,16 @@ static const char *phase_name(SquatPhase p)
 
 void SquatMode_Init(void)
 {
+    uint32_t now_ms = get_ticks_ms();
+
     memset(&s_mode, 0, sizeof(s_mode));
     s_mode.state = SQUAT_MODE_IDLE;
     s_mode.stream_interval_ms = 200u;
     s_mode.remote_phase = SQUAT_PHASE_IDLE;
+    s_mode.sample_interval_ms = ms_from_hz(SQUAT_SAMPLE_RATE_HZ);
+    s_mode.display_interval_ms = SQUAT_DISPLAY_FRAME_INTERVAL_MS;
+    s_mode.last_sample_ms = now_ms;
+    s_mode.last_display_ms = now_ms;
 
     WS2812B_Init();
     WS2812B_Clear();
@@ -67,27 +170,37 @@ void SquatMode_Init(void)
 
 void SquatMode_Start(void)
 {
+    uint32_t now_ms = get_ticks_ms();
+
     SquatDetect_Init();
     SquatDetect_Reset();
     s_mode.state = SQUAT_MODE_RUNNING;
     s_mode.remote_display_enabled = 0u;
-    WS2812B_ShowSquatFlash(WS2812B_ColorMake(0u, 200u, 0u), 120u);
+    s_mode.last_sample_ms = now_ms;
+    s_mode.last_render_valid = 0u;
+    schedule_flash(WS2812B_ColorMake(0u, 200u, 0u), 120u, now_ms);
 }
 
 void SquatMode_Stop(void)
 {
     s_mode.state = SQUAT_MODE_IDLE;
     s_mode.remote_display_enabled = 0u;
+    s_mode.flash_active = 0u;
+    s_mode.last_render_valid = 0u;
     WS2812B_Clear();
     (void)WS2812B_Refresh();
 }
 
 void SquatMode_Reset(void)
 {
+    uint32_t now_ms = get_ticks_ms();
+
     SquatDetect_Init();
     SquatDetect_Reset();
     s_mode.remote_display_enabled = 0u;
-    WS2812B_ShowSquatFlash(WS2812B_ColorMake(255u, 32u, 0u), 120u);
+    s_mode.last_sample_ms = now_ms;
+    s_mode.last_render_valid = 0u;
+    schedule_flash(WS2812B_ColorMake(255u, 32u, 0u), 120u, now_ms);
 }
 
 void SquatMode_OnKeyEvent(uint32_t now_ms)
@@ -167,6 +280,10 @@ void SquatMode_Process(uint32_t now_ms)
 {
     int16_t axis[3] = {0};
     uint8_t rep = 0u;
+    uint8_t sample_ok = 0u;
+    uint16_t display_count;
+    SquatPhase display_phase;
+    uint8_t display_progress;
 
     if (s_mode.state == SQUAT_MODE_IDLE)
     {
@@ -174,28 +291,39 @@ void SquatMode_Process(uint32_t now_ms)
         return;
     }
 
-    GsensorReadAxis(axis);
-    s_mode.last_axis[0] = axis[0];
-    s_mode.last_axis[1] = axis[1];
-    s_mode.last_axis[2] = axis[2];
-    s_mode.last_mag_g = Gsensor_CalcMagnitude_g_from_raw(axis);
-
-    rep = SquatDetect_ProcessSample(axis[0], axis[1], axis[2], now_ms);
-
-    if (s_mode.remote_display_enabled)
+    if (is_timeout(s_mode.last_sample_ms, s_mode.sample_interval_ms))
     {
-        WS2812B_ShowSquatScreen(s_mode.remote_count, s_mode.remote_phase, s_mode.remote_progress);
-        stream_once(now_ms);
-        return;
+        s_mode.last_sample_ms = now_ms;
+        sample_ok = GsensorReadAxisChecked(axis);
+        if (sample_ok)
+        {
+            s_mode.last_axis[0] = axis[0];
+            s_mode.last_axis[1] = axis[1];
+            s_mode.last_axis[2] = axis[2];
+            s_mode.last_mag_g = Gsensor_CalcMagnitude_g_from_raw(axis);
+            rep = SquatDetect_ProcessSample(axis[0], axis[1], axis[2], now_ms);
+        }
     }
-
-    WS2812B_ShowSquatScreen(SquatDetect_GetCount(), SquatDetect_GetPhase(), SquatDetect_GetProgress8());
 
     if (rep)
     {
-        WS2812B_ShowSquatFlash(WS2812B_ColorMake(0u, 255u, 0u), 80u);
-        WS2812B_ShowSquatScreen(SquatDetect_GetCount(), SquatDetect_GetPhase(), SquatDetect_GetProgress8());
+        schedule_flash(WS2812B_ColorMake(0u, 255u, 0u), 80u, now_ms);
     }
+
+    if (s_mode.remote_display_enabled)
+    {
+        display_count = s_mode.remote_count;
+        display_phase = s_mode.remote_phase;
+        display_progress = s_mode.remote_progress;
+    }
+    else
+    {
+        display_count = SquatDetect_GetCount();
+        display_phase = SquatDetect_GetPhase();
+        display_progress = SquatDetect_GetProgress8();
+    }
+
+    render_squat_display(now_ms, display_count, display_phase, display_progress);
 
     stream_once(now_ms);
 }

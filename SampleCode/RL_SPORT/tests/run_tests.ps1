@@ -24,6 +24,13 @@ if (-not $compiler) {
 
 $testTargets = @(
     @{
+        Name    = "test_squat_detect"
+        Sources = @(
+            (Join-Path $PSScriptRoot "test_squat_detect.c"),
+            (Join-Path $PSScriptRoot "..\app\algorithms\squat_detect.c")
+        )
+    },
+    @{
         Name    = "test_game_algorithms"
         Sources = @(
             (Join-Path $PSScriptRoot "test_game_algorithms.c")
