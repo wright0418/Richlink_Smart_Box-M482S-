@@ -77,6 +77,7 @@ project:
         - file: ../ble_at_repl.c
         - file: ../drivers/led.c
         - file: ../drivers/ws2812b.c
+        - file: ../drivers/ws2812b_digits.c
         - file: ../drivers/ws2812b_templates.c
         - file: ../drivers/ws2812b_patterns.c
         - file: ../drivers/buzzer.c
@@ -87,7 +88,9 @@ project:
         - file: ../board/usb_hid/usb_hid_mouse_desc.c
         - file: ../drivers/gsensor.c
         - file: ../app/mole_game.c
+        - file: ../app/squat_mode.c
         - file: ../app/algorithms/mole_hit_detect.c
+        - file: ../app/algorithms/squat_detect.c
         - file: ../app/algorithms/gsensor_jump_detect.c
         - file: ../app/algorithms/hall_anticheat.c
         - file: ../drivers/i2c.c

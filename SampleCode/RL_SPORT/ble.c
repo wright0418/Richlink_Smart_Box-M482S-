@@ -713,10 +713,13 @@ void Ble_RenameFlowProcess(void)
         break;
       }
 
-      /* Always compare current name suffix with MAC suffix to remediate
-         old FW wrong rename cases. */
+      /* Always compare current name suffix with MAC suffix so we can skip rename
+         when the BLE module already matches the expected profile-specific name.
+         This also allows repair of old/legacy names from prior firmware releases. */
 #if USE_MOLE_GAME
       s_rename.has_name_suffix = BleParser_ExtractNameSuffix4(device_name, MOLE_BLE_NAME_PREFIX, s_rename.name_suffix);
+#elif USE_SQUAT_MODE
+      s_rename.has_name_suffix = BleParser_ExtractNameSuffix4(device_name, SPORT_BLE_NAME_PREFIX, s_rename.name_suffix);
 #else
       s_rename.has_name_suffix = BleParser_ExtractRopeSuffix4(device_name, s_rename.name_suffix);
 #endif
@@ -787,8 +790,13 @@ void Ble_RenameFlowProcess(void)
     break;
 
   case BLE_RENAME_SEND_SET_NAME:
+    /* Send the profile-specific BLE device name for rename.
+       Squat mode uses SPORT_XXXX, Mole mode uses MOLE_XXXX, and legacy rope
+       firmware still uses ROPE_XXXX for backward compatibility. */
 #if USE_MOLE_GAME
     BLE_UART_SEND(UART1, "AT+NAME=%s%s\r\n", MOLE_BLE_NAME_PREFIX, s_rename.mac_suffix);
+#elif USE_SQUAT_MODE
+    BLE_UART_SEND(UART1, "AT+NAME=%s%s\r\n", SPORT_BLE_NAME_PREFIX, s_rename.mac_suffix);
 #else
     BLE_UART_SEND(UART1, "AT+NAME=ROPE_%s\r\n", s_rename.mac_suffix);
 #endif

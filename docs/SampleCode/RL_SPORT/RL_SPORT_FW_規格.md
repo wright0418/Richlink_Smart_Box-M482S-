@@ -66,7 +66,7 @@
 	- `get cycle` → 進入 `GAME_START` 並回應、蜂鳴提示
 	- `set end` → `GAME_STOP`、重置計數並發出完成提示
 	- `MAC_ADDR` / `DEVICE_NAME` → 解析並存入 `g_sys`
-- BLE 模組啟動流程包含 rename（`Ble_RenameFlow`），會將裝置名稱改為 `MOLE_XXXX`（取 MAC 後 4 碼）
+- BLE 模組啟動流程包含 rename（`Ble_RenameFlow`），會將裝置名稱改為 `SPORT_XXXX`（取 MAC 後 4 碼）
 - BLE 模組啟動流程改為非阻塞 rename 狀態機（`Ble_RenameFlowStart()` / `Ble_RenameFlowProcess()` / `Ble_RenameFlowIsDone()`）以避免開機卡住
 
 ## 測試 / 診斷通道

@@ -363,6 +363,47 @@ static uint8_t Gsensor_AutoDetectAndConfigure(void)
     uint8_t sc7_preferred_addr = Gsensor_GetSc7PreferredAddress();
     uint8_t sc7_alternate_addr = Gsensor_GetSc7AlternateAddress(sc7_preferred_addr);
 
+#if (GSENSOR_FORCE_DEVICE == GSENSOR_FORCE_DEVICE_SC7U22)
+    for (uint32_t retry = 0u; retry < GSENSOR_INIT_RETRY_COUNT; retry++)
+    {
+        if (SC7U22_ConfigureAtAddress(sc7_preferred_addr, g_current_fsr) ||
+            ((sc7_alternate_addr != sc7_preferred_addr) &&
+             SC7U22_ConfigureAtAddress(sc7_alternate_addr, g_current_fsr)))
+        {
+            g_device_type = GSENSOR_DEVICE_SC7U22;
+            g_gsensor_ready = 1u;
+            return 1u;
+        }
+        Gsensor_DelayMs(GSENSOR_SC7U22_INIT_RETRY_DELAY_MS);
+    }
+
+    g_device_type = GSENSOR_DEVICE_NONE;
+    g_sensor_addr = 0u;
+    g_last_device_id = 0u;
+    g_gsensor_ready = 0u;
+    return 0u;
+#elif (GSENSOR_FORCE_DEVICE == GSENSOR_FORCE_DEVICE_MXC400)
+    for (uint32_t retry = 0u; retry < GSENSOR_INIT_RETRY_COUNT; retry++)
+    {
+        g_sensor_addr = GSENSOR_MXC400_I2C_ADDR;
+        MXC400_to_wakeup(g_current_fsr);
+        if (MXC400_ProbeAtAddress(g_sensor_addr))
+        {
+            g_device_type = GSENSOR_DEVICE_MXC400;
+            g_last_device_id = 0u;
+            g_gsensor_ready = 1u;
+            return 1u;
+        }
+        Gsensor_DelayMs(GSENSOR_SC7U22_INIT_RETRY_DELAY_MS);
+    }
+
+    g_device_type = GSENSOR_DEVICE_NONE;
+    g_sensor_addr = 0u;
+    g_last_device_id = 0u;
+    g_gsensor_ready = 0u;
+    return 0u;
+#else
+
     for (uint32_t retry = 0u; retry < GSENSOR_INIT_RETRY_COUNT; retry++)
     {
         if (SC7U22_ConfigureAtAddress(sc7_preferred_addr, g_current_fsr))
@@ -397,6 +438,7 @@ static uint8_t Gsensor_AutoDetectAndConfigure(void)
     g_last_device_id = 0u;
     g_gsensor_ready = 0u;
     return 0u;
+#endif
 }
 
 static void Gsensor_RequestRecovery(void)

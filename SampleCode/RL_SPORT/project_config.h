@@ -78,9 +78,16 @@
    This mode keeps the BLE transport and board diagnostics, disables the
    legacy rope-jump gameplay paths, and enables the BLE GATT UART LED matrix
    protocol used by the cognitive training app. */
-#define USE_MOLE_GAME 1
+#define USE_MOLE_GAME 0
+#define USE_SQUAT_MODE 1
 #define MOLE_TEST_TRACE_ENABLE 1 /* 1: print Mole protocol/hit trace on UART0 for COM3 verification */
+
+/* BLE device name prefixes used by the active firmware profile.
+   - USE_MOLE_GAME: rename to MOLE_XXXX
+   - USE_SQUAT_MODE: rename to SPORT_XXXX
+   - legacy rope mode: rename to ROPE_XXXX */
 #define MOLE_BLE_NAME_PREFIX "MOLE_"
+#define SPORT_BLE_NAME_PREFIX "SPORT_"
 #define MOLE_LED_COUNT 64u
 #define MOLE_LED_ROWS 8u
 #define MOLE_LED_COLS 8u
@@ -120,6 +127,30 @@
 #define MOLE_WS2812_DIAG_REPEAT 0
 #define MOLE_WS2812_DIAG_STEP_MS 1000u
 #define MOLE_WS2812_DIAG_GPIO_PROBE_MS 200u
+
+/* Squat mode (8x8 RGB + G-sensor) */
+#define SQUAT_USE_RGB_8X8 1
+#define SQUAT_USE_CMSIS_DSP 1
+#define SQUAT_SENSOR_FORCE_MXC400 1
+#define SQUAT_ENABLE_REPL_RAW_STREAM 1
+#define SQUAT_ENABLE_REPL_FEATURE_STREAM 1
+#define SQUAT_ENABLE_REPL_STATE_STREAM 1
+#define SQUAT_ENABLE_PROGRESS_BAR 1
+#define SQUAT_ENABLE_REP_FLASH 1
+#define SQUAT_DISPLAY_MAX_COUNT 99u
+
+#define GSENSOR_FORCE_DEVICE_NONE 0u
+#define GSENSOR_FORCE_DEVICE_SC7U22 1u
+#define GSENSOR_FORCE_DEVICE_MXC400 2u
+#if USE_SQUAT_MODE && SQUAT_SENSOR_FORCE_MXC400
+#define GSENSOR_FORCE_DEVICE GSENSOR_FORCE_DEVICE_MXC400
+#else
+#define GSENSOR_FORCE_DEVICE GSENSOR_FORCE_DEVICE_NONE
+#endif
+
+#if USE_SQUAT_MODE && USE_MOLE_GAME
+#error "USE_SQUAT_MODE and USE_MOLE_GAME are mutually exclusive"
+#endif
 
 /*
  * Auto version major-digit policy (feature-driven):
@@ -258,6 +289,10 @@
 
 #if USE_HALL_ANTICHEAT && USE_GSENSOR_JUMP_DETECT
 #error "USE_HALL_ANTICHEAT and USE_GSENSOR_JUMP_DETECT are mutually exclusive"
+#endif
+
+#if USE_SQUAT_MODE && (USE_GSENSOR_JUMP_DETECT || USE_HALL_ANTICHEAT)
+#error "USE_SQUAT_MODE is mutually exclusive with jump/anti-cheat modes"
 #endif
 
 /* BLE AT REPL test mode (isolated from game BLE protocol) */

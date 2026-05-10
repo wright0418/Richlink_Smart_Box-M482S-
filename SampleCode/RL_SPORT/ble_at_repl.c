@@ -31,6 +31,9 @@
 #include "drivers/adc.h"
 #include "ble.h"
 #include "fmc.h"
+#if USE_SQUAT_MODE
+#include "app/squat_mode.h"
+#endif
 
 #if USE_BLE_AT_REPL
 
@@ -724,6 +727,10 @@ static void handle_help(void)
                  "BUZZER_ON|BUZZER_OFF|BUZZER_BEEP|"
                  "SENSOR_READ|SENSOR_STREAM|"
                  "ADC_READ|HALL_READ|KEY_READ|"
+#if USE_SQUAT_MODE
+                 "SQUAT_INFO|SQUAT_START|SQUAT_STOP|SQUAT_RESET|SQUAT_STREAM|"
+                 "SQUAT_LED|"
+#endif
                  "DFLASH_INFO|DFLASH_READ|DFLASH_WRITE|DFLASH_ERASE");
 }
 
@@ -770,6 +777,259 @@ static void handle_status_verbose(void)
               (unsigned long)(vdda_mv / 1000u), (unsigned long)(vdda_mv % 1000u));
     repl_send("+OK,STATUS_VERBOSE_G,AX=%d,AY=%d,AZ=%d\r\n", axis[0], axis[1], axis[2]);
 }
+
+#if USE_SQUAT_MODE
+static const char *squat_stream_name(SquatStreamType t)
+{
+    switch (t)
+    {
+    case SQUAT_STREAM_RAW:
+        return "RAW";
+    case SQUAT_STREAM_FEATURE:
+        return "FEATURE";
+    case SQUAT_STREAM_STATE:
+        return "STATE";
+    case SQUAT_STREAM_NONE:
+    default:
+        return "NONE";
+    }
+}
+
+static const char *squat_phase_name(SquatPhase p)
+{
+    switch (p)
+    {
+    case SQUAT_PHASE_STAND:
+        return "STAND";
+    case SQUAT_PHASE_DESCEND:
+        return "DESCEND";
+    case SQUAT_PHASE_BOTTOM:
+        return "BOTTOM";
+    case SQUAT_PHASE_ASCEND:
+        return "ASCEND";
+    case SQUAT_PHASE_IDLE:
+    default:
+        return "IDLE";
+    }
+}
+
+static uint8_t parse_squat_phase(const char *token, SquatPhase *out)
+{
+    if ((!token) || (!out))
+    {
+        return 0u;
+    }
+
+    if (strcmp(token, "IDLE") == 0)
+    {
+        *out = SQUAT_PHASE_IDLE;
+        return 1u;
+    }
+    if (strcmp(token, "STAND") == 0)
+    {
+        *out = SQUAT_PHASE_STAND;
+        return 1u;
+    }
+    if (strcmp(token, "DESCEND") == 0)
+    {
+        *out = SQUAT_PHASE_DESCEND;
+        return 1u;
+    }
+    if (strcmp(token, "BOTTOM") == 0)
+    {
+        *out = SQUAT_PHASE_BOTTOM;
+        return 1u;
+    }
+    if (strcmp(token, "ASCEND") == 0)
+    {
+        *out = SQUAT_PHASE_ASCEND;
+        return 1u;
+    }
+    return 0u;
+}
+
+static uint8_t parse_squat_stream_type(const char *token, SquatStreamType *out)
+{
+    if ((!token) || (!out))
+    {
+        return 0u;
+    }
+
+    if (strcmp(token, "RAW") == 0)
+    {
+        *out = SQUAT_STREAM_RAW;
+        return 1u;
+    }
+    if (strcmp(token, "FEATURE") == 0)
+    {
+        *out = SQUAT_STREAM_FEATURE;
+        return 1u;
+    }
+    if (strcmp(token, "STATE") == 0)
+    {
+        *out = SQUAT_STREAM_STATE;
+        return 1u;
+    }
+    return 0u;
+}
+
+static void handle_squat_info(void)
+{
+    repl_send("+OK,SQUAT_INFO,MODE=%u,COUNT=%u,PHASE=%s,PROG=%u,STREAM=%s,INT=%lu,SENSOR=%s\r\n",
+              (unsigned)SquatMode_GetState(),
+              (unsigned)SquatMode_GetCount(),
+              squat_phase_name(SquatMode_GetPhase()),
+              (unsigned)SquatMode_GetProgress8(),
+              squat_stream_name(SquatMode_GetStreamType()),
+              (unsigned long)SquatMode_GetStreamIntervalMs(),
+              GsensorGetDeviceName());
+}
+
+static void handle_squat_start(void)
+{
+    SquatMode_Start();
+    repl_send_ok("SQUAT_START", "OK");
+}
+
+static void handle_squat_stop(void)
+{
+    SquatMode_Stop();
+    repl_send_ok("SQUAT_STOP", "OK");
+}
+
+static void handle_squat_reset(void)
+{
+    SquatMode_Reset();
+    repl_send_ok("SQUAT_RESET", "OK");
+}
+
+static void handle_squat_stream(const char *cmd)
+{
+    if (strcmp(cmd, "SQUAT_STREAM,QUERY") == 0)
+    {
+        repl_send("+OK,SQUAT_STREAM,QUERY,TYPE=%s,INT=%lu\r\n",
+                  squat_stream_name(SquatMode_GetStreamType()),
+                  (unsigned long)SquatMode_GetStreamIntervalMs());
+        return;
+    }
+
+    if (strcmp(cmd, "SQUAT_STREAM,STOP") == 0)
+    {
+        SquatMode_StopStream();
+        repl_send_ok("SQUAT_STREAM", "STOP");
+        return;
+    }
+
+    if (strncmp(cmd, "SQUAT_STREAM,START,", 19) == 0)
+    {
+        char params[48];
+        char *comma;
+        char *type_s;
+        char *intv_s;
+        uint32_t intv = 200u;
+        SquatStreamType type;
+
+        strncpy(params, cmd + 19, sizeof(params) - 1u);
+        params[sizeof(params) - 1u] = '\0';
+
+        comma = strchr(params, ',');
+        if (comma == NULL)
+        {
+            repl_send_err(ERR_PARAM, "SQUAT_STREAM");
+            return;
+        }
+
+        *comma = '\0';
+        type_s = params;
+        intv_s = comma + 1;
+
+        if ((!parse_squat_stream_type(type_s, &type)) || (!is_decimal_number(intv_s)))
+        {
+            repl_send_err(ERR_PARAM, "SQUAT_STREAM");
+            return;
+        }
+
+        intv = (uint32_t)strtoul(intv_s, NULL, 10);
+        SquatMode_SetStream(type, intv);
+        repl_send("+OK,SQUAT_STREAM,START,%s,%lu\r\n",
+                  squat_stream_name(type),
+                  (unsigned long)SquatMode_GetStreamIntervalMs());
+        return;
+    }
+
+    repl_send_err(ERR_PARAM, "SQUAT_STREAM");
+}
+
+static void handle_squat_led(const char *cmd)
+{
+    if (strcmp(cmd, "SQUAT_LED,QUERY") == 0)
+    {
+        repl_send("+OK,SQUAT_LED,QUERY,EN=%u\r\n", (unsigned)SquatMode_IsRemoteDisplayEnabled());
+        return;
+    }
+
+    if (strcmp(cmd, "SQUAT_LED,CLEAR") == 0)
+    {
+        SquatMode_ClearRemoteDisplay();
+        repl_send_ok("SQUAT_LED", "CLEAR");
+        return;
+    }
+
+    if (strncmp(cmd, "SQUAT_LED,SET,", 14) == 0)
+    {
+        char params[64];
+        char *comma1;
+        char *comma2;
+        char *count_s;
+        char *phase_s;
+        char *prog_s;
+        uint32_t count;
+        uint32_t prog;
+        SquatPhase phase;
+
+        strncpy(params, cmd + 14, sizeof(params) - 1u);
+        params[sizeof(params) - 1u] = '\0';
+
+        comma1 = strchr(params, ',');
+        if (comma1 == NULL)
+        {
+            repl_send_err(ERR_PARAM, "SQUAT_LED");
+            return;
+        }
+        *comma1 = '\0';
+
+        comma2 = strchr(comma1 + 1, ',');
+        if (comma2 == NULL)
+        {
+            repl_send_err(ERR_PARAM, "SQUAT_LED");
+            return;
+        }
+        *comma2 = '\0';
+
+        count_s = params;
+        phase_s = comma1 + 1;
+        prog_s = comma2 + 1;
+
+        if ((!is_decimal_number(count_s)) || (!parse_squat_phase(phase_s, &phase)) || (!is_decimal_number(prog_s)))
+        {
+            repl_send_err(ERR_PARAM, "SQUAT_LED");
+            return;
+        }
+
+        count = (uint32_t)strtoul(count_s, NULL, 10);
+        prog = (uint32_t)strtoul(prog_s, NULL, 10);
+
+        SquatMode_SetRemoteDisplay((uint16_t)count, phase, (uint8_t)prog);
+        repl_send("+OK,SQUAT_LED,SET,COUNT=%lu,PHASE=%s,PROG=%lu\r\n",
+                  (unsigned long)((count > 99u) ? 99u : count),
+                  squat_phase_name(phase),
+                  (unsigned long)((prog > 8u) ? 8u : prog));
+        return;
+    }
+
+    repl_send_err(ERR_PARAM, "SQUAT_LED");
+}
+#endif
 
 static uint8_t handle_safe_or_common_cmd(const char *cmd)
 {
@@ -896,6 +1156,44 @@ uint8_t BleAtRepl_HandleMessage(const char *msg)
         handle_status_verbose();
         return 1u;
     }
+
+#if USE_SQUAT_MODE
+    if (strcmp(cmd, "SQUAT_INFO") == 0)
+    {
+        handle_squat_info();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "SQUAT_START") == 0)
+    {
+        handle_squat_start();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "SQUAT_STOP") == 0)
+    {
+        handle_squat_stop();
+        return 1u;
+    }
+
+    if (strcmp(cmd, "SQUAT_RESET") == 0)
+    {
+        handle_squat_reset();
+        return 1u;
+    }
+
+    if (strncmp(cmd, "SQUAT_STREAM", 12) == 0)
+    {
+        handle_squat_stream(cmd);
+        return 1u;
+    }
+
+    if (strncmp(cmd, "SQUAT_LED", 9) == 0)
+    {
+        handle_squat_led(cmd);
+        return 1u;
+    }
+#endif
 
     /* --- Commands we allow outside REPL (safe/read-only or explicitly permitted) --- */
     if (handle_safe_or_common_cmd(cmd))

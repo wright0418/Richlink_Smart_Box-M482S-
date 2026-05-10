@@ -5,7 +5,7 @@
 
 ## 2. 功能需求
 1. 沿用 BLE 藍芽跳繩電路板的硬體設計，並在其基礎上開發地鼠裝置端的功能。
-2. BLE NAME 更名 為 MOLE_xxxx (xxxx 為BLE MAC Address 的後四碼)，以便識別不同的地鼠裝置。
+2. BLE NAME 更名 為 SPORT_xxxx (xxxx 為BLE MAC Address 的後四碼)，以便識別不同的深蹲裝置。
 3. 接收主機端傳遞的 RGB 8x8 LED 燈陣列資料，並根據資料控制 LED 燈陣列的顯示。
 4. 將玩家的打擊資訊回傳給主機端，以便主機端進行遊戲邏輯處理。
 

@@ -204,9 +204,9 @@
 
 驗證門檻：
 
-- 新增 parser host tests，涵蓋：connected/disconnected、CMD/DATA mode、`get cycle`、`set end`、MAC suffix、MOLE suffix、echo filtering。
+- 新增 parser host tests，涵蓋：connected/disconnected、CMD/DATA mode、`get cycle`、`set end`、MAC suffix、SPORT suffix、echo filtering。
 - CMSIS/AC6 build 成功。
-- 板上 BLE rename 仍符合 `MOLE_XXXX`。
+- 板上 BLE rename 仍符合 `SPORT_XXXX`。
 
 ### Phase 4 — System status API 收斂（第一波已完成）
 

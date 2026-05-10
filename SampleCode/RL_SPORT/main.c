@@ -29,6 +29,9 @@
 #if USE_MOLE_GAME
 #include "app/mole_game.h"
 #endif
+#if USE_SQUAT_MODE
+#include "app/squat_mode.h"
+#endif
 
 #if USE_GSENSOR_JUMP_DETECT
 #include "app/algorithms/gsensor_jump_detect.h"
@@ -164,6 +167,21 @@ static void RL_UpdateLedState(uint8_t low_batt)
   return;
 #endif
 
+#if USE_SQUAT_MODE
+  /* Squat profile LED rule:
+     - Idle (開機待機): 每 3 秒亮 0.1 秒
+     - Running (按 KEY 開始/歸零後): 每 1 秒亮 0.1 秒 */
+  if (SquatMode_GetState() == SQUAT_MODE_RUNNING)
+  {
+    SetGreenLedMode(1.0f, 0.1f);
+  }
+  else
+  {
+    SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
+  }
+  return;
+#endif
+
   if (Sys_GetGameState() == GAME_START)
   {
     SetGreenLedMode(1.0f, 0.1f);
@@ -207,6 +225,9 @@ static void RL_HandleBleAndGameState(void)
 
 #if USE_MOLE_GAME
   MoleGame_Process(get_ticks_ms());
+  return;
+#elif USE_SQUAT_MODE
+  CheckBleRecvMsg();
   return;
 #else
 
@@ -505,6 +526,11 @@ static void RL_InitApplication(void)
   DBG_PRINT("[Main] Mole game firmware profile enabled\n");
 #endif
 
+#if USE_SQUAT_MODE
+  SquatMode_Init();
+  DBG_PRINT("[Main] Squat mode firmware profile enabled\n");
+#endif
+
 #if USE_GSENSOR_JUMP_DETECT
   JumpDetect_Init();
   DBG_PRINT("[Main] G-Sensor jump detection mode enabled\n");
@@ -629,6 +655,18 @@ int main()
 
     RL_HandleBleAndGameState();
     RL_HandleMoleLowBatteryShutdown(s_low_batt);
+    continue;
+#endif
+
+#if USE_SQUAT_MODE
+    if (Sys_GetKeyAFlag())
+    {
+      Sys_SetKeyAFlag(0);
+      SquatMode_OnKeyEvent(now);
+    }
+
+    RL_HandleBleAndGameState();
+    SquatMode_Process(now);
     continue;
 #endif
 
