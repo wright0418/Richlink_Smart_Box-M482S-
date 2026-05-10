@@ -12,10 +12,6 @@
 #include "board/gpio.h"
 #include "board/usb_hid/usb_hid_mouse.h"
 #include "ble.h"
-<<<<<<< HEAD
-#include "drivers/i2c.h"
-=======
->>>>>>> 增加-6-axis-sensor-SC7U22
 #include "system_status.h"
 
 static volatile uint8_t g_uart_test_mode = 0u;
