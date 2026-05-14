@@ -8,8 +8,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <string.h>
 
 #include "NuMicro.h"
 #include "gpio.h"
@@ -182,9 +180,7 @@ void BoardTest_GPIO_Init(void)
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT);
 
     /* Power/VBUS pins */
-#if POWER_LOCK_ENABLE
     GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
-#endif
     GPIO_SetMode(PA, BIT12, GPIO_MODE_INPUT);
 
     /* Safe default output state */
@@ -312,7 +308,6 @@ static void test_keyb(BoardTestStats *stats)
     }
 }
 
-#if USE_JUMP_DETECT
 static void test_hall_inputs(BoardTestStats *stats)
 {
     uint32_t start = get_ticks_ms();
@@ -354,43 +349,30 @@ static void test_hall_inputs(BoardTestStats *stats)
 
     bt_record(stats, "HALL_PB7_PB8", BT_STATUS_FAIL, "No Hall transition detected");
 }
-#else
-static void test_hall_inputs(BoardTestStats *stats)
-{
-    printf("[BT] Step 6/9 HALL_PB7_PB8: SKIPPED (jump detect disabled)\n");
-    bt_record(stats, "HALL_PB7_PB8", BT_STATUS_SKIP, "Jump detection disabled (USE_JUMP_DETECT=0)");
-}
-#endif
 
 static void test_power_pins(BoardTestStats *stats)
 {
+    uint32_t pa11;
     uint8_t vbus;
 
     printf("[BT] Step 7/9 POWER: sample PA11 lock / PA12 VBUS\n");
 
     USBDetect_Init();
+    pa11 = (PA->PIN & BIT11) ? 1u : 0u;
     vbus = USBDetect_IsHigh();
 
-#if POWER_LOCK_ENABLE
-    {
-        uint32_t pa11 = (PA->PIN & BIT11) ? 1u : 0u;
-        printf("[BT] POWER snapshot PA11=%lu VBUS=%u\n",
-               (unsigned long)pa11,
-               (unsigned)vbus);
+    printf("[BT] POWER snapshot PA11=%lu VBUS=%u\n",
+           (unsigned long)pa11,
+           (unsigned)vbus);
 
-        if (pa11 != 0u)
-        {
-            bt_record(stats, "POWER_PA11_PA12", BT_STATUS_PASS, "PA11 high; PA12(VBUS) snapshot printed above");
-        }
-        else
-        {
-            bt_record(stats, "POWER_PA11_PA12", BT_STATUS_FAIL, "PA11 low unexpectedly (power lock should stay asserted)");
-        }
+    if (pa11 != 0u)
+    {
+        bt_record(stats, "POWER_PA11_PA12", BT_STATUS_PASS, "PA11 high; PA12(VBUS) snapshot printed above");
     }
-#else
-    printf("[BT] POWER snapshot PA11=DISABLED VBUS=%u\n", (unsigned)vbus);
-    bt_record(stats, "POWER_PA11_PA12", BT_STATUS_SKIP, "PowerLock disabled by POWER_LOCK_ENABLE=0; VBUS sampled only");
-#endif
+    else
+    {
+        bt_record(stats, "POWER_PA11_PA12", BT_STATUS_FAIL, "PA11 low unexpectedly (power lock should stay asserted)");
+    }
 }
 
 static void test_vdda(BoardTestStats *stats)
@@ -409,26 +391,13 @@ static void test_vdda(BoardTestStats *stats)
            (unsigned long)(vdda_mv / 1000u),
            (unsigned long)(vdda_mv % 1000u));
 
-    /* Include the exact measured voltage in the test record for clarity */
+    if ((vdda >= 2.0f) && (vdda <= 4.0f))
     {
-        char detail[64];
-        int len = snprintf(detail, sizeof(detail), "VDDA=%lu.%03luV",
-                           (unsigned long)(vdda_mv / 1000u),
-                           (unsigned long)(vdda_mv % 1000u));
-        if (len < 0)
-        {
-            strncpy(detail, "VDDA snapshot (value unavailable)", sizeof(detail));
-            detail[sizeof(detail) - 1] = '\0';
-        }
-
-        if ((vdda >= 2.0f) && (vdda <= 4.0f))
-        {
-            bt_record(stats, "VDDA_BG", BT_STATUS_PASS, detail);
-        }
-        else
-        {
-            bt_record(stats, "VDDA_BG", BT_STATUS_FAIL, detail);
-        }
+        bt_record(stats, "VDDA_BG", BT_STATUS_PASS, "Band-gap supply measurement in expected range");
+    }
+    else
+    {
+        bt_record(stats, "VDDA_BG", BT_STATUS_FAIL, "Out of range (expected 2.0V~4.0V)");
     }
 }
 
@@ -498,51 +467,31 @@ static void test_imu_static(BoardTestStats *stats)
            (double)stddev,
            (unsigned long)gyro_abs_mean,
            (unsigned long)comm_fail);
-    /* Build detailed reason string so test output explains why PASS/FAIL */
+
+    if (comm_fail > 0u)
     {
-        char detail[128];
-        int len = 0;
+        pass = 0u;
+    }
+    if ((mean < BT_IMU_STATIC_ACC_MEAN_MIN_G) || (mean > BT_IMU_STATIC_ACC_MEAN_MAX_G))
+    {
+        pass = 0u;
+    }
+    if (stddev > BT_IMU_STATIC_ACC_STD_MAX_G)
+    {
+        pass = 0u;
+    }
+    if (is_sc7 && (gyro_abs_mean > BT_IMU_STATIC_GYRO_ABS_MEAN_MAX))
+    {
+        pass = 0u;
+    }
 
-        if (comm_fail > 0u)
-        {
-            pass = 0u;
-        }
-        if ((mean < BT_IMU_STATIC_ACC_MEAN_MIN_G) || (mean > BT_IMU_STATIC_ACC_MEAN_MAX_G))
-        {
-            pass = 0u;
-        }
-        if (stddev > BT_IMU_STATIC_ACC_STD_MAX_G)
-        {
-            pass = 0u;
-        }
-        if (is_sc7 && (gyro_abs_mean > BT_IMU_STATIC_GYRO_ABS_MEAN_MAX))
-        {
-            pass = 0u;
-        }
-
-        len = snprintf(detail, sizeof(detail), "sensor=%s INT=%lu mean=%.3f std=%.3f gyro_abs_mean=%lu comm_fail=%lu",
-                       GsensorGetDeviceName(),
-                       (unsigned long)pc5_int,
-                       (double)mean,
-                       (double)stddev,
-                       (unsigned long)gyro_abs_mean,
-                       (unsigned long)comm_fail);
-
-        if (len < 0)
-        {
-            /* snprintf failed - fallback summary */
-            strncpy(detail, "IMU snapshot (values not available)", sizeof(detail));
-            detail[sizeof(detail) - 1] = '\0';
-        }
-
-        if (pass != 0u)
-        {
-            bt_record(stats, "IMU_I2C_PC5", BT_STATUS_PASS, detail);
-        }
-        else
-        {
-            bt_record(stats, "IMU_I2C_PC5", BT_STATUS_FAIL, detail);
-        }
+    if (pass != 0u)
+    {
+        bt_record(stats, "IMU_I2C_PC5", BT_STATUS_PASS, "6-axis static check passed");
+    }
+    else
+    {
+        bt_record(stats, "IMU_I2C_PC5", BT_STATUS_FAIL, "Static magnitude/gyro criteria failed");
     }
 }
 
@@ -561,7 +510,7 @@ void BoardTest_RunAll(void)
     BoardTestStats stats = {0};
 
     printf("\n=== RL_SPORT V3 Board Test ===\n");
-    printf("[BT] FLOW=FULL IO={PB2:Y_LED,PB3:G_LED,PB15:KEYA,PC0:KEYB,PB7/PB8:HALL,PC7:BUZZER,PC5:IMU_INT,PF6:WS2812,PA12:VBUS}\n");
+    printf("[BT] FLOW=FULL IO={PB2:Y_LED,PB3:G_LED,PB15:KEYA,PC0:KEYB,PB7/PB8:HALL,PC7:BUZZER,PC5:IMU_INT,PF6:WS2812,PA11:PWR_LOCK,PA12:VBUS}\n");
     printf("[BT] Start tests...\n");
 
     BoardTest_GPIO_Init();

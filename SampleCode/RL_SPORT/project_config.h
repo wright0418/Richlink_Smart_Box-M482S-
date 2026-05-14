@@ -5,7 +5,7 @@
 /* System/clock configuration */
 #define PLL_CLOCK 96000000
 
-#define DEBUG 0 /* Normal run: disable heavy UART debug noise */
+#define DEBUG 1 /* Normal run: disable heavy UART debug noise */
 #if DEBUG
 /* Only include stdio when debug printing is enabled */
 #include <stdio.h>
@@ -62,9 +62,9 @@
      FW_VERSION_MAJOR.FW_VERSION_MINOR.FW_VERSION_PATCH
    The major digit is selected automatically from enabled LED feature
    flags so the version string encodes the capability tier. */
-#define FW_VERSION_MINOR 0
+#define FW_VERSION_MINOR 1
 #define FW_VERSION_PATCH 0
-#define BOARD_NAME "RL_SPORT_V3"
+#define BOARD_NAME "RL_WEAR_V1"
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
 
@@ -97,8 +97,8 @@
    - USE_SQUAT_MODE: rename to SPORT_XXXX
    - legacy rope mode: rename to ROPE_XXXX */
 #define MOLE_BLE_NAME_PREFIX "MOLE_"
+#define MOLE_LED_COUNT 256u
 #define SPORT_BLE_NAME_PREFIX "SPORT_"
-#define MOLE_LED_COUNT 64u
 #define MOLE_LED_ROWS 8u
 #define MOLE_LED_COLS 8u
 #define MOLE_LED_LEGACY8_SUPPORT 1u
@@ -115,9 +115,11 @@
 #else
 #define MOLE_WS2812_LED_COUNT MOLE_LED_COUNT
 #endif
-#define MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT 20u
+#define MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT 10u
 #define MOLE_LED_MIN_HOLD_MS 30u /* consecutive LED frames: keep current frame visible for at least this duration */
-#define MOLE_WS2812_BOOT_SELF_TEST_BRIGHTNESS_PERCENT 40u
+#define MOLE_WS2812_BOOT_SELF_TEST_BRIGHTNESS_PERCENT 50u
+#define MOLE_WS2812_BOOT_SELF_TEST_COLOR_HOLD_MS 2000u
+#define MOLE_WS2812_BOOT_SELF_TEST_SENSOR_SAMPLES 10u
 #define MOLE_PACKET_RX_CACHE_SIZE 256u
 #define MOLE_HIT_BUTTON_ENABLE 1
 #define MOLE_HIT_GSENSOR_ENABLE 1
@@ -260,7 +262,7 @@
 /* Board test control
    0: Do not run BoardTest_RunAll() at boot (default for normal firmware)
    1: Run BoardTest_RunAll() once at boot */
-#define BOARD_TEST_AUTORUN 0
+#define BOARD_TEST_AUTORUN 1
 
 /* I2C / G-sensor robustness */
 #define GSENSOR_I2C_BUS_HZ 400000u /* Fast-mode I2C (400 kHz) */

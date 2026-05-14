@@ -38,6 +38,7 @@ typedef struct
     volatile uint8_t mac_addr[SYS_MAC_ADDR_BUF_SIZE];
     volatile uint8_t device_name[SYS_DEVICE_NAME_BUF_SIZE];
     volatile uint8_t keyA_flag;
+    volatile uint8_t keyB_flag;
     volatile uint8_t hall_pb7_irq_flag;
     volatile uint8_t hall_pb7_edge_pending;
     volatile uint8_t idle_state;        /* 0: moving, 1: idle */
@@ -73,6 +74,8 @@ void Sys_ResetJumpTimes(void);
 /* Button/sensor flag accessors */
 uint8_t Sys_GetKeyAFlag(void);
 void Sys_SetKeyAFlag(uint8_t flag);
+uint8_t Sys_GetKeyBFlag(void);
+void Sys_SetKeyBFlag(uint8_t flag);
 uint8_t Sys_GetHallPb7IrqFlag(void);
 void Sys_SetHallPb7IrqFlag(uint8_t flag);
 /**

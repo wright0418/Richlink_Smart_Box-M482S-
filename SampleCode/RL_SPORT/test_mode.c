@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "NuMicro.h"
 #include "project_config.h"
 #include "drivers/timer.h"
@@ -16,7 +17,9 @@
 #include "drivers/buzzer.h"
 #include "drivers/gsensor.h"
 #include "drivers/adc.h"
+#include "drivers/ws2812b.h"
 #include "board/gpio.h"
+#include "board/board_test_gpio.h"
 #include "board/usb_hid/usb_hid_mouse.h"
 #include "ble.h"
 #include "system_status.h"
@@ -92,9 +95,34 @@ static void AT_DispatchCommand(const char *line);
 #define TEST_BLE_MAC_TIMEOUT_MS 3000u
 #define TEST_GSENSOR_CAL_SAMPLES 64u
 #define TEST_GSENSOR_CAL_SAMPLE_INTERVAL_MS 20u
+#define TEST_IMU_STATIC_DEFAULT_SAMPLES 20u
+#define TEST_IMU_STATIC_MIN_SAMPLES 10u
+#define TEST_IMU_STATIC_MAX_SAMPLES 100u
+#define TEST_IMU_STATIC_ACC_MEAN_MIN_G 0.50f
+#define TEST_IMU_STATIC_ACC_MEAN_MAX_G 1.60f
+#define TEST_IMU_STATIC_ACC_STD_MAX_G 0.08f
+#define TEST_IMU_STATIC_GYRO_ABS_MEAN_MAX 2500u
 
 static float s_gsensor_cal_scale = 1.0f;
 static uint8_t s_gsensor_cal_valid = 0u;
+
+static uint8_t is_decimal_token(const char *s)
+{
+    if (!s || !*s)
+    {
+        return 0u;
+    }
+
+    while (*s)
+    {
+        if (*s < '0' || *s > '9')
+        {
+            return 0u;
+        }
+        s++;
+    }
+    return 1u;
+}
 
 /**
  * @brief Poll UART0 for the test menu entry command or AT+TEST prefix.
@@ -142,14 +170,122 @@ void TestMode_PollEnter(void)
 
 static void Test_LED(void)
 {
-    printf("[Test] LED PB3 blink x3\n");
+    printf("[Test] LED Green(PB3)+Yellow(PB2) blink x3\n");
     for (int i = 0; i < 3; ++i)
     {
-        PB->DOUT |= BIT3;
+        PB->DOUT |= (BIT2 | BIT3);
         delay_ms(100);
-        PB->DOUT &= ~BIT3;
+        PB->DOUT &= ~(BIT2 | BIT3);
         delay_ms(100);
     }
+}
+
+static void Test_WS2812Rainbow(void)
+{
+    static const WS2812B_Color k_rainbow[] = {
+        {255u, 0u, 0u},
+        {255u, 64u, 0u},
+        {255u, 128u, 0u},
+        {255u, 255u, 0u},
+        {0u, 255u, 0u},
+        {0u, 255u, 128u},
+        {0u, 255u, 255u},
+        {0u, 128u, 255u},
+        {0u, 0u, 255u},
+        {64u, 0u, 255u},
+        {128u, 0u, 255u},
+        {255u, 0u, 255u},
+        {255u, 0u, 128u},
+        {255u, 0u, 64u},
+        {255u, 32u, 32u},
+        {255u, 255u, 255u}};
+    const uint8_t color_count = (uint8_t)(sizeof(k_rainbow) / sizeof(k_rainbow[0]));
+
+    printf("[Test] WS2812 rainbow every 16 LEDs\n");
+    for (uint16_t i = 0u; i < (uint16_t)MOLE_WS2812_LED_COUNT; i++)
+    {
+        uint8_t color_idx = (uint8_t)((i / 16u) % color_count);
+        WS2812B_Color color = k_rainbow[color_idx];
+        WS2812B_SetPixel(i, color.r, color.g, color.b);
+    }
+    (void)WS2812B_Refresh();
+}
+
+static uint8_t Test_IMUStatic(uint32_t samples)
+{
+    uint32_t comm_fail = 0u;
+    float mean = 0.0f;
+    float m2 = 0.0f;
+    uint32_t count = 0u;
+    uint64_t gyro_abs_sum = 0u;
+    const uint8_t is_sc7 = (GsensorGetDeviceType() == GSENSOR_DEVICE_SC7U22) ? 1u : 0u;
+
+    if (samples < TEST_IMU_STATIC_MIN_SAMPLES)
+        samples = TEST_IMU_STATIC_MIN_SAMPLES;
+    if (samples > TEST_IMU_STATIC_MAX_SAMPLES)
+        samples = TEST_IMU_STATIC_MAX_SAMPLES;
+
+    printf("[Test] IMU static test samples=%lu sensor=%s\n",
+           (unsigned long)samples,
+           GsensorGetDeviceName());
+
+    for (uint32_t i = 0u; i < samples; i++)
+    {
+        int16_t acc[3] = {0};
+        int16_t gyro[3] = {0};
+        uint8_t ok = GsensorReadSixAxis(acc, gyro);
+        if (!ok)
+        {
+            comm_fail++;
+            continue;
+        }
+
+        float mag_g = Gsensor_CalcMagnitude_g_from_raw(acc);
+        count++;
+        float delta = mag_g - mean;
+        mean += delta / (float)count;
+        m2 += delta * (mag_g - mean);
+
+        gyro_abs_sum += (uint64_t)abs((int)gyro[0]);
+        gyro_abs_sum += (uint64_t)abs((int)gyro[1]);
+        gyro_abs_sum += (uint64_t)abs((int)gyro[2]);
+
+        delay_ms(20u);
+    }
+
+    if (count == 0u)
+    {
+        printf("[Test] IMU static FAIL: no valid sample\n");
+        return 0u;
+    }
+
+    float stddev = (count > 1u) ? sqrtf(m2 / (float)(count - 1u)) : 0.0f;
+    uint32_t gyro_abs_mean = (uint32_t)(gyro_abs_sum / ((uint64_t)count * 3ull));
+
+    printf("[Test] IMU static result mean=%.3f std=%.3f gyro_abs_mean=%lu comm_fail=%lu\n",
+           (double)mean,
+           (double)stddev,
+           (unsigned long)gyro_abs_mean,
+           (unsigned long)comm_fail);
+
+    if (comm_fail > 0u)
+    {
+        return 0u;
+    }
+    if (mean < TEST_IMU_STATIC_ACC_MEAN_MIN_G || mean > TEST_IMU_STATIC_ACC_MEAN_MAX_G)
+    {
+        return 0u;
+    }
+    if (stddev > TEST_IMU_STATIC_ACC_STD_MAX_G)
+    {
+        return 0u;
+    }
+    if (is_sc7 && (gyro_abs_mean > TEST_IMU_STATIC_GYRO_ABS_MEAN_MAX))
+    {
+        return 0u;
+    }
+
+    return 1u;
 }
 
 static void Test_Buzzer(void)
@@ -161,13 +297,18 @@ static void Test_Buzzer(void)
 
 static void Test_Key(void)
 {
-    printf("[Test] Key PB15: press within 5s\n");
+    printf("[Test] Key KEYA(PB15) / KEYB(PC0): press within 5s\n");
     uint32_t start = get_ticks_ms();
     while (!is_timeout(start, 5000))
     {
         if ((GPIO_GET_IN_DATA(PB) & BIT15) == 0)
         {
-            printf("[Test] Key pressed\n");
+            printf("[Test] KEYA(PB15) pressed\n");
+            return;
+        }
+        if ((GPIO_GET_IN_DATA(PC) & BIT0) == 0)
+        {
+            printf("[Test] KEYB(PC0) pressed\n");
             return;
         }
     }
@@ -347,27 +488,24 @@ static void Test_BLE_AT_CMD(void)
 
 static void RunAllTests(void)
 {
-    Test_LED();
-    Test_Buzzer();
-    Test_Key();
-    Test_Hall();
-    Test_Gsensor();
-    Test_ADC();
+    BoardTest_RunAll();
 }
 
 static void UART0_TestMenuLoop(void)
 {
     char line[8];
     printf("\n=== UART0 Test Mode ===\n");
-    printf("1) LED PB3\n");
+    printf("1) LED PB2/PB3\n");
     printf("2) Buzzer PC7\n");
-    printf("3) Key PB15\n");
+    printf("3) Key KEYA(PB15) / KEYB(PC0)\n");
     printf("4) HALL PB7/PB8\n");
     printf("5) G-sensor I2C\n");
-    printf("6) ADC PB1\n");
-    printf("7) Run all tests\n");
+    printf("6) VDDA (band-gap)\n");
+    printf("7) Run full board test\n");
     printf("8) USB FS HID Mouse (auto 5s)\n");
     printf("9) BLE AT CMD name check\n");
+    printf("a) WS2812 16x16 rainbow test\n");
+    printf("b) IMU 6-axis static test\n");
     printf("0) Exit\n");
 
     while (g_uart_test_mode)
@@ -403,6 +541,14 @@ static void UART0_TestMenuLoop(void)
             break;
         case '9':
             Test_BLE_AT_CMD();
+            break;
+        case 'a':
+        case 'A':
+            Test_WS2812Rainbow();
+            break;
+        case 'b':
+        case 'B':
+            (void)Test_IMUStatic(TEST_IMU_STATIC_DEFAULT_SAMPLES);
             break;
         case '0':
             g_uart_test_mode = 0u;
@@ -478,7 +624,7 @@ static uint8_t AT_Info(const char *param)
 /* ------------------------------------------------------------------ */
 static uint8_t AT_Led(const char *param)
 {
-    char tok[8];
+    char tok[12];
     copy_token(param, tok, sizeof(tok));
 
     if (strcmp(tok, "ON") == 0)
@@ -505,8 +651,143 @@ static uint8_t AT_Led(const char *param)
         printf("+TEST:LED,PASS,BLINK=3\r\n");
         return 1u;
     }
+
+    if (strcmp(tok, "YON") == 0)
+    {
+        PB->DOUT |= BIT2;
+        printf("+TEST:LED,PASS,YELLOW=ON\r\n");
+        return 1u;
+    }
+    if (strcmp(tok, "YOFF") == 0)
+    {
+        PB->DOUT &= ~BIT2;
+        printf("+TEST:LED,PASS,YELLOW=OFF\r\n");
+        return 1u;
+    }
+    if (strcmp(tok, "BOTH_ON") == 0)
+    {
+        PB->DOUT |= (BIT2 | BIT3);
+        printf("+TEST:LED,PASS,BOTH=ON\r\n");
+        return 1u;
+    }
+    if (strcmp(tok, "BOTH_OFF") == 0)
+    {
+        PB->DOUT &= ~(BIT2 | BIT3);
+        printf("+TEST:LED,PASS,BOTH=OFF\r\n");
+        return 1u;
+    }
+
     printf("+TEST:LED,FAIL,BAD_PARAM\r\n");
     return 0u;
+}
+
+static uint8_t AT_Ws2812(const char *param)
+{
+    char tok[12];
+    copy_token(param, tok, sizeof(tok));
+
+    if (strcmp(tok, "RAINBOW") != 0)
+    {
+        printf("+TEST:WS2812,FAIL,BAD_PARAM\r\n");
+        return 0u;
+    }
+
+    Test_WS2812Rainbow();
+    printf("+TEST:WS2812,PASS,MODE=RAINBOW,SEG=16\r\n");
+    return 1u;
+}
+
+static uint8_t AT_Imu(const char *param)
+{
+    char tok[12];
+    uint32_t samples = TEST_IMU_STATIC_DEFAULT_SAMPLES;
+    copy_token(param, tok, sizeof(tok));
+
+    if (strcmp(tok, "STATIC") != 0)
+    {
+        printf("+TEST:IMU,FAIL,BAD_PARAM\r\n");
+        return 0u;
+    }
+
+    const char *p2 = next_param(param);
+    if (p2 && *p2)
+    {
+        samples = parse_u32(p2);
+    }
+
+    if (samples < TEST_IMU_STATIC_MIN_SAMPLES)
+        samples = TEST_IMU_STATIC_MIN_SAMPLES;
+    if (samples > TEST_IMU_STATIC_MAX_SAMPLES)
+        samples = TEST_IMU_STATIC_MAX_SAMPLES;
+
+    /* Re-init wake path to keep test deterministic after long idle. */
+    GsensorWakeup();
+    delay_ms(50u);
+
+    int16_t acc[3] = {0};
+    int16_t gyro[3] = {0};
+    float mean = 0.0f;
+    float m2 = 0.0f;
+    uint32_t valid = 0u;
+    uint32_t comm_fail = 0u;
+    uint64_t gyro_abs_sum = 0u;
+    const uint8_t is_sc7 = (GsensorGetDeviceType() == GSENSOR_DEVICE_SC7U22) ? 1u : 0u;
+
+    for (uint32_t i = 0u; i < samples; i++)
+    {
+        if (!GsensorReadSixAxis(acc, gyro))
+        {
+            comm_fail++;
+            delay_ms(20u);
+            continue;
+        }
+
+        float mag_g = Gsensor_CalcMagnitude_g_from_raw(acc);
+        valid++;
+        float delta = mag_g - mean;
+        mean += delta / (float)valid;
+        m2 += delta * (mag_g - mean);
+
+        gyro_abs_sum += (uint64_t)abs((int)gyro[0]);
+        gyro_abs_sum += (uint64_t)abs((int)gyro[1]);
+        gyro_abs_sum += (uint64_t)abs((int)gyro[2]);
+
+        delay_ms(20u);
+    }
+
+    if (valid == 0u)
+    {
+        printf("+TEST:IMU,FAIL,NO_SAMPLE\r\n");
+        return 0u;
+    }
+
+    float stddev = (valid > 1u) ? sqrtf(m2 / (float)(valid - 1u)) : 0.0f;
+    uint32_t gyro_abs_mean = (uint32_t)(gyro_abs_sum / ((uint64_t)valid * 3ull));
+
+    uint8_t pass = 1u;
+    if (comm_fail > 0u)
+        pass = 0u;
+    if (mean < TEST_IMU_STATIC_ACC_MEAN_MIN_G || mean > TEST_IMU_STATIC_ACC_MEAN_MAX_G)
+        pass = 0u;
+    if (stddev > TEST_IMU_STATIC_ACC_STD_MAX_G)
+        pass = 0u;
+    if (is_sc7 && (gyro_abs_mean > TEST_IMU_STATIC_GYRO_ABS_MEAN_MAX))
+        pass = 0u;
+
+    uint32_t mean_i = (uint32_t)(mean * 1000.0f);
+    uint32_t std_i = (uint32_t)(stddev * 1000.0f);
+
+    printf("+TEST:IMU,%s,MODE=STATIC,SENSOR=%s,SAMPLES=%lu,VALID=%lu,COMM_FAIL=%lu,ACC_MEAN=%lu.%03lu,ACC_STD=%lu.%03lu,GYRO_ABS_MEAN=%lu\r\n",
+           pass ? "PASS" : "FAIL",
+           GsensorGetDeviceName(),
+           (unsigned long)samples,
+           (unsigned long)valid,
+           (unsigned long)comm_fail,
+           (unsigned long)(mean_i / 1000u), (unsigned long)(mean_i % 1000u),
+           (unsigned long)(std_i / 1000u), (unsigned long)(std_i % 1000u),
+           (unsigned long)gyro_abs_mean);
+
+    return pass;
 }
 
 /* ------------------------------------------------------------------ */
@@ -544,23 +825,86 @@ static uint8_t AT_Buzzer(const char *param)
 static uint8_t AT_Key(const char *param)
 {
     uint32_t timeout = 5000u;
+    uint8_t watch_keya = 1u;
+    uint8_t watch_keyb = 1u;
 
     if (param && *param)
-        timeout = parse_u32(param);
+    {
+        char tok1[12];
+        copy_token(param, tok1, sizeof(tok1));
+
+        if (is_decimal_token(tok1))
+        {
+            timeout = parse_u32(tok1);
+        }
+        else if ((strcmp(tok1, "A") == 0) || (strcmp(tok1, "KEYA") == 0))
+        {
+            watch_keya = 1u;
+            watch_keyb = 0u;
+            const char *p2 = next_param(param);
+            if (p2 && *p2)
+            {
+                timeout = parse_u32(p2);
+            }
+        }
+        else if ((strcmp(tok1, "B") == 0) || (strcmp(tok1, "KEYB") == 0))
+        {
+            watch_keya = 0u;
+            watch_keyb = 1u;
+            const char *p2 = next_param(param);
+            if (p2 && *p2)
+            {
+                timeout = parse_u32(p2);
+            }
+        }
+        else if (strcmp(tok1, "AB") == 0)
+        {
+            watch_keya = 1u;
+            watch_keyb = 1u;
+            const char *p2 = next_param(param);
+            if (p2 && *p2)
+            {
+                timeout = parse_u32(p2);
+            }
+        }
+        else
+        {
+            printf("+TEST:KEY,FAIL,BAD_PARAM\r\n");
+            return 0u;
+        }
+    }
+
     if (timeout == 0)
         timeout = 5000u;
 
     uint32_t start = get_ticks_ms();
     while (!is_timeout(start, timeout))
     {
-        if ((GPIO_GET_IN_DATA(PB) & BIT15) == 0)
+        if (watch_keya && ((GPIO_GET_IN_DATA(PB) & BIT15) == 0))
         {
             uint32_t elapsed = get_elapsed_ms(start);
-            printf("+TEST:KEY,PASS,T=%lu\r\n", (unsigned long)elapsed);
+            printf("+TEST:KEY,PASS,KEY=KEYA,T=%lu\r\n", (unsigned long)elapsed);
+            return 1u;
+        }
+        if (watch_keyb && ((GPIO_GET_IN_DATA(PC) & BIT0) == 0))
+        {
+            uint32_t elapsed = get_elapsed_ms(start);
+            printf("+TEST:KEY,PASS,KEY=KEYB,T=%lu\r\n", (unsigned long)elapsed);
             return 1u;
         }
     }
-    printf("+TEST:KEY,FAIL,TIMEOUT\r\n");
+    if (watch_keya && watch_keyb)
+    {
+        printf("+TEST:KEY,FAIL,TIMEOUT,KEY=AB\r\n");
+    }
+    else if (watch_keya)
+    {
+        printf("+TEST:KEY,FAIL,TIMEOUT,KEY=KEYA\r\n");
+    }
+    else
+    {
+        printf("+TEST:KEY,FAIL,TIMEOUT,KEY=KEYB\r\n");
+    }
     return 0u;
 }
 
@@ -1090,6 +1434,8 @@ typedef struct
 static const AT_CmdEntry s_at_cmd_table[] = {
     {"INFO", AT_Info},
     {"LED", AT_Led},
+    {"WS2812", AT_Ws2812},
+    {"IMU", AT_Imu},
     {"BUZZER", AT_Buzzer},
     {"KEY", AT_Key},
     {"HALL", AT_Hall},
@@ -1120,6 +1466,8 @@ static void AT_DispatchCommand(const char *line)
         s_at_test_session_active = 0u;
         Sys_SetReplMode(0u);
         Sys_SetLedOverride(0u);
+        Sys_SetKeyAFlag(0u);
+        Sys_SetKeyBFlag(0u);
         (void)Sys_TakeHallPb7PendingEdges();
         Sys_SetHallPb7IrqFlag(0);
         printf("+TEST:EXIT,PASS\r\n");
@@ -1134,6 +1482,8 @@ static void AT_DispatchCommand(const char *line)
     Sys_SetLedOverride(1u);
 
     /* Clear stale hall pending events right before handling command */
+    Sys_SetKeyAFlag(0u);
+    Sys_SetKeyBFlag(0u);
     (void)Sys_TakeHallPb7PendingEdges();
     Sys_SetHallPb7IrqFlag(0);
 
@@ -1162,6 +1512,8 @@ static void AT_DispatchCommand(const char *line)
     }
 
     /* Clear hall pending events once after command as well. */
+    Sys_SetKeyAFlag(0u);
+    Sys_SetKeyBFlag(0u);
     (void)Sys_TakeHallPb7PendingEdges();
     Sys_SetHallPb7IrqFlag(0);
 }

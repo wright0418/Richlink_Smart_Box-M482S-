@@ -106,6 +106,18 @@ static void SetGreenLedRaw(uint8_t state)
         PB->DOUT &= ~BIT3;
 }
 
+void SetYellowLed(uint8_t state)
+{
+    if (state)
+    {
+        PB->DOUT |= BIT2;
+    }
+    else
+    {
+        PB->DOUT &= ~BIT2;
+    }
+}
+
 void SetGreenLed(uint8_t state)
 {
     DBG_PRINT("[LED] SetGreenLed state=%u (force)\n", (unsigned)state);
@@ -229,12 +241,15 @@ void LedSetModePercent(float freq, uint8_t duty_percent)
 
 void Led_Init(void)
 {
+    GPIO_SetMode(PB, BIT2, GPIO_MODE_OUTPUT);
     GPIO_SetMode(PB, BIT3, GPIO_MODE_OUTPUT);
+    SetYellowLed(0);
     SetGreenLedRaw(0);
 }
 
 void Led_SpdModeGpio(void)
 {
+    GPIO_SetMode(PB, BIT2, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT3, GPIO_MODE_INPUT);
 }
 

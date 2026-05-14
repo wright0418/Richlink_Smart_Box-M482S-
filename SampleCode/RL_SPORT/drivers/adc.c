@@ -30,10 +30,17 @@ void Adc_UpdateVdda(void)
         }
     }
 
-    if (raw_bg > 0)
+    if ((raw_bg > 0) && (raw_bg < (int32_t)ADC_FULL_SCALE))
     {
         /* AVDD_actual = VBG_nominal * 4095 / raw_bg */
         s_vdda = (ADC_VBG_NOMINAL * ADC_FULL_SCALE) / (float)raw_bg;
+    }
+    else if (raw_bg >= (int32_t)ADC_FULL_SCALE)
+    {
+        /* Band-gap conversion saturated.
+           This usually means VREF is not AVDD/VREF pin (e.g. internal VREF selected),
+           so the computed VDDA would collapse to ~1.2V and be invalid.
+           Keep previous cached value. */
     }
     /* else: keep previous cached value */
 }
@@ -50,6 +57,10 @@ uint8_t Adc_IsVddaLow(void)
 
 void Adc_Init(void)
 {
+    /* For VDDA = VBG * 4095 / raw_bg to be valid, EADC reference must be AVDD/VREF pin.
+       If internal VREF is selected (e.g. 1.2V), band-gap conversion saturates and reads ~1.2V. */
+    SYS_SetVRef(SYS_VREFCTL_VREF_PIN);
+
     /* Only need EADC open for band-gap (sample module 16, fixed channel) */
     EADC_Open(EADC, EADC_CTL_DIFFEN_SINGLE_END);
 

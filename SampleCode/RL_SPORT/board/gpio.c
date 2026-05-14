@@ -36,8 +36,11 @@ void Gpio_Init(void)
     NVIC_EnableIRQ(GPB_IRQn);
 
     /* PC GPIO */
+    GPIO_SetMode(PC, BIT0, GPIO_MODE_QUASI); // KEYB
+    GPIO_EnableInt(PC, 0, GPIO_INT_FALLING);
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT); // G sensor interrupt
     /* PC5 interrupt disabled (G-sensor INT) */
+    NVIC_EnableIRQ(GPC_IRQn);
 }
 
 void EnableI2C_Schmitt(void)
@@ -165,6 +168,7 @@ void InitSpdPins(void)
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
+    GPIO_SetMode(PC, BIT0, GPIO_MODE_QUASI); /* KEYB */
     GPIO_SetMode(PC, BIT5, GPIO_MODE_INPUT); /* G sensor interrupt */
 }
 
@@ -258,6 +262,12 @@ void GPB_IRQHandler(void)
 
 void GPC_IRQHandler(void)
 {
+    if (GPIO_GET_INT_FLAG(PC, BIT0))
+    {
+        GPIO_CLR_INT_FLAG(PC, BIT0);
+        Sys_SetKeyBFlag(1);
+    }
+
     /* PC5 interrupt disabled; clear any unexpected pending flags */
     if (GPIO_GET_INT_FLAG(PC, BIT5))
     {

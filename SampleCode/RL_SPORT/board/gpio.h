@@ -17,9 +17,9 @@
 /**
  * @brief Initialize push-buttons and G-sensor GPIOs.
  *
- * Configures PB7, PB8, PB15 (buttons) and PC5 (G-sensor interrupt)
+ * Configures PB7, PB8, PB15(KEYA), PC0(KEYB) and PC5 (G-sensor interrupt)
  * as inputs, enables appropriate interrupt triggering and debounce for
- * the user key (PB15) and Hall sensor (PB7). Also enables NVIC IRQs
+ * the user keys (PB15/PC0) and Hall sensor (PB7). Also enables NVIC IRQs
  * for GPB/GPC lines.
  *
  * Hall Sensor (PB7): Falling edge triggered, counted as 2 per jump.
