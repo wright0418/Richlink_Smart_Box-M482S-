@@ -88,7 +88,7 @@
 /* Separate control for BLE / UART1 related MOLE_TEST prints.
    Default follows MOLE_TEST_TRACE_ENABLE to preserve legacy behavior. */
 #ifndef MOLE_TEST_BLE_TRACE_ENABLE
-#define MOLE_TEST_BLE_TRACE_ENABLE MOLE_TEST_TRACE_ENABLE
+#define MOLE_TEST_BLE_TRACE_ENABLE 0 /* default: disable verbose BLE/UART1 hex dumps; set to 1 for debug */
 #endif
 #define MOLE_BLE_NAME_PREFIX "MOLE_"
 #define MOLE_LED_COUNT 256u
@@ -110,7 +110,7 @@
 #endif
 #define MOLE_LED_DEFAULT_BRIGHTNESS_PERCENT 10u
 #define MOLE_LED_MIN_HOLD_MS 30u /* consecutive LED frames: keep current frame visible for at least this duration */
-#define MOLE_WS2812_BOOT_SELF_TEST_BRIGHTNESS_PERCENT 50u
+#define MOLE_WS2812_BOOT_SELF_TEST_BRIGHTNESS_PERCENT 10u
 #define MOLE_WS2812_BOOT_SELF_TEST_COLOR_HOLD_MS 2000u
 #define MOLE_WS2812_BOOT_SELF_TEST_SENSOR_SAMPLES 10u
 #define MOLE_PACKET_RX_CACHE_SIZE 256u
