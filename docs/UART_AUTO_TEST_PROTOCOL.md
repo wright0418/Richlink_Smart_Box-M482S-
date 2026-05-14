@@ -470,6 +470,7 @@ MCU:  +TEST:HALL,PASS,EDGE=PB7,T=800
 - AT 命令解析器在 **main loop** 中輪詢 UART0
 - 不需要先輸入 `"test"` — 直接發送 `AT+TEST=` 命令即可觸發
 - 原有的互動式 `"test"` 選單仍然保留
+- 開機快捷方式：按住 **KEYB (PC0, active-low)** 約 0.8 秒可自動進入 UART 互動式 test menu
 
 ### 5.2 與原有 test menu 共存
 - `TestMode_PollEnter()` 先檢查是否為 `AT+TEST=` 前綴
@@ -490,6 +491,7 @@ MCU:  +TEST:HALL,PASS,EDGE=PB7,T=800
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| 1.5 | 2026-05-15 | 新增開機 KEYB(PC0) 快捷進入 UART test menu；開機短鳴改為 `project_config.h` 可配置 |
 | 1.4 | 2026-05-14 | 新增 KEYA/KEYB 文件、PB2 黃燈命令、`AT+TEST=WS2812,RAINBOW`、`AT+TEST=IMU,STATIC` |
 | 1.3 | 2026-03-14 | 移除 `AT+TEST` 除錯回應，新增 `AT+TEST=GSENSOR,CAL`，`AT+TEST=GSENSOR` 回傳 `G_RAW`/`G_CAL` |
 | 1.2 | 2025-06 | INFO 輸出加入 BUILD= 編譯日期時間，FW 版本定義移至 project_config.h |

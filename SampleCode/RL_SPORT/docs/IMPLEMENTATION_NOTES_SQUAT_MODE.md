@@ -38,6 +38,7 @@
 放在 `project_config.h`：
 
 ```c
+#define RL_WEAR_SQUAT_DSP_PROFILE 1
 #define USE_SQUAT_MODE 1
 #define SQUAT_USE_RGB_8X8 1
 #define SQUAT_USE_CMSIS_DSP 1
@@ -49,6 +50,8 @@
 #define SQUAT_ENABLE_REP_FLASH 1
 #define SQUAT_DISPLAY_MAX_COUNT 99u
 ```
+
+> `RL_WEAR_SQUAT_DSP_PROFILE=1` 建議作為 RL 穿戴預設配置：會在編譯期強制 `USE_SQUAT_MODE=1`、`USE_MOLE_GAME=0`、`SQUAT_USE_CMSIS_DSP=1`，避免混入非深蹲路徑。
 
 ### 與既有模式的關係
 建議互斥：

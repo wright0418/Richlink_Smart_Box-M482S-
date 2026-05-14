@@ -159,6 +159,7 @@
 若是產線或板端 bring-up，建議順序如下：
 
 1. 上電開機
+   - 可選：按住 `KEYB(PC0)` 約 0.8 秒，直接進入 UART test mode（不用先輸入 `test`）
 2. 執行 `BoardTest_RunAll()`
 3. 人工確認：
    - LED 顯示

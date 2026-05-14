@@ -27,6 +27,13 @@
 void TestMode_PollEnter(void);
 
 /**
+ * @brief Force-enter UART0 interactive test mode.
+ *
+ * Useful for boot-time hardware shortcuts (e.g. hold KEYB at power-on).
+ */
+void TestMode_ForceEnter(void);
+
+/**
  * @brief Run the UART0 interactive test menu loop if active.
  */
 void TestMode_RunMenuIfActive(void);

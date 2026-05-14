@@ -68,10 +68,34 @@
 #define FW_BUILD_DATE __DATE__
 #define FW_BUILD_TIME __TIME__
 
+/* Boot behavior */
+#define BOOT_BEEP_ENABLE 1
+#define BOOT_BEEP_FREQ_HZ 2000u
+#define BOOT_BEEP_DURATION_MS 220u
+
+/* UART test-mode boot shortcut
+   Hold KEYB (PC0, active-low) during boot for UART_TEST_BOOT_KEYB_HOLD_MS
+   to enter UART0 interactive test menu automatically. */
+#define UART_TEST_BOOT_KEYB_ENABLE 1
+#define UART_TEST_BOOT_KEYB_HOLD_MS 800u
+
 #define FW_STR_IMPL(x) #x
 #define FW_STR(x) FW_STR_IMPL(x)
 
+#if (BOOT_BEEP_ENABLE != 0) && (BOOT_BEEP_ENABLE != 1)
+#error "BOOT_BEEP_ENABLE must be 0 or 1"
+#endif
+
+#if (UART_TEST_BOOT_KEYB_ENABLE != 0) && (UART_TEST_BOOT_KEYB_ENABLE != 1)
+#error "UART_TEST_BOOT_KEYB_ENABLE must be 0 or 1"
+#endif
+
 /* General project flags */
+
+/* RL 穿戴深蹲 DSP 專屬 profile
+   1: 強制以深蹲 + CMSIS-DSP 路徑編譯（建議 RL_WEAR 量產配置）
+   0: 允許手動混搭其他 profile 旗標 */
+#define RL_WEAR_SQUAT_DSP_PROFILE 1
 
 /* Power lock control
    1: enable PA11 power-lock control path (legacy behavior)
@@ -153,6 +177,18 @@
 #define SQUAT_ENABLE_REP_FLASH 1
 #define SQUAT_DISPLAY_MAX_COUNT 99u
 
+#if RL_WEAR_SQUAT_DSP_PROFILE
+#if (USE_SQUAT_MODE != 1)
+#error "RL_WEAR_SQUAT_DSP_PROFILE requires USE_SQUAT_MODE=1"
+#endif
+#if (USE_MOLE_GAME != 0)
+#error "RL_WEAR_SQUAT_DSP_PROFILE requires USE_MOLE_GAME=0"
+#endif
+#if (SQUAT_USE_CMSIS_DSP != 1)
+#error "RL_WEAR_SQUAT_DSP_PROFILE requires SQUAT_USE_CMSIS_DSP=1"
+#endif
+#endif
+
 #define GSENSOR_FORCE_DEVICE_NONE 0u
 #define GSENSOR_FORCE_DEVICE_SC7U22 1u
 #define GSENSOR_FORCE_DEVICE_MXC400 2u
@@ -173,7 +209,7 @@
  * 3.x.y: 16x16 color chunk enabled
  */
 #if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
-#define FW_VERSION_MAJOR 0
+#define FW_VERSION_MAJOR 3
 #elif MOLE_ENABLE_RGB16X16
 #define FW_VERSION_MAJOR 2
 #else
@@ -192,9 +228,16 @@
 #define FW_CAP_HIT_BUTTON 0x00000010u
 #define FW_CAP_HIT_GSENSOR 0x00000020u
 #define FW_CAP_MOLE_PROFILE 0x00000040u
+#define FW_CAP_SQUAT_PROFILE 0x00000080u
+
+#if USE_SQUAT_MODE
+#define FW_CAPABILITY_MASK_PROFILE FW_CAP_SQUAT_PROFILE
+#else
+#define FW_CAPABILITY_MASK_PROFILE FW_CAP_MOLE_PROFILE
+#endif
 
 #define FW_CAPABILITY_MASK_BASE \
-   (FW_CAP_LEGACY_8X8_MONO | FW_CAP_MOLE_PROFILE)
+   (FW_CAP_LEGACY_8X8_MONO | FW_CAPABILITY_MASK_PROFILE)
 #if MOLE_ENABLE_RGB16X16 && MOLE_ENABLE_RGB16X16_COLOR
 #define FW_CAPABILITY_MASK_RGB16 (FW_CAP_RGB16_MONO | FW_CAP_RGB16_COLOR_CHUNKED)
 #elif MOLE_ENABLE_RGB16X16

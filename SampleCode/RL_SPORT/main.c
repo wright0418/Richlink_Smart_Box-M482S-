@@ -72,9 +72,36 @@ static uint8_t s_prev_game_running = 0u;
 
 static void RL_StartupBeep(void)
 {
-  /* One clear audible beep at boot. */
-  BuzzerPlay(2000u, 220u);
-  delay_ms(260u);
+  /* One short audible beep at boot (configurable by project_config.h). */
+#if BOOT_BEEP_ENABLE
+  BuzzerPlay(BOOT_BEEP_FREQ_HZ, BOOT_BEEP_DURATION_MS);
+  delay_ms(BOOT_BEEP_DURATION_MS + 40u);
+#endif
+}
+
+static void RL_CheckBootShortcutEnterUartTest(void)
+{
+#if UART_TEST_BOOT_KEYB_ENABLE
+  /* KEYB = PC0 (active-low). Hold during boot to auto-enter UART test mode. */
+  if ((GPIO_GET_IN_DATA(PC) & BIT0) == 0u)
+  {
+    uint32_t t0 = get_ticks_ms();
+    while (((GPIO_GET_IN_DATA(PC) & BIT0) == 0u) &&
+           (get_elapsed_ms(t0) < UART_TEST_BOOT_KEYB_HOLD_MS))
+    {
+      delay_ms(10u);
+    }
+
+    if (get_elapsed_ms(t0) >= UART_TEST_BOOT_KEYB_HOLD_MS)
+    {
+      DBG_PRINT("[TestMode] KEYB boot shortcut triggered -> enter UART test mode\n");
+      TestMode_ForceEnter();
+      /* Feedback beep for successful shortcut trigger. */
+      BuzzerPlay(2600u, 80u);
+      delay_ms(100u);
+    }
+  }
+#endif
 }
 
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
@@ -618,6 +645,7 @@ int main()
 
   RL_InitDrivers();
   RL_StartupBeep();
+  RL_CheckBootShortcutEnterUartTest();
   RL_InitApplication();
 
 #if USE_GSENSOR_JUMP_DETECT

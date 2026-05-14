@@ -4,8 +4,14 @@
 #include <math.h>
 #include <string.h>
 
-#ifdef ARM_MATH_CM4
+#if SQUAT_USE_CMSIS_DSP && defined(ARM_MATH_CM4)
 #include "arm_math.h"
+#endif
+
+#if SQUAT_USE_CMSIS_DSP && defined(ARM_MATH_CM4)
+#define SQUAT_DSP_ENABLED 1
+#else
+#define SQUAT_DSP_ENABLED 0
 #endif
 
 /*
@@ -83,7 +89,7 @@ typedef struct
 
 static SquatCtx s_ctx;
 
-#ifdef ARM_MATH_CM4
+#if SQUAT_DSP_ENABLED
 static arm_fir_instance_f32 s_fir;
 static float s_fir_state[SQUAT_FIR_TAPS + 1u];
 static const float s_fir_coeffs[SQUAT_FIR_TAPS] = {0.06f, 0.12f, 0.2f, 0.24f, 0.2f, 0.12f, 0.06f};
@@ -120,7 +126,7 @@ static float vec_mag(float x, float y, float z)
  */
 static float fir_step(float in)
 {
-#ifdef ARM_MATH_CM4
+#if SQUAT_DSP_ENABLED
     float out = 0.0f;
     arm_fir_f32(&s_fir, &in, &out, 1u);
     return out;
@@ -144,7 +150,7 @@ static float rms_recent(float v)
         s_ctx.rms_count++;
     }
 
-#ifdef ARM_MATH_CM4
+#if SQUAT_DSP_ENABLED
     arm_rms_f32(s_ctx.rms_hist, s_ctx.rms_count, &sum_sq);
     return sum_sq;
 #else
@@ -160,7 +166,7 @@ void SquatDetect_Init(void)
 {
     memset(&s_ctx, 0, sizeof(s_ctx));
     s_ctx.phase = SQUAT_PHASE_IDLE;
-#ifdef ARM_MATH_CM4
+#if SQUAT_DSP_ENABLED
     memset(s_fir_state, 0, sizeof(s_fir_state));
     arm_fir_init_f32(&s_fir, SQUAT_FIR_TAPS, (float *)s_fir_coeffs, s_fir_state, 1u);
 #endif

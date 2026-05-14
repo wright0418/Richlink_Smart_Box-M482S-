@@ -168,6 +168,11 @@ void TestMode_PollEnter(void)
     }
 }
 
+void TestMode_ForceEnter(void)
+{
+    g_uart_test_mode = 1u;
+}
+
 static void Test_LED(void)
 {
     printf("[Test] LED Green(PB3)+Yellow(PB2) blink x3\n");
