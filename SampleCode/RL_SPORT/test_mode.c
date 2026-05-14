@@ -1265,8 +1265,12 @@ static uint8_t AT_Pwr(const char *param)
     }
     if (strcmp(tok, "LOCK") == 0)
     {
+#if POWER_LOCK_ENABLE
         uint32_t pa11 = (PA->PIN & BIT11) ? 1u : 0u;
         printf("+TEST:PWR,PASS,PA11=%lu\r\n", (unsigned long)pa11);
+#else
+        printf("+TEST:PWR,SKIP,PA11=DISABLED\r\n");
+#endif
         return 1u;
     }
     printf("+TEST:PWR,FAIL,BAD_PARAM\r\n");

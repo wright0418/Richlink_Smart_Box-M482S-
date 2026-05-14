@@ -2,6 +2,13 @@
 
 此文件描述目前 `RL_SPORT` 韌體中的完整板級測試流程，內容已對齊現行 I/O 規劃與功能配置。
 
+## Power Lock 功能開關（目前設定）
+
+- `SampleCode/RL_SPORT/project_config.h`
+   - `#define POWER_LOCK_ENABLE 0`
+
+目前專案以「實體開關機 SW」為主，不使用 PA11 Power Lock 控制。
+
 ## 目的
 
 `BoardTest_RunAll()` 是一套 **full board test**：
@@ -73,9 +80,9 @@
    - 類型：**PASS/FAIL**
 
 7. `POWER_PA11_PA12`
-   - 讀取 `PA11`（Power Lock）與 `PA12`（VBUS）
-   - `PA11` 應維持 High
-   - 類型：**PASS/FAIL**
+   - 讀取 `PA12`（VBUS）
+   - `PA11`（Power Lock）在 `POWER_LOCK_ENABLE=0` 時會標示為 disabled
+   - 類型：**SKIP**（當 `POWER_LOCK_ENABLE=0`）
 
 8. `VDDA_BG`
    - 以 internal band-gap 量測 `VDDA`
@@ -102,7 +109,9 @@
 - `KEYA_PB15`：timeout 內必須偵測到 active-low press
 - `KEYB_PC0`：timeout 內必須偵測到 active-low press
 - `HALL_PB7_PB8`：timeout 內至少要有 1 次狀態變化
-- `POWER_PA11_PA12`：`PA11` 必須為 high；`PA12` 只列印當下狀態
+- `POWER_PA11_PA12`：
+   - `POWER_LOCK_ENABLE=1` 時：`PA11` 必須為 high，`PA12` 列印當下狀態
+   - `POWER_LOCK_ENABLE=0` 時：此項為 `SKIP`，僅列印 `PA12`
 - `VDDA_BG`：`VDDA` 必須落在 `2.0V ~ 4.0V`
 - `IMU_I2C_PC5`：6-axis static 指標需通過（含 comm fail / magnitude / stddev / gyro mean）
 

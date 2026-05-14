@@ -73,6 +73,11 @@
 
 /* General project flags */
 
+/* Power lock control
+   1: enable PA11 power-lock control path (legacy behavior)
+   0: disable PA11 power-lock control and rely on physical power switch */
+#define POWER_LOCK_ENABLE 0
+
 /* Cognitive training / Whac-A-Mole firmware profile
    -------------------------------------------------
    This mode keeps the BLE transport and board diagnostics, disables the
@@ -80,6 +85,11 @@
    protocol used by the cognitive training app. */
 #define USE_MOLE_GAME 1
 #define MOLE_TEST_TRACE_ENABLE 1 /* 1: print Mole protocol/hit trace on UART0 for COM3 verification */
+/* Separate control for BLE / UART1 related MOLE_TEST prints.
+   Default follows MOLE_TEST_TRACE_ENABLE to preserve legacy behavior. */
+#ifndef MOLE_TEST_BLE_TRACE_ENABLE
+#define MOLE_TEST_BLE_TRACE_ENABLE MOLE_TEST_TRACE_ENABLE
+#endif
 #define MOLE_BLE_NAME_PREFIX "MOLE_"
 #define MOLE_LED_COUNT 256u
 #define MOLE_LED_ROWS 8u
@@ -248,6 +258,11 @@
 
 /* G-Sensor Jump Detection Configuration */
 /* Set to 1 to use G-Sensor based jump counting (replaces HALL sensor) */
+/* Master switch: enable or disable all jump-detection features (HALL/G-sensor) */
+#ifndef USE_JUMP_DETECT
+#define USE_JUMP_DETECT 0
+#endif
+
 #define USE_GSENSOR_JUMP_DETECT 1
 
 /* Hall anti-cheat: validate Hall count against G-sensor estimate.
@@ -260,6 +275,17 @@
 
 #if USE_HALL_ANTICHEAT && USE_GSENSOR_JUMP_DETECT
 #error "USE_HALL_ANTICHEAT and USE_GSENSOR_JUMP_DETECT are mutually exclusive"
+#endif
+
+/* If the master jump-detection switch is disabled, force-disable both
+   G-sensor and Hall-based detection modes and related hit reporting. */
+#if !USE_JUMP_DETECT
+#undef USE_GSENSOR_JUMP_DETECT
+#define USE_GSENSOR_JUMP_DETECT 0
+#undef USE_HALL_ANTICHEAT
+#define USE_HALL_ANTICHEAT 0
+#undef MOLE_HIT_GSENSOR_ENABLE
+#define MOLE_HIT_GSENSOR_ENABLE 0
 #endif
 
 /* BLE AT REPL test mode (isolated from game BLE protocol) */

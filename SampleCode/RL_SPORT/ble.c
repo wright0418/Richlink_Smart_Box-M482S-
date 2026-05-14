@@ -54,7 +54,7 @@ void *memmove(void *dest, const void *src, size_t n);
 #include "app/mole_game.h"
 #endif
 
-#if MOLE_TEST_TRACE_ENABLE
+#if MOLE_TEST_BLE_TRACE_ENABLE
 #define BLE_TRACE_PRINT(fmt, ...) printf("[MOLE_TEST] " fmt, ##__VA_ARGS__)
 #else
 #define BLE_TRACE_PRINT(fmt, ...)
@@ -112,7 +112,7 @@ static volatile uint16_t s_raw_rx_tail = 0u;
 
 static void BLE_DebugDumpBytes(const char *tag, const uint8_t *data, uint32_t len, uint32_t max_show)
 {
-#if MOLE_TEST_TRACE_ENABLE
+#if MOLE_TEST_BLE_TRACE_ENABLE
   if ((tag == NULL) || (data == NULL) || (len == 0u))
   {
     return;
