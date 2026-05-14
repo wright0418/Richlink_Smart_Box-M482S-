@@ -56,6 +56,8 @@ static uint8_t s_hall_edge_residual = 0u;
 #else
 #define MOLE_MAIN_TRACE(fmt, ...)
 #endif
+#define MOLE_HIT_CODE_KEYA 0x01u
+#define MOLE_HIT_CODE_KEYB 0x02u
 #if USE_MOLE_GAME && MOLE_LOW_BATT_POWER_OFF
 static uint8_t s_low_batt_shutdown_count = 0u;
 static uint32_t s_low_batt_shutdown_last_check = 0u;
@@ -67,9 +69,9 @@ static uint8_t s_prev_game_running = 0u;
 
 static void RL_StartupBeep(void)
 {
-  /* One short beep at boot, independent from board test flow. */
-  BuzzerPlay(1200u, 80u);
-  delay_ms(120u);
+  /* One clear audible beep at boot. */
+  BuzzerPlay(2000u, 220u);
+  delay_ms(260u);
 }
 
 static void RL_HandleJumpDetect(uint32_t now, int16_t *axis)
@@ -353,6 +355,12 @@ void ProcessKeyAEvent(void)
   Game_ResetMovementTimer();
 }
 
+void ProcessKeyBEvent(void)
+{
+  /* KEYB follows the same behavior as KEYA for user-activity refresh. */
+  Game_ResetMovementTimer();
+}
+
 void SYS_Init(void)
 {
   /*---------------------------------------------------------------------------------------------------------*/
@@ -490,6 +498,9 @@ static void RL_InitDrivers(void)
   /* UI outputs */
   Led_Init();
   Buzzer_Init();
+  /* Boot indication: light both LEDs first (Green PB3 + Yellow PB2). */
+  SetGreenLed(1u);
+  SetYellowLed(1u);
   /* Default boot LED: every 3 seconds on for 0.3s (freq=1/3 Hz, duty=10%) */
   SetGreenLedMode(RL_IDLE_LED_FREQ_HZ, RL_IDLE_LED_DUTY);
 }
@@ -624,7 +635,12 @@ int main()
     if (Sys_GetKeyAFlag())
     {
       Sys_SetKeyAFlag(0);
-      MoleGame_OnButtonEvent(now);
+      MoleGame_OnButtonEvent(now, MOLE_HIT_CODE_KEYA);
+    }
+    if (Sys_GetKeyBFlag())
+    {
+      Sys_SetKeyBFlag(0);
+      MoleGame_OnButtonEvent(now, MOLE_HIT_CODE_KEYB);
     }
 
     RL_HandleBleAndGameState();
@@ -695,6 +711,11 @@ int main()
     {
       Sys_SetKeyAFlag(0);
       ProcessKeyAEvent();
+    }
+    if (Sys_GetKeyBFlag())
+    {
+      Sys_SetKeyBFlag(0);
+      ProcessKeyBEvent();
     }
 
     RL_HandleBleAndGameState();

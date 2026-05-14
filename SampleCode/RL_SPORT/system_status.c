@@ -131,6 +131,16 @@ void Sys_SetKeyAFlag(uint8_t flag)
     g_sys.keyA_flag = flag;
 }
 
+uint8_t Sys_GetKeyBFlag(void)
+{
+    return g_sys.keyB_flag;
+}
+
+void Sys_SetKeyBFlag(uint8_t flag)
+{
+    g_sys.keyB_flag = flag;
+}
+
 uint8_t Sys_GetHallPb7IrqFlag(void)
 {
     return g_sys.hall_pb7_irq_flag;
@@ -181,6 +191,7 @@ void Sys_Init(void)
     memset((void *)g_sys.mac_addr, 0, sizeof(g_sys.mac_addr));
     memset((void *)g_sys.device_name, 0, sizeof(g_sys.device_name));
     g_sys.keyA_flag = 0;
+    g_sys.keyB_flag = 0;
     g_sys.hall_pb7_irq_flag = 0;
     g_sys.hall_pb7_edge_pending = 0;
     g_sys.idle_state = 0;

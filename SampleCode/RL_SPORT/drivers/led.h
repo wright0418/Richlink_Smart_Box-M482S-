@@ -1,6 +1,6 @@
 /**
  * @file led.h
- * @brief Green LED control module (public API)
+ * @brief Green/Yellow LED control module (public API)
  *
  * This header exposes a small API for blinking and controlling the
  * GREEN LED on the board. It provides frequency/duty configuration
@@ -19,6 +19,7 @@ extern volatile float g_LedDuty;
 
 /* LED pin definition (module-owned) */
 #define PIN_PIN_GREEN_LED PB3
+#define PIN_PIN_YELLOW_LED PB2
 
 /* LED default parameters */
 #define LED_FREQ_DEFAULT 2
@@ -34,6 +35,7 @@ extern volatile float g_LedDuty;
 
 void Led_Init(void);
 void SetGreenLed(uint8_t state);
+void SetYellowLed(uint8_t state);
 void SetGreenLedMode(float freq, float duty);
 void SetGreenLedModePercent(float freq, uint8_t duty_percent);
 void LedSetModePercent(float freq, uint8_t duty_percent);

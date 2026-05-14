@@ -5,7 +5,7 @@
 
 void MoleGame_Init(void);
 void MoleGame_Process(uint32_t now_ms);
-void MoleGame_OnButtonEvent(uint32_t now_ms);
+void MoleGame_OnButtonEvent(uint32_t now_ms, uint8_t hit_code);
 void MoleGame_ShutdownOutputs(void);
 void MoleGame_ResetFrameState(void);
 

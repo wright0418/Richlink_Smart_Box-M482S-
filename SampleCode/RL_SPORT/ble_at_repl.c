@@ -490,8 +490,9 @@ static void handle_hall_read(void)
 
 static void handle_key_read(void)
 {
-    uint8_t pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
-    repl_send("+OK,KEY_READ,PB15=%u\r\n", pressed);
+    uint8_t keya_pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
+    uint8_t keyb_pressed = ((PC->PIN & BIT0) == 0u) ? 1u : 0u;
+    repl_send("+OK,KEY_READ,KEYA_PB15=%u,KEYB_PC0=%u\r\n", keya_pressed, keyb_pressed);
 }
 
 /* ===================== PING ===================== */
@@ -753,18 +754,20 @@ static void handle_status_verbose(void)
     float vdda = Adc_GetVdda();
     uint8_t pb7_low = ((PB->PIN & BIT7) == 0u) ? 1u : 0u;
     uint8_t pb8_low = ((PB->PIN & BIT8) == 0u) ? 1u : 0u;
-    uint8_t key_pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
+    uint8_t keya_pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
+    uint8_t keyb_pressed = ((PC->PIN & BIT0) == 0u) ? 1u : 0u;
 
     GsensorReadAxis(axis);
 
     uint32_t vdda_mv = (uint32_t)(vdda * 1000.0f);
-    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEY=%u,PB7=%u,PB8=%u,VDDA=%lu.%03lu\r\n",
+    repl_send("+OK,STATUS_VERBOSE,BLE=%u,GAME=%u,REPL=%u,IDLE=%u,JUMP=%u,KEYA=%u,KEYB=%u,PB7=%u,PB8=%u,VDDA=%lu.%03lu\r\n",
               (unsigned)Sys_GetBleState(),
               (unsigned)Sys_GetGameState(),
               (unsigned)Sys_GetReplMode(),
               (unsigned)Sys_GetIdleState(),
               (unsigned)Sys_GetJumpTimes(),
-              (unsigned)key_pressed,
+              (unsigned)keya_pressed,
+              (unsigned)keyb_pressed,
               (unsigned)pb7_low,
               (unsigned)pb8_low,
               (unsigned long)(vdda_mv / 1000u), (unsigned long)(vdda_mv % 1000u));
@@ -985,8 +988,9 @@ void BleAtRepl_RunIfActive(void)
         break;
         case REPL_STREAM_SRC_KEY:
         {
-            uint8_t pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
-            repl_send("+DATA,KEY,PB15=%u\r\n", pressed);
+            uint8_t keya_pressed = ((PB->PIN & BIT15) == 0u) ? 1u : 0u;
+            uint8_t keyb_pressed = ((PC->PIN & BIT0) == 0u) ? 1u : 0u;
+            repl_send("+DATA,KEY,KEYA_PB15=%u,KEYB_PC0=%u\r\n", keya_pressed, keyb_pressed);
         }
         break;
         case REPL_STREAM_SRC_GSENSOR:

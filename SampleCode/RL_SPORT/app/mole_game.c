@@ -19,6 +19,8 @@
 #include <string.h>
 
 #define MOLE_RAW_READ_CHUNK 64u
+#define MOLE_HIT_CODE_KEYA 0x01u
+#define MOLE_HIT_CODE_KEYB 0x02u
 
 #if MOLE_TEST_TRACE_ENABLE
 extern int printf(const char *format, ...);
@@ -252,6 +254,57 @@ static void MoleGame_FillAllPixels(uint8_t r, uint8_t g, uint8_t b)
     WS2812B_FillRgb(r, g, b);
 }
 
+static void MoleGame_FillRainbowBy16Leds(void)
+{
+    static const WS2812B_Color k_rainbow[] = {
+        {255u, 0u, 0u},
+        {255u, 64u, 0u},
+        {255u, 128u, 0u},
+        {255u, 255u, 0u},
+        {0u, 255u, 0u},
+        {0u, 255u, 128u},
+        {0u, 255u, 255u},
+        {0u, 128u, 255u},
+        {0u, 0u, 255u},
+        {64u, 0u, 255u},
+        {128u, 0u, 255u},
+        {255u, 0u, 255u},
+        {255u, 0u, 128u},
+        {255u, 0u, 64u},
+        {255u, 32u, 32u},
+        {255u, 255u, 255u}};
+    const uint8_t color_count = (uint8_t)(sizeof(k_rainbow) / sizeof(k_rainbow[0]));
+
+    for (uint16_t i = 0u; i < (uint16_t)MOLE_WS2812_LED_COUNT; i++)
+    {
+        uint8_t color_idx = (uint8_t)((i / 16u) % color_count);
+        WS2812B_Color color = k_rainbow[color_idx];
+        WS2812B_SetPixel(i, color.r, color.g, color.b);
+    }
+}
+
+static void MoleGame_LogBootSixAxisSamples(void)
+{
+    DBG_PRINT("[MOLE] Boot 6-axis precheck start samples=%u sensor=%s addr=0x%02X\n",
+              (unsigned)MOLE_WS2812_BOOT_SELF_TEST_SENSOR_SAMPLES,
+              GsensorGetDeviceName(),
+              (unsigned)GsensorGetI2CAddress());
+
+    for (uint32_t i = 0u; i < MOLE_WS2812_BOOT_SELF_TEST_SENSOR_SAMPLES; i++)
+    {
+        int16_t acc[3] = {0};
+        int16_t gyro[3] = {0};
+        uint8_t ok = GsensorReadSixAxis(acc, gyro);
+
+        DBG_PRINT("[MOLE] 6AXIS[%lu] %s ACC=%d,%d,%d GYR=%d,%d,%d\n",
+                  (unsigned long)(i + 1u),
+                  ok ? "OK" : "FAIL",
+                  acc[0], acc[1], acc[2],
+                  gyro[0], gyro[1], gyro[2]);
+        delay_ms(20u);
+    }
+}
+
 static void MoleGame_RunWs2812BootSelfTest(void)
 {
 #if MOLE_WS2812_BOOT_SELF_TEST
@@ -290,27 +343,29 @@ static void MoleGame_RunWs2812BootSelfTest(void)
         delay_ms(MOLE_WS2812_DIAG_STEP_MS);
     }
 #else
-    const uint32_t step_ms = MOLE_WS2812_BOOT_SELF_TEST_STEP_MS;
-    const uint8_t template_count = WS2812B_GameTemplateCount();
+    const uint32_t hold_ms = MOLE_WS2812_BOOT_SELF_TEST_COLOR_HOLD_MS;
 
-    DBG_PRINT("[MOLE] Self-test template sequence start count=%u\n", (unsigned)template_count);
+    DBG_PRINT("[MOLE] Self-test 16x16 sequence start (R/G/B=%lums, rainbow=16-led stripe)\n",
+              (unsigned long)hold_ms);
 
-    for (uint8_t i = 0u; i < template_count; i++)
-    {
-        const WS2812B_GameTemplate *tpl = WS2812B_GameTemplateAt(i);
-        if (tpl == NULL)
-        {
-            continue;
-        }
+    MoleGame_FillAllPixels(255u, 0u, 0u);
+    refresh_ok = WS2812B_Refresh();
+    DBG_PRINT("[MOLE] Self-test RED refresh=%u\n", (unsigned)refresh_ok);
+    delay_ms(hold_ms);
 
-        DBG_PRINT("[MOLE] Self-test template[%u]=%s\n", (unsigned)i, tpl->name);
-        refresh_ok = WS2812B_ShowTemplate(tpl->template_id,
-                                          tpl->on_color,
-                                          tpl->off_color,
-                                          tpl->use_polling);
-        DBG_PRINT("[MOLE] Self-test template[%u] refresh=%u\n", (unsigned)i, (unsigned)refresh_ok);
-        delay_ms(step_ms);
-    }
+    MoleGame_FillAllPixels(0u, 255u, 0u);
+    refresh_ok = WS2812B_Refresh();
+    DBG_PRINT("[MOLE] Self-test GREEN refresh=%u\n", (unsigned)refresh_ok);
+    delay_ms(hold_ms);
+
+    MoleGame_FillAllPixels(0u, 0u, 255u);
+    refresh_ok = WS2812B_Refresh();
+    DBG_PRINT("[MOLE] Self-test BLUE refresh=%u\n", (unsigned)refresh_ok);
+    delay_ms(hold_ms);
+
+    MoleGame_FillRainbowBy16Leds();
+    refresh_ok = WS2812B_Refresh();
+    DBG_PRINT("[MOLE] Self-test RAINBOW refresh=%u\n", (unsigned)refresh_ok);
 
     WS2812B_SetBrightness(saved_brightness);
     DBG_PRINT("[MOLE] WS2812 boot self-test done, brightness restored=%u\n", (unsigned)saved_brightness);
@@ -318,10 +373,20 @@ static void MoleGame_RunWs2812BootSelfTest(void)
 #endif
 }
 
-static void MoleGame_SendHitReport(void)
+static void MoleGame_SendHitReport(uint8_t hit_report)
 {
-    static const uint8_t hit_report = 0x01u;
-    MOLE_TRACE_PRINT("TX HIT=0x01\r\n");
+    if (hit_report == MOLE_HIT_CODE_KEYA)
+    {
+        MOLE_TRACE_PRINT("TX HIT=0x01 -> KEYA, 0x02->KEYB\r\n");
+    }
+    else if (hit_report == MOLE_HIT_CODE_KEYB)
+    {
+        MOLE_TRACE_PRINT("TX HIT=0x02 -> KEYB, 0x01->KEYA\r\n");
+    }
+    else
+    {
+        MOLE_TRACE_PRINT("TX HIT=0x%02X\r\n", (unsigned)hit_report);
+    }
     BLESendBytes(&hit_report, 1u);
 }
 
@@ -471,7 +536,8 @@ static void MoleGame_ProcessGsensor(uint32_t now_ms)
     mag_g = Gsensor_CalcMagnitude_g_from_raw(axis);
     if (MoleHitDetector_ProcessAccelMag(&s_hit_detector, now_ms, mag_g))
     {
-        MoleGame_SendHitReport();
+        /* Keep legacy payload for G-sensor triggered hit. */
+        MoleGame_SendHitReport(MOLE_HIT_CODE_KEYA);
     }
 #else
     (void)now_ms;
@@ -506,6 +572,7 @@ void MoleGame_Init(void)
     DBG_PRINT("[MOLE] Hit detection method: button=%u gsensor=%u\n",
               (s_game_ctx.hit_detection_method & MOLE_HIT_METHOD_BUTTON) ? 1u : 0u,
               (s_game_ctx.hit_detection_method & MOLE_HIT_METHOD_GSENSOR) ? 1u : 0u);
+    MoleGame_LogBootSixAxisSamples();
     MoleGame_RunWs2812BootSelfTest();
     DBG_PRINT("[MOLE] Init complete\n");
 }
@@ -518,7 +585,7 @@ void MoleGame_Process(uint32_t now_ms)
     MoleGame_ProcessGsensor(now_ms);
 }
 
-void MoleGame_OnButtonEvent(uint32_t now_ms)
+void MoleGame_OnButtonEvent(uint32_t now_ms, uint8_t hit_code)
 {
     /* Only process button if enabled in hit detection method */
     if (!(s_game_ctx.hit_detection_method & MOLE_HIT_METHOD_BUTTON))
@@ -528,7 +595,7 @@ void MoleGame_OnButtonEvent(uint32_t now_ms)
 
     if (MoleHitDetector_ProcessButton(&s_hit_detector, now_ms))
     {
-        MoleGame_SendHitReport();
+        MoleGame_SendHitReport(hit_code);
     }
 }
 

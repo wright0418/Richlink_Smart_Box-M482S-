@@ -119,6 +119,24 @@ LED 閃爍 3 次。
 | MCU → Host | `+TEST:LED,PASS,BLINK=3\r\n` |
 |            | `OK\r\n` |
 
+#### `AT+TEST=LED,YON` / `AT+TEST=LED,YOFF`
+控制黃色 LED (PB2)。
+
+| 方向 | 內容 |
+|------|------|
+| Host → MCU | `AT+TEST=LED,YON\r\n` |
+| MCU → Host | `+TEST:LED,PASS,YELLOW=ON\r\n` |
+|            | `OK\r\n` |
+
+| 方向 | 內容 |
+|------|------|
+| Host → MCU | `AT+TEST=LED,YOFF\r\n` |
+| MCU → Host | `+TEST:LED,PASS,YELLOW=OFF\r\n` |
+|            | `OK\r\n` |
+
+#### `AT+TEST=LED,BOTH_ON` / `AT+TEST=LED,BOTH_OFF`
+同時控制綠燈 PB3 與黃燈 PB2。
+
 ---
 
 ### 3.3 蜂鳴器測試
@@ -143,18 +161,21 @@ LED 閃爍 3 次。
 
 ### 3.4 按鍵測試
 
-#### `AT+TEST=KEY[,<timeout_ms>]`
-等待按鍵 PB15 按下。不帶參數時預設 5000ms。
+#### `AT+TEST=KEY[,<key_sel>][,<timeout_ms>]`
+等待按鍵事件；支援 KEYA=PB15、KEYB=PC0。不帶參數時預設監聽兩顆鍵、timeout=5000ms。
+
+- `<key_sel>` 可為：`KEYA` / `A` / `KEYB` / `B` / `AB`
+- 向下相容：若第一參數為純數字，視為 `<timeout_ms>`
 
 | 方向 | 內容 |
 |------|------|
-| Host → MCU | `AT+TEST=KEY,3000\r\n` |
-| MCU → Host (成功) | `+TEST:KEY,PASS,T=1234\r\n` |
+| Host → MCU | `AT+TEST=KEY,AB,3000\r\n` |
+| MCU → Host (成功) | `+TEST:KEY,PASS,KEY=KEYA,T=1234\r\n` |
 |                   | `OK\r\n` |
-| MCU → Host (超時) | `+TEST:KEY,FAIL,TIMEOUT\r\n` |
+| MCU → Host (超時) | `+TEST:KEY,FAIL,TIMEOUT,KEY=AB\r\n` |
 |                   | `ERROR\r\n` |
 
-`T=` 表示按鍵被偵測到時經過的毫秒數。
+`T=` 表示按鍵被偵測到時經過的毫秒數；`KEY=` 表示觸發來源。
 
 ---
 
@@ -252,6 +273,36 @@ LED 閃爍 3 次。
 |                   | `ERROR\r\n` |
 
 **判定標準：** 2.0V ≤ V ≤ 5.5V。`MV=` 為毫伏整數值。
+
+---
+
+### 3.7.1 WS2812 彩虹測試
+
+#### `AT+TEST=WS2812,RAINBOW`
+顯示 16x16 WS2812 彩虹測試圖（每 16 顆 LED 一個顏色分段）。
+
+| 方向 | 內容 |
+|------|------|
+| Host → MCU | `AT+TEST=WS2812,RAINBOW\r\n` |
+| MCU → Host | `+TEST:WS2812,PASS,MODE=RAINBOW,SEG=16\r\n` |
+|            | `OK\r\n` |
+
+---
+
+### 3.7.2 6 軸靜止測試
+
+#### `AT+TEST=IMU,STATIC[,<samples>]`
+板子保持靜止，連續取樣 6 軸資料，檢查加速度平均值、標準差與通訊狀態。
+
+| 方向 | 內容 |
+|------|------|
+| Host → MCU | `AT+TEST=IMU,STATIC,20\r\n` |
+| MCU → Host (成功) | `+TEST:IMU,PASS,MODE=STATIC,SENSOR=SC7U22,...\r\n` |
+|                  | `OK\r\n` |
+| MCU → Host (失敗) | `+TEST:IMU,FAIL,MODE=STATIC,SENSOR=SC7U22,...\r\n` |
+|                  | `ERROR\r\n` |
+
+`samples` 範圍為 10~100，未帶入時預設 20。
 
 ---
 
@@ -439,6 +490,7 @@ MCU:  +TEST:HALL,PASS,EDGE=PB7,T=800
 
 | 版本 | 日期 | 說明 |
 |------|------|------|
+| 1.4 | 2026-05-14 | 新增 KEYA/KEYB 文件、PB2 黃燈命令、`AT+TEST=WS2812,RAINBOW`、`AT+TEST=IMU,STATIC` |
 | 1.3 | 2026-03-14 | 移除 `AT+TEST` 除錯回應，新增 `AT+TEST=GSENSOR,CAL`，`AT+TEST=GSENSOR` 回傳 `G_RAW`/`G_CAL` |
 | 1.2 | 2025-06 | INFO 輸出加入 BUILD= 編譯日期時間，FW 版本定義移至 project_config.h |
 | 1.1 | 2026-03-14 | 更新 — 將 FW 版本調整為 1.1.0，GSENSOR 與 I2C/I2C SCAN 行為與回傳欄位同步 |
