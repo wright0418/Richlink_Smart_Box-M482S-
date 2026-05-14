@@ -128,8 +128,8 @@
 #define MOLE_WS2812_DIAG_STEP_MS 1000u
 #define MOLE_WS2812_DIAG_GPIO_PROBE_MS 200u
 
-/* Squat mode (8x8 RGB + G-sensor) */
-#define SQUAT_USE_RGB_8X8 1
+/* Squat mode (was 8x8 RGB + G-sensor). For RL穿戴系統 debug, use 16x16 RGB display */
+#define SQUAT_USE_RGB_8X8 0
 #define SQUAT_USE_CMSIS_DSP 1
 #define SQUAT_SAMPLE_RATE_HZ 50u
 #define SQUAT_DISPLAY_FRAME_INTERVAL_MS 33u
