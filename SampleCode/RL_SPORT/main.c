@@ -164,7 +164,11 @@ static void RL_HandleBatteryCheck(uint32_t now, uint32_t *last_batt_check_time, 
     Adc_UpdateVdda();
     float vdda = Adc_GetVdda();
     uint8_t is_low = Adc_IsVddaLow();
+#if BATTERY_DEBUG_LOG_ENABLE
     DBG_PRINT("[BATT] vdda=%.3fV %s\n", (double)vdda, is_low ? "LOW" : "OK");
+#else
+    (void)vdda;
+#endif
     *low_batt = is_low;
   }
 }
@@ -585,7 +589,7 @@ static void RL_InitApplication(void)
   HallAntiCheat_Init();
   DBG_PRINT("[Main] HALL + anti-cheat (G-sensor validation) enabled\n");
 #else
-  DBG_PRINT("[Main] HALL Sensor jump detection mode enabled\n");
+  DBG_PRINT("[Main] Jump detection mode disabled\n");
 #endif
 }
 

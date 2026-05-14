@@ -206,6 +206,12 @@
             if (!t) return;
             debugLog(`RX: ${t}`);
 
+            if (t.startsWith('+DATA,SQUAT_COUNT,')) {
+                const kv = parseKvCsv(t.slice('+DATA,SQUAT_COUNT,'.length));
+                const count = parseInt(kv.COUNT || '0', 10);
+                ui.countText.textContent = Number.isFinite(count) ? String(count) : '0';
+            }
+
             if (t.startsWith('+DATA,SQUAT_STATE,')) {
                 const kv = parseKvCsv(t.slice('+DATA,SQUAT_STATE,'.length));
                 const state = kv.STATE || 'IDLE';

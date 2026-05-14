@@ -134,6 +134,12 @@ uint8_t GsensorReadDeviceId(uint8_t *device_id);
 float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis);
 
 /**
+ * @brief Get raw-counts-per-g scale for current sensor backend and FSR.
+ * @return Counts-per-g used to convert raw axis counts into g.
+ */
+float Gsensor_GetCountsPerG(void);
+
+/**
  * @brief Sensor-specific low-level power-down helper.
  *
  * Writes the sensor control register to place the device into power-down

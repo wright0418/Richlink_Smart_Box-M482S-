@@ -76,7 +76,7 @@
 /* UART test-mode boot shortcut
    Hold KEYB (PC0, active-low) during boot for UART_TEST_BOOT_KEYB_HOLD_MS
    to enter UART0 interactive test menu automatically. */
-#define UART_TEST_BOOT_KEYB_ENABLE 1
+#define UART_TEST_BOOT_KEYB_ENABLE 0
 #define UART_TEST_BOOT_KEYB_HOLD_MS 800u
 
 #define FW_STR_IMPL(x) #x
@@ -169,7 +169,15 @@
 #define SQUAT_USE_CMSIS_DSP 1
 #define SQUAT_SAMPLE_RATE_HZ 50u
 #define SQUAT_DISPLAY_FRAME_INTERVAL_MS 33u
-#define SQUAT_SENSOR_FORCE_MXC400 1
+/* Squat sensor backend selection
+   0: auto-detect (recommended; supports SC7U22 6-axis and MXC400)
+   1: force MXC400 only */
+#define SQUAT_SENSOR_FORCE_MXC400 0
+#define SQUAT_T_DOWN_G 0.22f
+#define SQUAT_T_UP_G 0.18f
+#define SQUAT_T_DEPTH_SCORE 0.45f
+#define SQUAT_BOTTOM_HOLD_MS 140u
+#define SQUAT_REP_MIN_INTERVAL_MS 320u
 #define SQUAT_ENABLE_REPL_RAW_STREAM 1
 #define SQUAT_ENABLE_REPL_FEATURE_STREAM 1
 #define SQUAT_ENABLE_REPL_STATE_STREAM 1
@@ -302,10 +310,15 @@
 #define LOW_BATT_LED_FREQ_HZ 4.0f
 #define LOW_BATT_LED_DUTY 0.1f
 
+/* Battery debug logging
+   0: keep battery check silent (recommended for normal operation)
+   1: print [BATT] voltage/status periodically */
+#define BATTERY_DEBUG_LOG_ENABLE 0
+
 /* Board test control
    0: Do not run BoardTest_RunAll() at boot (default for normal firmware)
    1: Run BoardTest_RunAll() once at boot */
-#define BOARD_TEST_AUTORUN 1
+#define BOARD_TEST_AUTORUN 0
 
 /* I2C / G-sensor robustness */
 #define GSENSOR_I2C_BUS_HZ 400000u /* Fast-mode I2C (400 kHz) */

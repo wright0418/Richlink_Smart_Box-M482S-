@@ -279,6 +279,7 @@ static void stream_once(uint32_t now_ms)
 void SquatMode_Process(uint32_t now_ms)
 {
     int16_t axis[3] = {0};
+    char line[64];
     uint8_t rep = 0u;
     uint8_t sample_ok = 0u;
     uint16_t display_count;
@@ -308,6 +309,11 @@ void SquatMode_Process(uint32_t now_ms)
     if (rep)
     {
         schedule_flash(WS2812B_ColorMake(0u, 255u, 0u), 80u, now_ms);
+
+        /* Always push a count event for BLE Web UI, even if state stream is not active. */
+        snprintf(line, sizeof(line), "+DATA,SQUAT_COUNT,COUNT=%u\r\n",
+                 (unsigned)SquatDetect_GetCount());
+        BLESendData(line);
     }
 
     if (s_mode.remote_display_enabled)

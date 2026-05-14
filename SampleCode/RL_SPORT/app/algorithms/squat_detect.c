@@ -1,6 +1,7 @@
 #include "squat_detect.h"
 
 #include "../../project_config.h"
+#include "../../drivers/gsensor.h"
 #include <math.h>
 #include <string.h>
 
@@ -192,9 +193,10 @@ uint8_t SquatDetect_ProcessSample(int16_t ax, int16_t ay, int16_t az, uint32_t n
      * - 誤判太多、重力方向飄很快 -> 把 alpha 調小一點
      */
     const float alpha = 0.04f;
-    const float x = (float)ax;
-    const float y = (float)ay;
-    const float z = (float)az;
+    const float cpg = Gsensor_GetCountsPerG();
+    const float x = (float)ax / cpg;
+    const float y = (float)ay / cpg;
+    const float z = (float)az / cpg;
 
     float gmag;
     float ux;
@@ -213,9 +215,9 @@ uint8_t SquatDetect_ProcessSample(int16_t ax, int16_t ay, int16_t az, uint32_t n
     s_ctx.grav_z = (1.0f - alpha) * s_ctx.grav_z + alpha * z;
 
     gmag = vec_mag(s_ctx.grav_x, s_ctx.grav_y, s_ctx.grav_z);
-    if (gmag < 1.0f)
+    if (gmag < 0.1f)
     {
-        gmag = 1.0f;
+        gmag = 0.1f;
     }
 
     ux = s_ctx.grav_x / gmag;
@@ -225,7 +227,7 @@ uint8_t SquatDetect_ProcessSample(int16_t ax, int16_t ay, int16_t az, uint32_t n
     linx = x - s_ctx.grav_x;
     liny = y - s_ctx.grav_y;
     linz = z - s_ctx.grav_z;
-    vert = (linx * ux + liny * uy + linz * uz) / 1024.0f;
+    vert = (linx * ux + liny * uy + linz * uz);
     vert_f = fir_step(vert);
     rms = rms_recent(vert_f);
 
@@ -245,8 +247,8 @@ uint8_t SquatDetect_ProcessSample(int16_t ax, int16_t ay, int16_t az, uint32_t n
      */
     depth = clampf((fabsf(s_ctx.valley) + fabsf(s_ctx.peak)) * 1.2f + rms * 0.8f, 0.0f, 1.0f);
 
-    s_ctx.feat.raw_mag_g = vec_mag(x, y, z) / 1024.0f;
-    s_ctx.feat.grav_mag_g = gmag / 1024.0f;
+    s_ctx.feat.raw_mag_g = vec_mag(x, y, z);
+    s_ctx.feat.grav_mag_g = gmag;
     s_ctx.feat.vert_acc_g = vert_f;
     s_ctx.feat.depth_score = depth;
     s_ctx.feat.rms_g = rms;

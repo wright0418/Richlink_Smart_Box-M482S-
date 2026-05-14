@@ -678,23 +678,39 @@ uint8_t GsensorReadDeviceId(uint8_t *device_id)
 static const float s_mxc_cpg[] = {1024.0f, 512.0f, 256.0f};       /* FSR_2G, FSR_4G, FSR_8G */
 static const float s_sc7u22_cpg[] = {16384.0f, 8192.0f, 4096.0f}; /* FSR_2G, FSR_4G, FSR_8G */
 
-float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
+float Gsensor_GetCountsPerG(void)
 {
     const float *cpg_table = s_mxc_cpg;
     float cpg = 1024.0f;
+
+    if (g_device_type == GSENSOR_DEVICE_SC7U22)
+    {
+        cpg_table = s_sc7u22_cpg;
+    }
+
+    if (g_current_fsr <= FSR_8G)
+    {
+        cpg = cpg_table[g_current_fsr];
+    }
+
+    if (cpg <= 0.0f)
+    {
+        cpg = 1024.0f;
+    }
+
+    return cpg;
+}
+
+float Gsensor_CalcMagnitude_g_from_raw(int16_t *axis)
+{
+    float cpg;
 
     if (axis == NULL)
     {
         return 0.0f;
     }
-    if (g_device_type == GSENSOR_DEVICE_SC7U22)
-    {
-        cpg_table = s_sc7u22_cpg;
-    }
-    if (g_current_fsr <= FSR_8G)
-    {
-        cpg = cpg_table[g_current_fsr];
-    }
+
+    cpg = Gsensor_GetCountsPerG();
 
     float xg = (float)axis[0] / cpg;
     float yg = (float)axis[1] / cpg;
