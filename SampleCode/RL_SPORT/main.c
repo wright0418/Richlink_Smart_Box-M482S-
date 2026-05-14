@@ -254,7 +254,10 @@ static void RL_HandleBleAndGameState(void)
 
 static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 {
-#if USE_MOLE_GAME && MOLE_DISABLE_IDLE_POWER_OFF
+#if !POWER_LOCK_ENABLE
+  (void)poweroff_done;
+  return;
+#elif USE_MOLE_GAME && MOLE_DISABLE_IDLE_POWER_OFF
   (void)poweroff_done;
   return;
 #else
@@ -277,6 +280,10 @@ static void RL_HandleIdlePowerOff(uint8_t *poweroff_done)
 static void RL_HandleMoleLowBatteryShutdown(uint8_t low_batt)
 {
 #if USE_MOLE_GAME && MOLE_LOW_BATT_POWER_OFF
+#if !POWER_LOCK_ENABLE
+  (void)low_batt;
+  return;
+#else
   uint32_t now = get_ticks_ms();
 
   /* Keep low-battery protection for battery operation, but do not force
@@ -340,6 +347,7 @@ static void RL_HandleMoleLowBatteryShutdown(uint8_t low_batt)
       /* wait for power to cut */
     }
   }
+#endif
 #else
   (void)low_batt;
 #endif
@@ -558,6 +566,21 @@ static void RL_InitApplication(void)
 int main()
 {
   int16_t axis[3];
+  /*
+   * NOTE: LDROM may set PA11 (Power Lock) = 1 during early boot.
+   * When the Power Lock feature is compiled out (POWER_LOCK_ENABLE==0),
+   * ensure we explicitly drive PA11 low here so the board does not remain
+   * in a locked power state left by boot ROM. This mirrors the guarded
+   * behavior of PowerLock_Set/Init elsewhere but acts early in main().
+   */
+#if !POWER_LOCK_ENABLE
+  /* Configure PA11 as GPIO output and drive low regardless of POWER_LOCK_ENABLE
+     so we clear any LDROM-set lock. Use direct register ops to avoid calling
+     PowerLock_Set which is a no-op when POWER_LOCK_ENABLE==0. */
+  SYS->GPA_MFPH &= ~SYS_GPA_MFPH_PA11MFP_Msk; /* set as GPIO */
+  GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
+  PA->DOUT &= ~BIT11; /* drive low */
+#endif
 
   RL_InitSystemCore();
   RL_InitBoardInputs();

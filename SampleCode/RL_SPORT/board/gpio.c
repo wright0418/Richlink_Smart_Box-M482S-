@@ -15,14 +15,20 @@ void Gpio_Init(void)
     /* PB GPIO */
     GPIO_SetMode(PB, BIT15, GPIO_MODE_QUASI);
 
+#if USE_JUMP_DETECT
 #if !USE_GSENSOR_JUMP_DETECT
     /* HALL sensors used for jump counting: enable PB7 input and interrupt only */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
     GPIO_EnableInt(PB, 7, GPIO_INT_FALLING);
-    /* PB8 interrupt disabled */
+/* PB8 interrupt disabled */
 #else
     /* In G-Sensor mode, PB7/PB8 are not used for counting; keep as inputs but do not enable HALL interrupts */
+    GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
+    GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
+#endif
+#else
+    /* Jump detection disabled: keep PB7/PB8 as inputs and do not enable interrupts */
     GPIO_SetMode(PB, BIT7, GPIO_MODE_INPUT);
     GPIO_SetMode(PB, BIT8, GPIO_MODE_INPUT);
 #endif
@@ -77,8 +83,11 @@ static void Board_ConfigUartPins(void)
 
 static void Board_ConfigPowerPins(void)
 {
-    SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk | SYS_GPA_MFPH_PA12MFP_Msk);
+    SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA12MFP_Msk);
+#if POWER_LOCK_ENABLE
+    SYS->GPA_MFPH &= ~(SYS_GPA_MFPH_PA11MFP_Msk);
     GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
+#endif
 }
 
 void Board_ConfigWs2812SpiPin(void)
@@ -113,13 +122,18 @@ void Board_ReleaseIOPD(void)
 
 void PowerLock_Init(void)
 {
+#if POWER_LOCK_ENABLE
     /* Configure PA11 as output mode and assert lock (high). */
     GPIO_SetMode(PA, BIT11, GPIO_MODE_OUTPUT);
     PA->DOUT |= BIT11;
+#else
+    DBG_PRINT("[Power] PowerLock disabled by POWER_LOCK_ENABLE=0\n");
+#endif
 }
 
 void PowerLock_Set(uint8_t on)
 {
+#if POWER_LOCK_ENABLE
     if (on)
     {
         PA->DOUT |= BIT11;
@@ -128,6 +142,9 @@ void PowerLock_Set(uint8_t on)
     {
         PA->DOUT &= ~BIT11;
     }
+#else
+    (void)on;
+#endif
 }
 
 void USBDetect_Init(void)
@@ -173,6 +190,7 @@ void GPIO_ResetHallEdgeCount(void)
 
 void GPB_IRQHandler(void)
 {
+#if USE_JUMP_DETECT
 #if !USE_GSENSOR_JUMP_DETECT
     /* ============================================================================
      * Hall Sensor Jump Detection (PB7 only)
@@ -216,7 +234,18 @@ void GPB_IRQHandler(void)
     {
         GPIO_CLR_INT_FLAG(PB, BIT8);
     }
-#endif /* USE_GSENSOR_JUMP_DETECT */
+#endif /* !USE_GSENSOR_JUMP_DETECT */
+#else
+    /* Jump detection disabled - clear any stray flags and do not process */
+    if (GPIO_GET_INT_FLAG(PB, BIT7))
+    {
+        GPIO_CLR_INT_FLAG(PB, BIT7);
+    }
+    if (GPIO_GET_INT_FLAG(PB, BIT8))
+    {
+        GPIO_CLR_INT_FLAG(PB, BIT8);
+    }
+#endif /* USE_JUMP_DETECT */
 
     /* Button (PB15) handling - always active */
     if (GPIO_GET_INT_FLAG(PB, BIT15))

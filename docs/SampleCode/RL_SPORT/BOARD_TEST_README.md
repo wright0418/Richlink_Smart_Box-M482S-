@@ -1,182 +1,205 @@
-# RL_SPORT 板上測試指南 (UART0 測試模式)
+# RL_SPORT V3 板測指南
 
-目的
-- 提供一個透過序列埠 (UART0) 進入的互動式板上測試選單，讓 PC 測試工具可以自動或手動逐項檢查硬體周邊（LED、蜂鳴器、按鍵、HALL、G-sensor、ADC、USB、BLE）。
+此文件描述目前 `RL_SPORT` 韌體中的完整板級測試流程，內容已對齊現行 I/O 規劃與功能配置。
 
-通訊設定（PC 端）
-- Baud: 115200
-- Data: 8 bits
-- Parity: None
-- Stop: 1
-- 換行: CR 或 CRLF（按下 Enter 即可送出）
+## Power Lock 功能開關（目前設定）
 
-如何進入 UART 測試模式
-- 接上電源後於 UART0（通常對應開發板的 USB-UART）送出純文字 `test` 並以 Enter 結尾（`\r` 或 `\r\n`）。
-- 韌體會在背景輪詢 UART0，如果接收到一行等於 `test`，會切換到測試選單模式並回傳選單文字。
-- 範例：PC 傳送 `test\r` -> 板子回傳 `=== UART0 Test Mode ===` 與選單清單。
+- `SampleCode/RL_SPORT/project_config.h`
+   - `#define POWER_LOCK_ENABLE 0`
 
-測試選單與對應行為
-- 選單會顯示數字 (0-9) 選項，使用者在提示 `Select>` 後輸入數字並按 Enter。
-- 常見選項（以韌體實作為準）:
-   1) LED PB3
-     - 行為：閃爍 PB3 三次。
-     - 輸出範例：`[Test] LED PB3 blink x3`，不會有機器可解析的結果，屬人工檢查項目。
+目前專案以「實體開關機 SW」為主，不使用 PA11 Power Lock 控制。
 
-  2) Buzzer PC7
-     - 行為：播放一次 beep。
-     - 輸出範例：`[Test] Buzzer PC7 beep`。
+## 目的
 
-  3) Key PB15
-     - 行為：等待 5 秒內按下 PB15，若偵測到輸出 `Key pressed`，否則回傳 `Key TIMEOUT`。
-     - 可由 PC 驅動按鍵控制 (若具備外部按鍵控制治具)。
+`BoardTest_RunAll()` 是一套 **full board test**：
 
-  4) HALL PB7/PB8
-     - 行為：連續讀取 3 秒，偵測 PB7/PB8 變化並輸出變動值。
-     - 輸出範例：`[Test] PB7=0 PB8=1`。
+- 對齊目前實際使用的 I/O 腳位
+- 同時涵蓋
+  - **人工確認項目**：LED、Buzzer、WS2812 顯示
+  - **互動項目**：KEYA、KEYB、HALL
+  - **自動判斷項目**：Power Lock / VBUS、VDDA、IMU 6-axis
+- 可在開機自動執行，也可從 UART0 測試選單進入
 
-  5) G-sensor I2C
-     - 行為：讀取 3 組三軸資料並顯示。
-     - 輸出範例：`[Test] XYZ = 12, 34, -56`。
+## 目前板測對齊的 I/O / 功能
 
-  6) ADC PB1 (battery)
-     - 行為：讀取電池 ADC 平均值並回傳原始值與電壓。
-     - 輸出範例：`[Test] raw=1023 V=3.70V`。
+- `PB2`：Yellow LED
+- `PB3`：Green LED
+- `PB15`：KEYA
+- `PC0`：KEYB
+- `PB7` / `PB8`：HALL inputs
+- `PC7`：Buzzer
+- `PC5`：IMU interrupt input
+- `PF6`：WS2812 data (`SPI0_MOSI`)
+- `PA11`：Power Lock
+- `PA12`：USB VBUS detect
+- `PB4` / `PB5`：I2C0 (IMU)
+- `PB12` / `PB13`：UART0 測試埠
+- `PA8` / `PA9`：UART1 / BLE module
 
-  7) Run all tests
-     - 會依序執行 LED / Buzzer / Key / HALL / G-sensor / ADC 等（部分為人工檢查）。
+> 注意：目前電壓檢查不是量 `PB1` 外部 ADC，而是使用 **EADC band-gap** 反推 `VDDA`。
 
-  8) USB FS HID Mouse (auto 5s)
-     - 行為：啟動板上 USB HID Mouse 測試流程自動執行 5 秒。
-     - 輸出範例：`[Test] USB auto test done`。
+## Full Board Test 流程
 
-  9) BLE AT CMD name check
-     - 行為：切換 BLE 模組到 CMD 模式，查詢名稱並判斷回傳是否包含預期字首 `SPORT_`。
-     - 成功回傳範例：`[Test] BLE_AT_CMD PASS`。失敗會列出失敗原因。
+執行 `BoardTest_RunAll()` 時，UART0 會印出：
 
-  0) Exit
-   - 行為：離開測試模式並回到主程式循環。
+- `=== RL_SPORT V3 Board Test ===`
+- `[BT] FLOW=FULL ...`
+- 各測項結果
+- 最後摘要：`[BT] SUMMARY: PASS=x FAIL=y MANUAL=z SKIP=w`
 
-自動化測試工具要點（PC 端）
-- 先開啟序列埠 (115200 8N1)，確保能讀寫 CR 或 CRLF。
-- 步驟範例：
-   1) 傳送 `test\r`。
-   2) 等待並解析選單輸出（可使用 timeout ，例如 1s）。
-   3) 傳送選項號（例如 `9`）再加上 `\r`。
-   4) 監聽並解析測試回應；視項目不同回應可能是可解析的資料（ADC、G-sensor、HALL）或狀態字串（PASS/FAIL/TIMEOUT/MANUAL CHECK）。
+### 測項順序
 
-回應字串與格式約定
-- 所有板上測試輸出皆使用 `printf()`，會回傳可讀的 ASCII 行（以 `\n` 或 `\r\n` 結尾），常見前綴：`[Test]`、`[BT]`。
-- 自動化解析應採行為驅動（關鍵字 match）：
-   - 成功或主要資訊通常以 `PASS`、`raw=`、`V=`、`XYZ =`、`PB7=` 等關鍵字出現。
-   - 人工檢查項目會標示 `MANUAL CHECK`，需人工確認或配合外部儀器。
+1. `LED_GY`
+   - 依序顯示：Green → Yellow → Both
+   - 腳位：`PB3`, `PB2`
+   - 類型：**MANUAL**
 
-實務注意事項與硬體設定
-- 進入測試模式需要在 UART0 接收到 `test` 並送出換行；如果主程式已經大量使用 UART0 做其他工作，請在進入測試前暫停或確保序列埠交互不會被搶佔。
-- Key (PB15) 必須設為 Quasi mode（韌體預設於 `Gpio_Init()` 與 `BoardTest_GPIO_Init()` 已設定）。
-- Power Lock (PA11) 與充電行為：韌體在啟動時會偵測 USB 充電，若偵測到則會進入充電模式（不啟動遊戲），且 `PowerMgmt_ChargeModeInit()` 會在必要時將 PA11 設為可驅動狀態以釋放/控制電源鎖（實作請參考 `board/power_mgmt.c`）。若測試需要控制/驗證 power lock，請注意此腳位為輸出模式。
+2. `BUZZER_PC7`
+   - 連續播放兩個不同音高的 beep
+   - 腳位：`PC7`
+   - 類型：**MANUAL**
 
-範例 PC 測試腳本摘錄（流程摘要）
-1) 開啟 COM 與 115200 8N1
-2) 傳送 `test\r`，等待選單
-3) 傳送 `9\r` 執行 BLE 名稱檢查
-4) 監聽回應 1s：若含 `BLE_AT_CMD PASS` 表示通過，否則記錄錯誤訊息
-5) 傳送 `0\r` 離開
+3. `WS2812_PF6`
+   - 顯示：Red → Green → Blue → Rainbow
+   - 腳位：`PF6`
+   - 類型：**MANUAL**（但韌體也會檢查 refresh 是否成功）
 
-檔案與實作參考
-- 測試模式實作：`SampleCode/RL_SPORT/test_mode.c`（包含選單、每項測試函式與 BLE 測試流程）
-- GPIO 板級測試：`SampleCode/RL_SPORT/board/board_test_gpio.c`
-- 電源 / 充電檢測：`SampleCode/RL_SPORT/board/power_mgmt.c`
+4. `KEYA_PB15`
+   - 等待 `KEYA` 按下
+   - 腳位：`PB15`
+   - 類型：**PASS/FAIL**
 
-建議
-- 若要自動化全部測項，建議在硬體測試夾具上加上可控按鍵與檢測回授點（例如 LED 回讀或 ADC 閾值），以把人工檢查項目改為可自動判斷。
+5. `KEYB_PC0`
+   - 等待 `KEYB` 按下
+   - 腳位：`PC0`
+   - 類型：**PASS/FAIL**
 
-若需我幫忙：
-- 我可以補一個範例 Python/serial 腳本 (pyserial) 做完整自動測試流程範本，或將 `test_mode` 的輸出標準化為機器易解析的 JSON-like 行，您要哪一種？
+6. `HALL_PB7_PB8`
+   - 等待磁鐵或治具造成 HALL 狀態變化
+   - 腳位：`PB7`, `PB8`
+   - 類型：**PASS/FAIL**
 
-RL_SPORT V3 - Board Test Guide
-==============================
+7. `POWER_PA11_PA12`
+   - 讀取 `PA12`（VBUS）
+   - `PA11`（Power Lock）在 `POWER_LOCK_ENABLE=0` 時會標示為 disabled
+   - 類型：**SKIP**（當 `POWER_LOCK_ENABLE=0`）
 
-Overview
---------
-This board test is a quick hardware check for RL_SPORT V3.
+8. `VDDA_BG`
+   - 以 internal band-gap 量測 `VDDA`
+   - 目前判定範圍：`2.0V ~ 4.0V`
+   - 類型：**PASS/FAIL**
 
-Current test items:
+9. `IMU_I2C_PC5`
+   - 執行 6-axis static test
+   - 使用 I2C 與 IMU 裝置通訊，並列印 `PC5` 狀態
+   - 類型：**PASS/FAIL**
 
-- LED (PB3)
-- Buzzer (PC7)
-- Battery ADC (PB1 / EADC0_CH1)
-- G-sensor I2C XYZ read (3 samples)
-- Key (PB15) is optional interactive test (not in default auto sequence)
+## 判定方式
 
-Boot behavior
--------------
-- Firmware always gives one short boot beep.
-- `BoardTest_RunAll()` is optional and controlled by `BOARD_TEST_AUTORUN` in `project_config.h`:
-  - `0`: do not auto-run board test at boot (default)
-  - `1`: run board test once at boot
+### MANUAL 項目
 
-Pin mode rule (important)
--------------------------
-- PB15 uses **Quasi mode** in app flow.
-- PA11 (Power Lock) uses **Output mode** only.
+以下測項會列為 `MANUAL`，需人眼 / 人耳確認：
 
-How to run
-----------
-1. Build `SampleCode/RL_SPORT`.
-2. Connect UART0 (PB12/PB13), 115200-8-N-1.
-3. Choose one method:
-   - Set `BOARD_TEST_AUTORUN = 1` and reboot, or
-   - Call `BoardTest_RunAll()` from a debug path/test entry.
+- `LED_GY`
+- `BUZZER_PC7`
+- `WS2812_PF6`
 
-UART log format
----------------
-Board test prints simple English logs:
+### PASS / FAIL 項目
 
-- `[BT] <ITEM>: PASS`
-- `[BT] <ITEM>: FAIL - <hint>`
-- `[BT] <ITEM>: SKIP`
-- Final summary: `[BT] SUMMARY: PASS=x FAIL=y SKIP=z`
+- `KEYA_PB15`：timeout 內必須偵測到 active-low press
+- `KEYB_PC0`：timeout 內必須偵測到 active-low press
+- `HALL_PB7_PB8`：timeout 內至少要有 1 次狀態變化
+- `POWER_PA11_PA12`：
+   - `POWER_LOCK_ENABLE=1` 時：`PA11` 必須為 high，`PA12` 列印當下狀態
+   - `POWER_LOCK_ENABLE=0` 時：此項為 `SKIP`，僅列印 `PA12`
+- `VDDA_BG`：`VDDA` 必須落在 `2.0V ~ 4.0V`
+- `IMU_I2C_PC5`：6-axis static 指標需通過（含 comm fail / magnitude / stddev / gyro mean）
 
-Current PASS/FAIL criteria
---------------------------
-- `LED`: manual check (must blink 3 times)
-- `BUZZER`: manual check (must beep 2 times)
-- `POWER_LOCK`: removed from board test (not tested here)
-- `BATTERY_ADC`: battery voltage must be in 2.0V ~ 5.5V
-- `GSENSOR_I2C`: read and print XYZ values for 3 samples
-- `BLE_AT_NAME`: removed from board test (use Test Mode item `9`)
-- `KEY`: optional test item (default SKIP in quick run)
+## 如何觸發板測
 
-Operator test steps (recommended)
----------------------------------
-1. Run board test and watch UART logs.
-2. Check LED and buzzer physically.
-3. If fail appears, follow hint text directly:
-   - `BATTERY_ADC` fail: check PB1 divider and ADC path
-4. Confirm final summary has `FAIL=0`.
+### 方式 1：開機自動執行
 
-Test Mode BLE AT CMD
---------------------
-Use UART test mode item `9) BLE AT CMD name check` for BLE name query/check.
+在 `SampleCode/RL_SPORT/project_config.h`：
 
-Key test notes (PB15)
----------------------
-If key test reports pressed without pressing:
+- `#define BOARD_TEST_AUTORUN 1`
 
-1. Run test with no touch for full timeout.
-2. Measure PB15 level:
-   - idle should stay HIGH
-   - press should go LOW
-3. If unstable, check key pull-up path and board noise coupling.
+系統開機後會自動執行 `BoardTest_RunAll()`。
 
-Integration example
--------------------
-```c
-int main(void)
-{
-    SYS_Init();
-    UART_Open(UART0, 115200);
-    BoardTest_RunAll();
-    while (1) { }
-}
-```
+### 方式 2：UART0 測試選單
+
+1. 連接 `UART0`（`PB12/PB13`），115200 8N1
+2. 傳送：`test\r`
+3. 選擇：`7`
+
+`7) Run full board test`
+
+此選項現在會直接呼叫與開機相同的 `BoardTest_RunAll()`。
+
+## UART0 測試選單（目前對齊版）
+
+- `1) LED PB2/PB3`
+- `2) Buzzer PC7`
+- `3) Key KEYA(PB15) / KEYB(PC0)`
+- `4) HALL PB7/PB8`
+- `5) G-sensor I2C`
+- `6) VDDA (band-gap)`
+- `7) Run full board test`
+- `8) USB FS HID Mouse (auto 5s)`
+- `9) BLE AT CMD name check`
+- `a) WS2812 16x16 rainbow test`
+- `b) IMU 6-axis static test`
+- `0) Exit`
+
+## 延伸測項（不在 boot full board test 中）
+
+以下測項仍建議從 UART test mode / `AT+TEST=` 執行：
+
+- BLE name / MAC 檢查（UART1 / BLE 模組）
+- USB HID Mouse 測試
+- 單項 AT 自動化測試（`AT+TEST=...`）
+
+理由：
+
+- 這些項目通常需要外部主機或 BLE 模組狀態配合
+- 不適合塞進每次上電都要跑的 boot board test 主流程
+
+## 建議治具流程
+
+若是產線或板端 bring-up，建議順序如下：
+
+1. 上電開機
+2. 執行 `BoardTest_RunAll()`
+3. 人工確認：
+   - LED 顯示
+   - Buzzer 聲音
+   - WS2812 畫面
+4. 依序觸發：
+   - KEYA
+   - KEYB
+   - HALL
+5. 觀察 UART0 摘要：`FAIL=0`
+6. 需要時再進 UART test mode 執行：
+   - BLE name check
+   - USB test
+   - 單項 AT 測試
+
+## 相關檔案
+
+- 板測主流程：`SampleCode/RL_SPORT/board/board_test_gpio.c`
+- 板測 API：`SampleCode/RL_SPORT/board/board_test_gpio.h`
+- UART 測試選單：`SampleCode/RL_SPORT/test_mode.c`
+- GPIO / Power：`SampleCode/RL_SPORT/board/gpio.c`, `board/power_mgmt.c`
+- 顯示 / 蜂鳴器 / 感測器驅動：
+  - `SampleCode/RL_SPORT/drivers/led.c`
+  - `SampleCode/RL_SPORT/drivers/buzzer.c`
+  - `SampleCode/RL_SPORT/drivers/ws2812b.c`
+  - `SampleCode/RL_SPORT/drivers/gsensor.c`
+  - `SampleCode/RL_SPORT/drivers/adc.c`
+
+## 補充
+
+如果未來 I/O 再變更，請至少同步更新這 3 個地方：
+
+1. `board_test_gpio.c`
+2. `test_mode.c`
+3. 本文件 `BOARD_TEST_README.md`
